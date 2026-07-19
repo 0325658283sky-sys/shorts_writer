@@ -45,18 +45,32 @@ def _row_to_clip(row: sqlite3.Row) -> Clip:
     )
 
 
+_CLIP_COLUMNS = """
+    id, user_id, video_id, highlight_id, output_path, subtitle_style,
+    subtitle_path, subtitled_output_path, tts_mode, narration_script,
+    narration_audio_path, narrated_output_path, status, error_message, created_at, updated_at
+"""
+
+
 def get_clip_for_user(conn: sqlite3.Connection, user_id: int, clip_id: int) -> Clip | None:
     row = conn.execute(
-        """
-        SELECT id, user_id, video_id, highlight_id, output_path, subtitle_style,
-               subtitle_path, subtitled_output_path, tts_mode, narration_script,
-               narration_audio_path, narrated_output_path, status, error_message, created_at, updated_at
-        FROM clips
-        WHERE id = ? AND user_id = ?
-        """,
+        f"SELECT {_CLIP_COLUMNS} FROM clips WHERE id = ? AND user_id = ?",
         (clip_id, user_id),
     ).fetchone()
     return _row_to_clip(row) if row else None
+
+
+def list_clips_for_user(conn: sqlite3.Connection, user_id: int) -> list[Clip]:
+    rows = conn.execute(
+        f"""
+        SELECT {_CLIP_COLUMNS}
+        FROM clips
+        WHERE user_id = ?
+        ORDER BY created_at DESC, id DESC
+        """,
+        (user_id,),
+    ).fetchall()
+    return [_row_to_clip(row) for row in rows]
 
 
 def _get_highlight_for_user(conn: sqlite3.Connection, user_id: int, highlight_id: int) -> sqlite3.Row | None:

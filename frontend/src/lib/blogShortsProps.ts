@@ -1,4 +1,4 @@
-import type { BlogShortsProps, BlogShortsStyleProps } from "@new-cut/remotion/types";
+import type { BlogShortsProps, BlogShortsStyleProps, TransitionType } from "@new-cut/remotion/types";
 import type { BlogClip, Board } from "../types";
 
 const DEFAULT_BOARD_DURATION_SEC = 2.5;
@@ -11,6 +11,7 @@ const STYLE_BY_VISUAL: Record<string, BlogShortsStyleProps> = {
     header: "overlay",
     accent: "#FFE566",
     transitionSec: 0.35,
+    transitionType: "fade",
     kenBurns: true,
   },
   card_news: {
@@ -19,6 +20,7 @@ const STYLE_BY_VISUAL: Record<string, BlogShortsStyleProps> = {
     header: "card_white",
     accent: "#1f6b4a",
     transitionSec: 0.35,
+    transitionType: "fade",
     kenBurns: true,
   },
   info_dark: {
@@ -27,6 +29,7 @@ const STYLE_BY_VISUAL: Record<string, BlogShortsStyleProps> = {
     header: "info_navy",
     accent: "#7CFFB2",
     transitionSec: 0.35,
+    transitionType: "fade",
     kenBurns: true,
   },
   bold_hook: {
@@ -35,6 +38,7 @@ const STYLE_BY_VISUAL: Record<string, BlogShortsStyleProps> = {
     header: "viral_black",
     accent: "#5EF2D0",
     transitionSec: 0.25,
+    transitionType: "slide",
     kenBurns: true,
   },
 };
@@ -60,7 +64,17 @@ export function buildBlogShortsProps(options: {
     styleSubtitle,
   } = options;
   const visualStyle = blogClip.visual_style || "fullscreen";
-  const style = STYLE_BY_VISUAL[visualStyle] ?? STYLE_BY_VISUAL.fullscreen;
+  const baseStyle = STYLE_BY_VISUAL[visualStyle] ?? STYLE_BY_VISUAL.fullscreen;
+  const transitionType = (blogClip.transition_type || baseStyle.transitionType || "fade") as TransitionType;
+  const transitionSec =
+    blogClip.transition_sec != null
+      ? blogClip.transition_sec
+      : (baseStyle.transitionSec ?? DEFAULT_TRANSITION_SEC);
+  const style: BlogShortsStyleProps = {
+    ...baseStyle,
+    transitionSec,
+    transitionType,
+  };
   const resolvedTitle =
     (styleTitle !== undefined ? styleTitle : blogClip.style_title) || blogClip.blog_title || null;
   const resolvedSubtitle =
@@ -70,7 +84,8 @@ export function buildBlogShortsProps(options: {
     title: blogClip.blog_title,
     styleTitle: resolvedTitle,
     styleSubtitle: resolvedSubtitle,
-    transitionSec: style.transitionSec ?? DEFAULT_TRANSITION_SEC,
+    transitionSec,
+    transitionType,
     source: "blog_clip",
     narrationUrl: narrationUrl ?? null,
     visualStyle,

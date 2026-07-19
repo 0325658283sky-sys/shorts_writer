@@ -1111,10 +1111,15 @@ These were mentioned in the original stage plan but do not exist as separate
 endpoints in the current code (see `docs/ARCHITECTURE.md` Known Limitations):
 
 ```text
-GET /clips/{clip_id}/preview   -- use GET /clips/{clip_id} (output_path) or
-                                   GET /clips/{clip_id}/download instead
-GET /clips                     -- no "list all my clips" endpoint; clips are
-                                   only reachable through their highlight_id
-Remotion render microservice   -- evaluated Stage 25; deferred (see
-                                   docs/REMOTION_EVAL.md)
+Remotion render microservice   -- Remotion is used in-process for blog shorts;
+                                   a separate render microservice is still deferred
+                                   (see docs/REMOTION_EVAL.md / PROJECT_STATUS)
+My-voice clone/upload          -- catalog voices only (see P3 deferred)
+```
+
+### Stage 9 clip list / preview (implemented)
+
+```text
+GET /clips                     -- list all clips for the current user
+GET /clips/{clip_id}/preview   -- stream best available MP4 for in-app preview
 ```

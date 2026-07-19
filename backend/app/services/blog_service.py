@@ -199,6 +199,12 @@ def _row_to_blog_clip(row: sqlite3.Row) -> BlogClip:
         ),
         style_title=row["style_title"] if "style_title" in keys else None,
         style_subtitle=row["style_subtitle"] if "style_subtitle" in keys else None,
+        transition_sec=(
+            float(row["transition_sec"])
+            if "transition_sec" in keys and row["transition_sec"] is not None
+            else None
+        ),
+        transition_type=row["transition_type"] if "transition_type" in keys else None,
         render_spec_json=row["render_spec_json"] if "render_spec_json" in keys else None,
         created_at=row["created_at"],
         updated_at=row["updated_at"],
@@ -211,7 +217,7 @@ _BLOG_CLIP_COLUMNS = """
     progress_percent, error_message, title_candidates_json, description, hashtags_json,
     metadata_error, tts_speed, bgm_asset_id, bgm_volume, active_version_id, target_length,
     narration_language, script_model, default_voice, auto_bgm, auto_sfx, wizard_step, visual_style,
-    style_title, style_subtitle, render_spec_json, created_at, updated_at
+    style_title, style_subtitle, transition_sec, transition_type, render_spec_json, created_at, updated_at
 """
 
 
@@ -1257,8 +1263,16 @@ def update_blog_clip_visual_style(
     user_id: int,
     blog_clip_id: int,
     visual_style: str,
+    *,
+    apply_pack: bool = True,
 ) -> BlogClip:
-    from app.services.visual_style_catalog import ALLOWED_VISUAL_STYLES, normalize_visual_style
+    from app.services.audio_service import get_system_audio_by_slug
+    from app.services.tts_service import is_known_voice
+    from app.services.visual_style_catalog import (
+        ALLOWED_VISUAL_STYLES,
+        normalize_visual_style,
+        resolve_visual_style,
+    )
 
     blog_clip = get_blog_clip_for_user(conn, user_id, blog_clip_id)
     if blog_clip is None:
@@ -1271,18 +1285,90 @@ def update_blog_clip_visual_style(
             detail="visual_style must be fullscreen, card_news, info_dark, or bold_hook.",
         )
     slug = normalize_visual_style(slug)
+    style = resolve_visual_style(slug)
+    transition_sec = float(style.get("transitionSec", 0.35))
+    transition_type = str(style.get("transitionType") or "fade")
+
+    set_parts = [
+        "visual_style = ?",
+        "transition_sec = ?",
+        "transition_type = ?",
+    ]
+    params: list[Any] = [slug, transition_sec, transition_type]
+    if apply_pack:
+        bgm_slug = style.get("recommendedBgmSlug")
+        if bgm_slug:
+            bgm = get_system_audio_by_slug(conn, str(bgm_slug))
+            if bgm is not None:
+                set_parts.append("bgm_asset_id = ?")
+                params.append(bgm.id)
+                set_parts.append("auto_bgm = 1")
+        if "recommendedAutoSfx" in style:
+            set_parts.append("auto_sfx = ?")
+            params.append(1 if style.get("recommendedAutoSfx") else 0)
+        voice_id = style.get("recommendedVoice")
+        if voice_id and is_known_voice(str(voice_id)):
+            set_parts.append("default_voice = ?")
+            params.append(str(voice_id))
+    set_parts.append("updated_at = CURRENT_TIMESTAMP")
+    params.append(blog_clip_id)
     conn.execute(
-        """
-        UPDATE blog_clips
-        SET visual_style = ?, updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-        """,
-        (slug, blog_clip_id),
+        f"UPDATE blog_clips SET {', '.join(set_parts)} WHERE id = ?",
+        params,
     )
     conn.commit()
     refreshed = get_blog_clip_for_user(conn, user_id, blog_clip_id)
     if refreshed is None:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Visual style update failed.")
+    return refreshed
+
+
+def update_blog_clip_motion_settings(
+    conn: sqlite3.Connection,
+    user_id: int,
+    blog_clip_id: int,
+    *,
+    transition_sec: float | None = None,
+    transition_type: str | None = None,
+    sec_set: bool = False,
+    type_set: bool = False,
+) -> BlogClip:
+    from app.services.visual_style_catalog import ALLOWED_TRANSITION_TYPES
+
+    blog_clip = get_blog_clip_for_user(conn, user_id, blog_clip_id)
+    if blog_clip is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Blog short not found.")
+    _require_awaiting_boards_for_mutation(blog_clip)
+    if not sec_set and not type_set:
+        return blog_clip
+
+    updates: list[str] = []
+    values: list[Any] = []
+    if sec_set:
+        if transition_sec is None:
+            updates.append("transition_sec = NULL")
+        else:
+            updates.append("transition_sec = ?")
+            values.append(float(transition_sec))
+    if type_set:
+        cleaned = (transition_type or "").strip().lower() or None
+        if cleaned is not None and cleaned not in ALLOWED_TRANSITION_TYPES:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="transition_type must be fade, none, or slide.",
+            )
+        updates.append("transition_type = ?")
+        values.append(cleaned)
+    updates.append("updated_at = CURRENT_TIMESTAMP")
+    values.append(blog_clip_id)
+    conn.execute(
+        f"UPDATE blog_clips SET {', '.join(updates)} WHERE id = ?",
+        values,
+    )
+    conn.commit()
+    refreshed = get_blog_clip_for_user(conn, user_id, blog_clip_id)
+    if refreshed is None:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Motion settings update failed.")
     return refreshed
 
 

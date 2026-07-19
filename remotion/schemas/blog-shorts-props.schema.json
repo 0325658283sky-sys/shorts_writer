@@ -9,9 +9,17 @@
   "properties": {
     "blogClipId": { "type": ["integer", "null"], "minimum": 1 },
     "title": { "type": ["string", "null"] },
-    "styleTitle": { "type": ["string", "null"] },
+    "styleTitle": {
+      "type": ["string", "null"],
+      "description": "Top title. Wrap accent words in *like this*."
+    },
     "styleSubtitle": { "type": ["string", "null"] },
     "transitionSec": { "type": "number", "minimum": 0, "maximum": 2, "default": 0.35 },
+    "transitionType": {
+      "type": "string",
+      "enum": ["fade", "none", "slide"],
+      "default": "fade"
+    },
     "source": {
       "type": "string",
       "enum": ["dummy", "blog_clip"],
@@ -39,6 +47,7 @@
         },
         "accent": { "type": "string" },
         "transitionSec": { "type": "number", "minimum": 0, "maximum": 2 },
+        "transitionType": { "type": "string", "enum": ["fade", "none", "slide"] },
         "kenBurns": { "type": "boolean" }
       }
     },

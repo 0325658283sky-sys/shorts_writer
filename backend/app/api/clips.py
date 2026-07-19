@@ -7,7 +7,14 @@ from app.api.users import get_current_user
 from app.db.database import get_connection
 from app.db.models import User
 from app.db.schemas import ClipCreateRequest, ClipMetadataResponse, ClipResponse, NarrationRequest, SubtitleCreateRequest
-from app.services.clip_service import apply_clip_narration, clip_download_path, create_clip_from_highlight, create_subtitled_clip, get_clip_for_user
+from app.services.clip_service import (
+    apply_clip_narration,
+    clip_download_path,
+    create_clip_from_highlight,
+    create_subtitled_clip,
+    get_clip_for_user,
+    list_clips_for_user,
+)
 from app.services.metadata_service import get_metadata_for_clip, get_or_create_clip_metadata, metadata_hashtags, metadata_title_candidates
 
 router = APIRouter(prefix="/clips", tags=["clips"])
@@ -44,6 +51,14 @@ def _to_metadata_response(metadata) -> ClipMetadataResponse:
         created_at=metadata.created_at,
         updated_at=metadata.updated_at,
     )
+
+
+@router.get("", response_model=list[ClipResponse])
+def list_clips(
+    current_user: User = Depends(get_current_user),
+    conn: sqlite3.Connection = Depends(get_connection),
+) -> list[ClipResponse]:
+    return [_to_clip_response(clip) for clip in list_clips_for_user(conn, current_user.id)]
 
 
 @router.post("/create", response_model=ClipResponse, status_code=201)
@@ -115,6 +130,20 @@ def download_clip(
     path = clip_download_path(clip)
     suffix = "narrated" if clip.narrated_output_path else "subtitled" if clip.subtitled_output_path else "clip"
     return FileResponse(path=path, media_type="video/mp4", filename=f"new-cut-{suffix}-{clip.id}.mp4")
+
+
+@router.get("/{clip_id}/preview")
+def preview_clip(
+    clip_id: int,
+    current_user: User = Depends(get_current_user),
+    conn: sqlite3.Connection = Depends(get_connection),
+) -> FileResponse:
+    """Stream the best available MP4 for in-app preview (narrated → subtitled → raw)."""
+    clip = get_clip_for_user(conn, current_user.id, clip_id)
+    if clip is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Clip not found.")
+    path = clip_download_path(clip)
+    return FileResponse(path=path, media_type="video/mp4", filename=f"new-cut-preview-{clip.id}.mp4")
 
 
 @router.get("/{clip_id}", response_model=ClipResponse)

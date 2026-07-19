@@ -7,6 +7,18 @@ Blog → shorts Remotion compositions.
 - R2: `@remotion/player` in frontend `BoardEditor` (same `BlogShorts` component)
 - R3: `npm run service` sidecar — FastAPI `BLOG_RENDER_ENGINE=remotion` calls `POST /render`
 
+## Style / transition smoke (no TTS)
+
+After changing visual styles, transitions, or catalog packs, encode short dummy clips:
+
+```powershell
+cd remotion
+npm run smoke-styles
+# → out/smoke/{fullscreen-fade,card_news-fade,info_dark-fade,bold_hook-slide,fullscreen-none}.mp4
+```
+
+This covers all four `visualStyle` presets plus `transitionType=none`. Full product render (TTS+BGM pack audio) still goes through `npm run service` + `POST /blog-clips/{id}/render`.
+
 ## Render service (R3)
 
 From repo root (starts remotion + API + Vite):

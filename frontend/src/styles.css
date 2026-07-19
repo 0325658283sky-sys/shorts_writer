@@ -459,8 +459,13 @@ textarea:focus {
   border-radius: 8px;
   background: var(--surface-2);
   border: 1px solid var(--line);
+  font: inherit;
   font-size: 13px;
   color: var(--ink-soft);
+}
+
+button.usage-chip {
+  cursor: pointer;
 }
 
 .usage-chip strong {
@@ -473,6 +478,129 @@ textarea:focus {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.usage-panel {
+  display: grid;
+  gap: 16px;
+  padding: 8px 0 24px;
+}
+
+.usage-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.usage-summary > div {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  background: var(--surface-2, #f4f6f5);
+  border-radius: 12px;
+}
+
+.usage-summary span {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.usage-summary strong {
+  font-size: 18px;
+}
+
+.usage-remaining-low {
+  color: #b45309;
+}
+
+.usage-note {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.plans-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+.plan-tile {
+  padding: 14px;
+  border: 1px solid var(--line, #d7e0da);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.plan-tile.active-plan {
+  border-color: var(--accent, #1f6b4a);
+  background: rgba(31, 107, 74, 0.06);
+}
+
+.plan-tile > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.plan-tile p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.clips-library {
+  display: grid;
+  gap: 16px;
+}
+
+.clips-library-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.clips-library-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--line, #d7e0da);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.clips-library-item > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.clips-library-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.clips-preview {
+  display: grid;
+  gap: 8px;
+}
+
+.clips-preview video {
+  width: min(360px, 100%);
+  border-radius: 12px;
+  background: #000;
+}
+
+.board-list-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
 }
 
 .studio-main {
@@ -1259,12 +1387,45 @@ button.flow-stepper-item:hover {
   height: 100%;
   border-radius: 999px;
   background: linear-gradient(90deg, var(--accent), #1aa6a0);
-  transition: width 0.4s ease;
+  transition: width 0.45s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.blog-progress-track.is-active {
+  background: #dce6e0;
+}
+
+.blog-progress-fill.is-alive::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    110deg,
+    transparent 20%,
+    rgba(255, 255, 255, 0.45) 45%,
+    transparent 70%
+  );
+  background-size: 200% 100%;
+  animation: progress-shimmer 1.4s linear infinite;
+}
+
+@keyframes progress-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
 }
 
 .blog-progress-label {
   color: var(--muted);
   font-size: 13px;
+}
+
+.blog-progress-hint {
+  color: var(--accent, #1f6b4a);
 }
 
 .flow-images-card {
@@ -1418,6 +1579,43 @@ button.flow-stepper-item:hover {
   font-size: 10px;
   font-weight: 700;
   vertical-align: middle;
+}
+
+.style-pack-hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--accent, #1f6b4a);
+}
+
+.motion-settings {
+  margin: 12px 0 18px;
+  padding: 12px 0;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.motion-settings-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 12px;
+}
+
+.motion-chip {
+  border: 1px solid #c9d4ce;
+  background: #fff;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.motion-chip.is-selected {
+  border-color: var(--accent, #1f6b4a);
+  background: rgba(31, 107, 74, 0.08);
+  color: var(--accent, #1f6b4a);
+  font-weight: 600;
 }
 
 .style-copy-field {

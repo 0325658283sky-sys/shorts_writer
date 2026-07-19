@@ -10,7 +10,7 @@ import {
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
-import type { BlogBoardProps, BlogShortsProps, BlogShortsStyleProps } from "./types";
+import type { BlogBoardProps, BlogShortsProps, BlogShortsStyleProps, TransitionType } from "./types";
 
 const FPS = 30;
 export const BLOG_SHORTS_WIDTH = 1080;
@@ -23,6 +23,7 @@ const STYLE_BY_VISUAL: Record<string, BlogShortsStyleProps> = {
     header: "overlay",
     accent: "#FFE566",
     transitionSec: 0.35,
+    transitionType: "fade",
     kenBurns: true,
   },
   card_news: {
@@ -31,6 +32,7 @@ const STYLE_BY_VISUAL: Record<string, BlogShortsStyleProps> = {
     header: "card_white",
     accent: "#1f6b4a",
     transitionSec: 0.35,
+    transitionType: "fade",
     kenBurns: true,
   },
   info_dark: {
@@ -39,6 +41,7 @@ const STYLE_BY_VISUAL: Record<string, BlogShortsStyleProps> = {
     header: "info_navy",
     accent: "#7CFFB2",
     transitionSec: 0.35,
+    transitionType: "fade",
     kenBurns: true,
   },
   bold_hook: {
@@ -47,9 +50,36 @@ const STYLE_BY_VISUAL: Record<string, BlogShortsStyleProps> = {
     header: "viral_black",
     accent: "#5EF2D0",
     transitionSec: 0.25,
+    transitionType: "slide",
     kenBurns: true,
   },
 };
+
+/** Parse `*accent*` markers in title text into colored spans. */
+export function AccentTitle({
+  text,
+  accent,
+  baseColor,
+}: {
+  text: string;
+  accent: string;
+  baseColor: string;
+}) {
+  const parts = text.split(/(\*[^*]+\*)/g).filter(Boolean);
+  return (
+    <>
+      {parts.map((part, index) => {
+        const marked = part.startsWith("*") && part.endsWith("*") && part.length > 2;
+        const content = marked ? part.slice(1, -1) : part;
+        return (
+          <span key={`${index}-${content}`} style={{ color: marked ? accent : baseColor }}>
+            {content}
+          </span>
+        );
+      })}
+    </>
+  );
+}
 
 /** Resolve API/http URLs or remotion/public-relative paths for <Img>. */
 export function resolveBoardImageSrc(imageUrl?: string | null): string | undefined {
@@ -74,6 +104,7 @@ function resolveStyle(props: BlogShortsProps): BlogShortsStyleProps {
       header: props.style.header ?? "none",
       accent: props.style.accent ?? "#FFE566",
       transitionSec: props.style.transitionSec ?? props.transitionSec ?? 0.35,
+      transitionType: props.style.transitionType ?? props.transitionType ?? "fade",
       kenBurns: props.style.kenBurns ?? true,
     };
   }
@@ -139,7 +170,7 @@ function StyleHeader({
             letterSpacing: "-0.03em",
           }}
         >
-          {title}
+          <AccentTitle text={title} accent={accent} baseColor="#151515" />
         </div>
         {subtitle?.trim() ? (
           <div
@@ -182,7 +213,7 @@ function StyleHeader({
             letterSpacing: "-0.02em",
           }}
         >
-          {title}
+          <AccentTitle text={title} accent={accent} baseColor="#ffffff" />
         </div>
         {subtitle?.trim() ? (
           <div
@@ -224,7 +255,7 @@ function StyleHeader({
             letterSpacing: "-0.03em",
           }}
         >
-          {title}
+          <AccentTitle text={title} accent={accent} baseColor="#ffffff" />
         </div>
         {subtitle?.trim() ? (
           <div
@@ -257,7 +288,9 @@ function StyleHeader({
         textShadow: "0 2px 14px rgba(0,0,0,0.55)",
       }}
     >
-      <div style={{ fontSize: 44, fontWeight: 900, lineHeight: 1.25, letterSpacing: "-0.02em" }}>{title}</div>
+      <div style={{ fontSize: 44, fontWeight: 900, lineHeight: 1.25, letterSpacing: "-0.02em" }}>
+        <AccentTitle text={title} accent={accent} baseColor="#ffffff" />
+      </div>
       {subtitle?.trim() ? (
         <div style={{ marginTop: 10, fontSize: 32, fontWeight: 700, color: accent }}>{subtitle}</div>
       ) : null}
@@ -525,8 +558,13 @@ function BoardScene({
 
 export const BlogShorts: React.FC<BlogShortsProps> = (props) => {
   const style = resolveStyle(props);
-  const transitionSec = props.transitionSec ?? style.transitionSec ?? 0.35;
-  const transitionFrames = boardFrames(transitionSec);
+  const transitionType: TransitionType = props.transitionType ?? style.transitionType ?? "fade";
+  const transitionSec =
+    transitionType === "none" ? 0 : (props.transitionSec ?? style.transitionSec ?? 0.35);
+  const transitionFrames =
+    transitionType === "none" || transitionSec <= 0
+      ? 0
+      : Math.max(1, Math.round(transitionSec * FPS));
   const boards = props.boards ?? [];
   const styleTitle = props.styleTitle ?? props.title ?? null;
   const styleSubtitle = props.styleSubtitle ?? null;
@@ -543,12 +581,16 @@ export const BlogShorts: React.FC<BlogShortsProps> = (props) => {
     boards.forEach((board, index) => {
       const spoken = boardFrames(board.durationSec);
       const overlap =
-        index < boards.length - 1 ? Math.min(transitionFrames, Math.max(0, spoken - 1)) : 0;
+        transitionType === "none" || transitionFrames <= 0
+          ? 0
+          : index < boards.length - 1
+            ? Math.min(transitionFrames, Math.max(0, spoken - 1))
+            : 0;
       items.push({ board, from: cursor, duration: spoken + overlap, spoken, index });
       cursor += spoken;
     });
     return items;
-  }, [boards, transitionFrames]);
+  }, [boards, transitionFrames, transitionType]);
 
   const narrationSrc = resolveBoardImageSrc(props.narrationUrl);
 
@@ -562,6 +604,7 @@ export const BlogShorts: React.FC<BlogShortsProps> = (props) => {
             styleTitle={styleTitle}
             styleSubtitle={styleSubtitle}
             transitionFrames={transitionFrames}
+            transitionType={transitionType}
             spokenFrames={spoken}
             isFirst={index === 0}
             isLast={index === timeline.length - 1}
@@ -578,6 +621,7 @@ function FadingBoard({
   styleTitle,
   styleSubtitle,
   transitionFrames,
+  transitionType,
   spokenFrames,
   isFirst,
   isLast,
@@ -587,6 +631,7 @@ function FadingBoard({
   styleTitle?: string | null;
   styleSubtitle?: string | null;
   transitionFrames: number;
+  transitionType: TransitionType;
   spokenFrames: number;
   isFirst: boolean;
   isLast: boolean;
@@ -595,28 +640,53 @@ function FadingBoard({
   const frame = useCurrentFrame();
   const { durationInFrames } = useVideoConfig();
 
-  const fadeIn = isFirst
-    ? 1
-    : interpolate(frame, [0, transitionFrames], [0, 1], {
-        extrapolateLeft: "clamp",
-        extrapolateRight: "clamp",
-      });
-  const fadeOut = isLast
-    ? 1
-    : interpolate(
-        frame,
-        [durationInFrames - transitionFrames, durationInFrames],
-        [1, 0],
-        {
+  const fadeIn =
+    isFirst || transitionType === "none" || transitionFrames <= 0
+      ? 1
+      : interpolate(frame, [0, transitionFrames], [0, 1], {
           extrapolateLeft: "clamp",
           extrapolateRight: "clamp",
-        },
-      );
+        });
+  const fadeOut =
+    isLast || transitionType === "none" || transitionFrames <= 0
+      ? 1
+      : interpolate(
+          frame,
+          [durationInFrames - transitionFrames, durationInFrames],
+          [1, 0],
+          {
+            extrapolateLeft: "clamp",
+            extrapolateRight: "clamp",
+          },
+        );
+
+  const slideIn =
+    transitionType !== "slide" || isFirst || transitionFrames <= 0
+      ? 0
+      : interpolate(frame, [0, transitionFrames], [72, 0], {
+          extrapolateLeft: "clamp",
+          extrapolateRight: "clamp",
+        });
+  const slideOut =
+    transitionType !== "slide" || isLast || transitionFrames <= 0
+      ? 0
+      : interpolate(
+          frame,
+          [durationInFrames - transitionFrames, durationInFrames],
+          [0, -72],
+          {
+            extrapolateLeft: "clamp",
+            extrapolateRight: "clamp",
+          },
+        );
 
   const showCaption = frame < spokenFrames;
+  const opacity = transitionType === "none" ? 1 : Math.min(fadeIn, fadeOut);
+  const transform =
+    transitionType === "slide" ? `translateX(${slideIn + slideOut}px)` : undefined;
 
   return (
-    <AbsoluteFill style={{ opacity: Math.min(fadeIn, fadeOut) }}>
+    <AbsoluteFill style={{ opacity, transform }}>
       <BoardScene
         board={board}
         styleTitle={styleTitle}

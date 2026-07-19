@@ -68,7 +68,10 @@ export function VideoStyleStep({
     <section className="flow-card">
       <p className="create-kicker">퀵 모드 · 영상 스타일</p>
       <h1>영상 스타일을 선택해 주세요</h1>
-      <p className="flow-lead">상단 타이틀·보조설명을 정한 뒤 스타일을 고르면 보이스 설정으로 이어갑니다.</p>
+      <p className="flow-lead">
+        상단 타이틀·보조설명을 정한 뒤 스타일을 고르면 추천 보이스·BGM이 함께 적용되고, 보이스 설정으로 이어갑니다.
+        강조 단어는 <code>*이렇게*</code> 감싸세요.
+      </p>
 
       <label className="style-copy-field">
         상단 타이틀
@@ -77,7 +80,7 @@ export function VideoStyleStep({
           value={titleDraft}
           disabled={saving}
           onChange={(event) => setTitleDraft(event.target.value)}
-          placeholder="예: 밀양 숨겨진 숙소 추천"
+          placeholder="예: 밀양 *숨겨진* 숙소 추천"
         />
       </label>
       <label className="style-copy-field">
@@ -113,6 +116,7 @@ export function VideoStyleStep({
             </div>
             <strong>{style.label}</strong>
             <span className="muted">{style.description}</span>
+            {style.packHint ? <span className="style-pack-hint">팩: {style.packHint}</span> : null}
           </button>
         ))}
       </div>

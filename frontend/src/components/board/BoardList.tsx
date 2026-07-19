@@ -9,6 +9,7 @@ export function BoardList({
   onSelect,
   onDelete,
   onAdd,
+  onAddIntro,
   onMove,
   onReorder,
   adding,
@@ -19,6 +20,7 @@ export function BoardList({
   onSelect: (boardId: number) => void;
   onDelete: (boardId: number) => void;
   onAdd: () => void;
+  onAddIntro: () => void;
   onMove: (boardId: number, direction: -1 | 1) => void;
   onReorder: (fromId: number, toId: number) => void;
   adding: boolean;
@@ -57,9 +59,14 @@ export function BoardList({
           />
         ))}
       </ul>
-      <button className="small-button" type="button" onClick={onAdd} disabled={adding}>
-        {adding ? "추가 중" : "+ 보드 추가"}
-      </button>
+      <div className="board-list-actions">
+        <button className="small-button" type="button" onClick={onAddIntro} disabled={adding}>
+          {adding ? "추가 중" : "+ 인트로"}
+        </button>
+        <button className="small-button" type="button" onClick={onAdd} disabled={adding}>
+          {adding ? "추가 중" : "+ 보드 추가"}
+        </button>
+      </div>
     </aside>
   );
 }

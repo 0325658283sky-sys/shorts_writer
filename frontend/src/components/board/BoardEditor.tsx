@@ -37,6 +37,7 @@ export function BoardEditor({
   const [visualStyle, setVisualStyle] = useState(blogClip.visual_style || "fullscreen");
   const [applyingVisualStyle, setApplyingVisualStyle] = useState(false);
   const [savingStyleCopy, setSavingStyleCopy] = useState(false);
+  const [savingMotion, setSavingMotion] = useState(false);
   const [bgmAssetId, setBgmAssetId] = useState<number | null>(blogClip.bgm_asset_id ?? null);
   const [bgmVolume, setBgmVolume] = useState(blogClip.bgm_volume ?? 0.3);
   const [audioSaving, setAudioSaving] = useState(false);
@@ -188,6 +189,37 @@ export function BoardEditor({
     }
   }
 
+  async function handleAddIntro() {
+    const imagePath = boards[0]?.image_path ?? selectedBoard?.image_path ?? imagePathPool[0];
+    if (!imagePath) {
+      setError("인트로에 쓸 이미지를 찾을 수 없습니다.");
+      return;
+    }
+    const rawTitle = (clip.style_title || clip.blog_title || "인트로").trim();
+    const introText = rawTitle.replace(/\*([^*]+)\*/g, "$1");
+    setAdding(true);
+    setError("");
+    try {
+      const created = await authorizedRequest<Board>(`/blog-clips/${blogClip.id}/boards`, {
+        method: "POST",
+        body: JSON.stringify({
+          image_path: imagePath,
+          text: introText,
+          order_index: 0,
+        }),
+      });
+      const loaded = await authorizedRequest<Board[]>(`/blog-clips/${blogClip.id}/boards`);
+      setBoards(loaded);
+      rememberImagePaths(loaded);
+      setSelectedBoardId(created.id);
+      onMessage("맨 앞에 인트로 보드를 추가했습니다.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "인트로 보드 추가에 실패했습니다.");
+    } finally {
+      setAdding(false);
+    }
+  }
+
   async function handleDelete(boardId: number) {
     setError("");
     try {
@@ -282,12 +314,13 @@ export function BoardEditor({
     try {
       const updated = await authorizedRequest<BlogClip>(`/blog-clips/${blogClip.id}/visual-style`, {
         method: "PATCH",
-        body: JSON.stringify({ visual_style: nextStyle }),
+        body: JSON.stringify({ visual_style: nextStyle, apply_pack: true }),
       });
       setVisualStyle(updated.visual_style || nextStyle);
+      setBgmAssetId(updated.bgm_asset_id ?? null);
       setClip(updated);
       onClipUpdated?.(updated);
-      onMessage("영상 스타일을 적용했습니다.");
+      onMessage("영상 스타일과 추천 오디오 팩을 적용했습니다.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "영상 스타일 적용에 실패했습니다.");
       throw err;
@@ -311,6 +344,27 @@ export function BoardEditor({
       throw err;
     } finally {
       setSavingStyleCopy(false);
+    }
+  }
+
+  async function handleMotionChange(body: {
+    transition_sec?: number;
+    transition_type?: "fade" | "none" | "slide";
+  }) {
+    setSavingMotion(true);
+    setError("");
+    try {
+      const updated = await authorizedRequest<BlogClip>(`/blog-clips/${blogClip.id}/motion-settings`, {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      });
+      setClip(updated);
+      onClipUpdated?.(updated);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "전환 설정 저장에 실패했습니다.");
+      throw err;
+    } finally {
+      setSavingMotion(false);
     }
   }
 
@@ -453,6 +507,7 @@ export function BoardEditor({
             onSelect={selectBoard}
             onDelete={handleDelete}
             onAdd={handleAdd}
+            onAddIntro={handleAddIntro}
             onMove={handleMove}
             onReorder={handleReorder}
             adding={adding}
@@ -484,10 +539,14 @@ export function BoardEditor({
             appliedVisualStyle={visualStyle}
             styleTitle={clip.style_title ?? clip.blog_title}
             styleSubtitle={clip.style_subtitle}
+            transitionSec={clip.transition_sec}
+            transitionType={clip.transition_type}
             onApplyVisualStyle={handleApplyVisualStyle}
             onStyleCopyChange={handleStyleCopyChange}
+            onMotionChange={handleMotionChange}
             applyingVisualStyle={applyingVisualStyle}
             savingStyleCopy={savingStyleCopy}
+            savingMotion={savingMotion}
             onMessage={onMessage}
             bgmAssetId={bgmAssetId}
             bgmVolume={bgmVolume}

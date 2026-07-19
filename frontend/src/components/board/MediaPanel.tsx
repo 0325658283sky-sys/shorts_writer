@@ -42,10 +42,14 @@ export function MediaPanel({
   appliedVisualStyle,
   styleTitle,
   styleSubtitle,
+  transitionSec,
+  transitionType,
   onApplyVisualStyle,
   onStyleCopyChange,
+  onMotionChange,
   applyingVisualStyle,
   savingStyleCopy,
+  savingMotion,
   onMessage,
   bgmAssetId,
   bgmVolume,
@@ -71,10 +75,17 @@ export function MediaPanel({
   appliedVisualStyle?: string | null;
   styleTitle?: string | null;
   styleSubtitle?: string | null;
+  transitionSec?: number | null;
+  transitionType?: string | null;
   onApplyVisualStyle: (style: string) => Promise<void>;
   onStyleCopyChange: (body: { style_title?: string; style_subtitle?: string }) => Promise<void>;
+  onMotionChange: (body: {
+    transition_sec?: number;
+    transition_type?: "fade" | "none" | "slide";
+  }) => Promise<void>;
   applyingVisualStyle: boolean;
   savingStyleCopy: boolean;
+  savingMotion: boolean;
   onMessage: (message: string) => void;
   bgmAssetId: number | null;
   bgmVolume: number;
@@ -375,10 +386,14 @@ export function MediaPanel({
           appliedStyle={appliedVisualStyle}
           styleTitle={styleTitle}
           styleSubtitle={styleSubtitle}
+          transitionSec={transitionSec}
+          transitionType={transitionType}
           onApply={onApplyVisualStyle}
           onStyleCopyChange={onStyleCopyChange}
+          onMotionChange={onMotionChange}
           applying={applyingVisualStyle}
           savingCopy={savingStyleCopy}
+          savingMotion={savingMotion}
           onMessage={onMessage}
         />
       ) : null}

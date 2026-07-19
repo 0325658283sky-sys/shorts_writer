@@ -10,7 +10,11 @@ from fastapi import HTTPException, status
 
 from app.core.config import settings
 from app.db.models import BlogClip, BlogClipBoard
-from app.services.visual_style_catalog import normalize_visual_style, remotion_style_payload
+from app.services.visual_style_catalog import (
+    normalize_transition_type,
+    normalize_visual_style,
+    remotion_style_payload,
+)
 
 DEFAULT_BOARD_DURATION_SEC = 2.5
 DEFAULT_TRANSITION_SEC = 0.35
@@ -169,12 +173,24 @@ def _props_from_boards(
     style_subtitle = (getattr(blog_clip, "style_subtitle", None) or "").strip() or None
     visual_style = normalize_visual_style(getattr(blog_clip, "visual_style", None))
     style = remotion_style_payload(visual_style)
+    clip_transition = getattr(blog_clip, "transition_sec", None)
+    transition_sec = (
+        float(clip_transition)
+        if clip_transition is not None
+        else float(style.get("transitionSec", DEFAULT_TRANSITION_SEC))
+    )
+    clip_type = getattr(blog_clip, "transition_type", None)
+    transition_type = normalize_transition_type(
+        clip_type if clip_type else style.get("transitionType")
+    )
+    style = {**style, "transitionSec": transition_sec, "transitionType": transition_type}
     return {
         "blogClipId": blog_clip.id,
         "title": title,
         "styleTitle": style_title,
         "styleSubtitle": style_subtitle,
-        "transitionSec": float(style.get("transitionSec", DEFAULT_TRANSITION_SEC)),
+        "transitionSec": transition_sec,
+        "transitionType": transition_type,
         "source": "blog_clip",
         "narrationUrl": narration_url,
         "visualStyle": visual_style,

@@ -5,6 +5,8 @@ from __future__ import annotations
 from typing import Any
 
 DEFAULT_VISUAL_STYLE = "fullscreen"
+ALLOWED_TRANSITION_TYPES = frozenset({"fade", "none", "slide"})
+DEFAULT_TRANSITION_TYPE = "fade"
 
 VISUAL_STYLES: dict[str, dict[str, Any]] = {
     "fullscreen": {
@@ -18,7 +20,12 @@ VISUAL_STYLES: dict[str, dict[str, Any]] = {
         "header": "overlay",
         "accent": "#FFE566",
         "transitionSec": 0.35,
+        "transitionType": "fade",
         "kenBurns": True,
+        "packHint": "브라이트 BGM · 전환 SFX",
+        "recommendedVoice": "alloy",
+        "recommendedBgmSlug": "bright_lift",
+        "recommendedAutoSfx": True,
     },
     "card_news": {
         "slug": "card_news",
@@ -31,7 +38,12 @@ VISUAL_STYLES: dict[str, dict[str, Any]] = {
         "header": "card_white",
         "accent": "#1f6b4a",
         "transitionSec": 0.35,
+        "transitionType": "fade",
         "kenBurns": True,
+        "packHint": "소프트 패드 BGM",
+        "recommendedVoice": "nova",
+        "recommendedBgmSlug": "soft_pad",
+        "recommendedAutoSfx": False,
     },
     "info_dark": {
         "slug": "info_dark",
@@ -44,7 +56,12 @@ VISUAL_STYLES: dict[str, dict[str, Any]] = {
         "header": "info_navy",
         "accent": "#7CFFB2",
         "transitionSec": 0.35,
+        "transitionType": "fade",
         "kenBurns": True,
+        "packHint": "칼름 드론 BGM",
+        "recommendedVoice": "onyx",
+        "recommendedBgmSlug": "calm_drone",
+        "recommendedAutoSfx": False,
     },
     "bold_hook": {
         "slug": "bold_hook",
@@ -57,7 +74,12 @@ VISUAL_STYLES: dict[str, dict[str, Any]] = {
         "header": "viral_black",
         "accent": "#5EF2D0",
         "transitionSec": 0.25,
+        "transitionType": "slide",
         "kenBurns": True,
+        "packHint": "프로모 펄스 · 전환 SFX · 슬라이드",
+        "recommendedVoice": "shimmer",
+        "recommendedBgmSlug": "promo_pulse",
+        "recommendedAutoSfx": True,
     },
 }
 
@@ -74,6 +96,12 @@ def normalize_visual_style(slug: str | None) -> str:
     return DEFAULT_VISUAL_STYLE
 
 
+def normalize_transition_type(value: str | None) -> str:
+    if value and value in ALLOWED_TRANSITION_TYPES:
+        return value
+    return DEFAULT_TRANSITION_TYPE
+
+
 def resolve_visual_style(slug: str | None) -> dict[str, Any]:
     return dict(VISUAL_STYLES[normalize_visual_style(slug)])
 
@@ -86,5 +114,6 @@ def remotion_style_payload(slug: str | None) -> dict[str, Any]:
         "header": style["header"],
         "accent": style["accent"],
         "transitionSec": style["transitionSec"],
+        "transitionType": style.get("transitionType", DEFAULT_TRANSITION_TYPE),
         "kenBurns": style["kenBurns"],
     }

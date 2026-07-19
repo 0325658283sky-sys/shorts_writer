@@ -139,14 +139,20 @@ Stages 17–24 APIs.
 
 ### Remaining backlog (2026-07-20)
 
-**P1 UX:** progress bar “alive” feel; voice default/empty-selection copy;
-style preview fidelity.
+**P1 UX (done):** soft-crawl progress bar + shimmer (`AliveProgressBar`);
+Quick voice auto-default + empty-selection copy; style-preview SVGs closer
+to Remotion headers.
 
-**P2 style:** transition type/duration UI; full style packs; custom templates;
-per-word accent colors in titles.
+**P2 style (done, thin):** clip `transition_sec`/`transition_type` + UI
+(fade|slide|none); catalog style packs apply recommended voice/BGM/SFX on
+style select; title `*accent*` words in Remotion headers. Deferred: user
+custom visual templates.
 
-**P3 product/ops:** credits UI, my-voice, intro board; Stage 9 clip
-list/preview; pytest; deploy/multi-user (`DEPLOYMENT.md`).
+**P3 product/ops (partial):** UsagePanel nav + remaining chip; `GET /clips`
++ `/preview` + Projects「클립」탭; BoardEditor「+ 인트로」; pytest
+(usage/style/remotion_props/blog_service) + optional CI workflow. Deferred:
+my-voice clone/upload, Stripe/credits ledger, multi-user deploy
+(`DEPLOYMENT.md`).
 
 ## Branching
 
@@ -661,12 +667,9 @@ frontend build, specifically looking for defects before calling the MVP done.
 
 ### Known gaps vs. the original 13-stage plan (not bugs, just scope not built)
 
-- `GET /clips/{clip_id}/preview` and `GET /clips` (list-all-my-clips) from the
-  original Stage 9 plan were never implemented as separate endpoints. Preview
-  today works implicitly through `GET /clips/{clip_id}` (which returns
-  `output_path`) or by downloading via `GET /clips/{clip_id}/download`. There
-  is no single endpoint that lists every clip a user has ever created — the
-  frontend only shows clips attached to highlights currently loaded in memory.
+- Stage 9 clip gaps closed (thin): `GET /clips` lists the user's clips;
+  `GET /clips/{clip_id}/preview` streams the best available MP4; Projects
+  「클립」탭 uses both.
 
 ### Known gaps in the blog-clip feature (see "Roadmap" below for the plan)
 
@@ -723,8 +726,10 @@ POST /clips/create
 POST /clips/{clip_id}/subtitles
 POST /clips/{clip_id}/metadata
 POST /clips/{clip_id}/narration
+GET /clips
 GET /clips/{clip_id}/metadata
 GET /clips/{clip_id}
+GET /clips/{clip_id}/preview
 GET /clips/{clip_id}/download
 ```
 
@@ -800,13 +805,17 @@ between "runs on my PC" and "runs as a real hosted service."
 
 ## Recommended Next Steps
 
-1. P1 UX: progress bar liveness; voice empty-selection behavior/copy.
-2. Keep end-to-end blog-shorts Remotion renders verified after style changes
-   (Typecast/OpenAI TTS + BGM path).
-3. Add automated tests (pytest around blog/remotion props services).
-4. Decide Stage 9 gaps: `GET /clips` list + preview, or drop from scope.
-5. When multi-user hosting matters: `docs/DEPLOYMENT.md` (DB/storage/queue)
+1. Optional later: my-voice clone/upload; user custom visual templates.
+2. When multi-user hosting matters: `docs/DEPLOYMENT.md` (DB/storage/queue)
    before payments/credits.
+
+Pytest/CI: `backend/tests` covers usage, visual-style catalog, remotion props,
+and blog_service helpers/mutations. Optional CI: `.github/workflows/backend-tests.yml`
+(runs on `backend/**` changes).
+
+Remotion style smoke (visual E2E, no TTS): from `remotion/`,
+`npm run smoke-styles` → `out/smoke/*.mp4` (4 styles + `none` transition).
+Full audio pipeline still needs sidecar + `POST /blog-clips/{id}/render`.
 
 ## Roadmap: Blog Clips -> SuperShorts-Level Product
 

@@ -9,6 +9,7 @@ import {
 } from "../constants";
 import type { BlogClip, ScriptTone, SubtitleStyle, VisualStyleSlug, WizardBoardsStep } from "../types";
 import { parseWizardBoardsStep } from "../types";
+import { AliveProgressBar } from "./AliveProgressBar";
 import { BlogClipCard } from "./BlogClipCard";
 import { ImageSelectStep } from "./ImageSelectStep";
 import { QuickSettingsStep } from "./QuickSettingsStep";
@@ -219,12 +220,12 @@ export function BlogClipFlow({
                   : "글을 읽고 이미지 후보와 대본을 준비하는 중입니다."}
               </p>
               <div className="flow-progress">
-                <div className="blog-progress-track">
-                  <div className="blog-progress-fill" style={{ width: `${blogClip.progress_percent}%` }} />
-                </div>
-                <span className="blog-progress-label">
-                  {stageLabel} · {blogClip.progress_percent}%
-                </span>
+                <AliveProgressBar
+                  className="blog-progress"
+                  percent={blogClip.progress_percent}
+                  active={isProgress}
+                  label={stageLabel}
+                />
               </div>
               <p className="create-note flow-url">{blogClip.source_url}</p>
             </section>

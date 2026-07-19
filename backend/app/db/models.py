@@ -208,6 +208,8 @@ class BlogClip:
     visual_style: str
     style_title: str | None
     style_subtitle: str | None
+    transition_sec: float | None
+    transition_type: str | None
     render_spec_json: str | None
     created_at: str
     updated_at: str

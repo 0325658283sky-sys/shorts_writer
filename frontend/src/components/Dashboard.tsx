@@ -17,8 +17,9 @@ import type {
 } from "../types";
 import { CreateStudio, type CreateSource } from "./CreateStudio";
 import { ProjectsPage } from "./ProjectsPage";
+import { UsagePanel } from "./UsagePanel";
 
-type StudioNav = "create" | "projects";
+type StudioNav = "create" | "projects" | "usage";
 
 export function Dashboard({
   user,
@@ -163,13 +164,27 @@ export function Dashboard({
                 <span className="studio-nav-count">{blogClips.length + videos.length}</span>
               ) : null}
             </button>
+            <button
+              type="button"
+              className={`studio-nav-link ${nav === "usage" ? "is-active" : ""}`}
+              onClick={() => setNav("usage")}
+            >
+              사용량
+            </button>
           </nav>
         </div>
         <div className="studio-topbar-meta">
-          <div className="usage-chip" title={activePlan?.name}>
+          <button
+            type="button"
+            className="usage-chip"
+            title={activePlan?.name}
+            onClick={() => setNav("usage")}
+          >
             <span>{usage?.plan_name ?? "요금제"}</span>
-            <strong>{usage ? `${usage.monthly_usage}/${usage.usage_limit}` : "—"}</strong>
-          </div>
+            <strong>
+              {usage ? `${usage.remaining}남음` : "—"}
+            </strong>
+          </button>
           <span className="account-chip">{user.email}</span>
           <button className="btn-ghost" type="button" onClick={onLogout}>
             로그아웃
@@ -210,7 +225,8 @@ export function Dashboard({
               </p>
             ) : null}
           </>
-        ) : (
+        ) : null}
+        {nav === "projects" ? (
           <>
             {uploadMessage ? (
               <p className="studio-toast" role="status">
@@ -251,7 +267,8 @@ export function Dashboard({
               onTtsModeChange={onTtsModeChange}
             />
           </>
-        )}
+        ) : null}
+        {nav === "usage" ? <UsagePanel usage={usage} plans={plans} /> : null}
       </main>
     </div>
   );

@@ -331,7 +331,7 @@ export function App() {
     try {
       let updated = await authorizedRequest<BlogClip>(`/blog-clips/${blogClip.id}/visual-style`, {
         method: "PATCH",
-        body: JSON.stringify({ visual_style: visualStyle }),
+        body: JSON.stringify({ visual_style: visualStyle, apply_pack: true }),
       });
       if (copy && (copy.style_title !== undefined || copy.style_subtitle !== undefined)) {
         updated = await authorizedRequest<BlogClip>(`/blog-clips/${blogClip.id}/style-copy`, {

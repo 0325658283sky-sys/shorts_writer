@@ -9,6 +9,7 @@
     "studio": "remotion studio",
     "build": "remotion bundle",
     "render": "remotion render BlogShorts out/blog-shorts-spike.mp4",
+    "smoke-styles": "node scripts/smoke-style-renders.mjs",
     "service": "node server.mjs",
     "sync-clip": "node scripts/sync-blog-clip.mjs",
     "export-db": "python scripts/export_from_db.py",

@@ -209,6 +209,7 @@ class BlogShortsStyleProps(BaseModel):
     header: str = "none"
     accent: str = "#FFE566"
     transitionSec: float = 0.35
+    transitionType: Literal["fade", "none", "slide"] = "fade"
     kenBurns: bool = True
 
 
@@ -220,6 +221,7 @@ class BlogShortsPropsResponse(BaseModel):
     styleTitle: str | None = None
     styleSubtitle: str | None = None
     transitionSec: float = 0.35
+    transitionType: Literal["fade", "none", "slide"] = "fade"
     source: Literal["dummy", "blog_clip"] = "blog_clip"
     narrationUrl: str | None = None
     visualStyle: str = "fullscreen"
@@ -270,11 +272,18 @@ class BlogClipWizardStepRequest(BaseModel):
 
 class BlogClipVisualStyleRequest(BaseModel):
     visual_style: VisualStyleSlug
+    # When true, apply catalog voice/BGM/SFX recommendations for the style.
+    apply_pack: bool = True
 
 
 class BlogClipStyleCopyRequest(BaseModel):
     style_title: str | None = None
     style_subtitle: str | None = None
+
+
+class BlogClipMotionSettingsRequest(BaseModel):
+    transition_sec: float | None = Field(default=None, ge=0.0, le=2.0)
+    transition_type: Literal["fade", "none", "slide"] | None = None
 
 
 class BlogClipTemplateApplyRequest(BaseModel):
@@ -441,6 +450,8 @@ class BlogClipResponse(BaseModel):
     visual_style: str = "fullscreen"
     style_title: str | None = None
     style_subtitle: str | None = None
+    transition_sec: float | None = None
+    transition_type: str | None = None
     # Temporary debug/ops payload from the last successful render (engine, duration, …).
     render_spec: dict | None = None
     created_at: str

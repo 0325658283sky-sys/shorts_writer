@@ -19,6 +19,7 @@ from app.db.schemas import (
     BlogClipTtsSettingsRequest,
     BlogClipVersionCreateRequest,
     BlogClipVersionResponse,
+    BlogClipMotionSettingsRequest,
     BlogClipStyleCopyRequest,
     BlogClipVisualStyleRequest,
     BlogClipWizardStepRequest,
@@ -72,6 +73,7 @@ from app.services.blog_service import (
     update_blog_clip_board,
     update_blog_clip_default_voice,
     update_blog_clip_tts_settings,
+    update_blog_clip_motion_settings,
     update_blog_clip_style_copy,
     update_blog_clip_visual_style,
     update_blog_clip_wizard_step,
@@ -117,6 +119,8 @@ def _to_blog_clip_response(blog_clip: BlogClip) -> BlogClipResponse:
         visual_style=blog_clip.visual_style,
         style_title=blog_clip.style_title,
         style_subtitle=blog_clip.style_subtitle,
+        transition_sec=blog_clip.transition_sec,
+        transition_type=blog_clip.transition_type,
         render_spec=blog_clip_render_spec(blog_clip),
         created_at=blog_clip.created_at,
         updated_at=blog_clip.updated_at,
@@ -428,6 +432,7 @@ def update_blog_clip_visual_style_endpoint(
         current_user.id,
         blog_clip_id,
         request.visual_style,
+        apply_pack=request.apply_pack,
     )
     return _to_blog_clip_response(blog_clip)
 
@@ -448,6 +453,26 @@ def update_blog_clip_style_copy_endpoint(
         style_subtitle=payload.get("style_subtitle"),
         title_set="style_title" in payload,
         subtitle_set="style_subtitle" in payload,
+    )
+    return _to_blog_clip_response(blog_clip)
+
+
+@router.patch("/{blog_clip_id}/motion-settings", response_model=BlogClipResponse)
+def update_blog_clip_motion_settings_endpoint(
+    blog_clip_id: int,
+    request: BlogClipMotionSettingsRequest,
+    current_user: User = Depends(get_current_user),
+    conn: sqlite3.Connection = Depends(get_connection),
+) -> BlogClipResponse:
+    payload = request.model_dump(exclude_unset=True)
+    blog_clip = update_blog_clip_motion_settings(
+        conn,
+        current_user.id,
+        blog_clip_id,
+        transition_sec=payload.get("transition_sec"),
+        transition_type=payload.get("transition_type"),
+        sec_set="transition_sec" in payload,
+        type_set="transition_type" in payload,
     )
     return _to_blog_clip_response(blog_clip)
 

@@ -10,6 +10,7 @@ export type ScriptModel = "gpt-4o-mini" | "gpt-4o";
 export type TtsMode = "original_audio" | "ai_narration";
 export type WizardBoardsStep = "video_style" | "edit_mode" | "quick" | "ready";
 export type VisualStyleSlug = "fullscreen" | "card_news" | "info_dark" | "bold_hook";
+export type TransitionType = "fade" | "none" | "slide";
 
 export type VisualStyle = {
   slug: VisualStyleSlug | string;
@@ -20,7 +21,12 @@ export type VisualStyle = {
   layout: string;
   caption: string;
   transitionSec: number;
+  transitionType?: TransitionType | string;
   kenBurns: boolean;
+  packHint?: string | null;
+  recommendedVoice?: string | null;
+  recommendedBgmSlug?: string | null;
+  recommendedAutoSfx?: boolean;
 };
 
 /** Normalize persisted wizard_step; legacy boards/voice/style → edit_mode. */
@@ -182,6 +188,8 @@ export type BlogClip = {
   visual_style?: VisualStyleSlug | string;
   style_title?: string | null;
   style_subtitle?: string | null;
+  transition_sec?: number | null;
+  transition_type?: TransitionType | string | null;
   render_spec?: RenderSpec | null;
   created_at: string;
   updated_at: string;

@@ -1,7 +1,14 @@
 ﻿<svg xmlns="http://www.w3.org/2000/svg" width="270" height="480" viewBox="0 0 270 480">
-  <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#4a7a8a"/><stop offset="100%" stop-color="#1a2430"/></linearGradient></defs>
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#5a7a8c"/>
+      <stop offset="100%" stop-color="#1a2430"/>
+    </linearGradient>
+  </defs>
   <rect width="270" height="480" fill="url(#g)"/>
+  <text x="28" y="78" fill="#fff" font-family="Arial,sans-serif" font-size="18" font-weight="700">풀스크린 훅 타이틀</text>
+  <text x="28" y="102" fill="#FFE566" font-family="Arial,sans-serif" font-size="13" font-weight="700">보조 설명</text>
   <rect x="24" y="340" width="222" height="72" rx="12" fill="rgba(0,0,0,0.55)"/>
-  <rect x="40" y="360" width="160" height="10" rx="4" fill="#fff"/>
-  <rect x="40" y="380" width="120" height="10" rx="4" fill="#ddd"/>
+  <rect x="40" y="362" width="170" height="10" rx="4" fill="#fff"/>
+  <rect x="40" y="382" width="120" height="10" rx="4" fill="#ddd"/>
 </svg>

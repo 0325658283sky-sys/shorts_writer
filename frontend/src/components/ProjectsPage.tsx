@@ -11,6 +11,7 @@ import type {
   TtsMode,
   Video,
 } from "../types";
+import { ClipsLibrary } from "./ClipsLibrary";
 import { VideoList } from "./VideoList";
 
 const WIZARD_STEP_LABELS = {
@@ -23,7 +24,7 @@ const WIZARD_STEP_LABELS = {
   style: "편집",
 } as const;
 
-type ProjectTab = "shorts" | "videos";
+type ProjectTab = "shorts" | "videos" | "clips";
 
 function formatDate(value: string) {
   const date = new Date(value);
@@ -154,6 +155,15 @@ export function ProjectsPage({
               영상
               <span className="projects-tab-count">{videos.length}</span>
             </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === "clips"}
+              className={`projects-tab ${tab === "clips" ? "is-active" : ""}`}
+              onClick={() => setTab("clips")}
+            >
+              클립
+            </button>
           </div>
           <label className="projects-search">
             <span className="sr-only">프로젝트 검색</span>
@@ -202,49 +212,57 @@ export function ProjectsPage({
               ))}
             </ul>
           )
-        ) : filteredVideos.length === 0 ? (
-          <div className="projects-empty">
-            <p>{videos.length === 0 ? "아직 가져온 영상이 없습니다." : "검색 결과가 없습니다."}</p>
-            {videos.length === 0 ? (
-              <button className="btn-outline" type="button" onClick={onCreateNew}>
-                새 프로젝트 만들기 →
-              </button>
-            ) : null}
-          </div>
-        ) : (
-          <div className="projects-video-wrap">
-            <VideoList
-              videos={filteredVideos}
-              transcripts={transcripts}
-              highlights={highlights}
-              clips={clips}
-              clipMetadata={clipMetadata}
-              copiedKey={copiedKey}
-              creatingClipId={creatingClipId}
-              downloadingClipId={downloadingClipId}
-              generatingMetadataId={generatingMetadataId}
-              narratingClipId={narratingClipId}
-              subtitleStyles={subtitleStyles}
-              ttsModes={ttsModes}
-              subtitlingClipId={subtitlingClipId}
-              analyzingId={analyzingId}
-              transcribingId={transcribingId}
-              highlightingId={highlightingId}
-              onAnalyze={onAnalyze}
-              onTranscript={onTranscript}
-              onHighlights={onHighlights}
-              onRefreshStatus={onRefreshStatus}
-              onApplyNarration={onApplyNarration}
-              onBurnSubtitles={onBurnSubtitles}
-              onCreateClip={onCreateClip}
-              onCopyText={onCopyText}
-              onDownloadClip={onDownloadClip}
-              onGenerateMetadata={onGenerateMetadata}
-              onStyleChange={onStyleChange}
-              onTtsModeChange={onTtsModeChange}
-            />
-          </div>
-        )}
+        ) : null}
+
+        {tab === "videos" ? (
+          filteredVideos.length === 0 ? (
+            <div className="projects-empty">
+              <p>{videos.length === 0 ? "아직 가져온 영상이 없습니다." : "검색 결과가 없습니다."}</p>
+              {videos.length === 0 ? (
+                <button className="btn-outline" type="button" onClick={onCreateNew}>
+                  새 프로젝트 만들기 →
+                </button>
+              ) : null}
+            </div>
+          ) : (
+            <div className="projects-video-wrap">
+              <VideoList
+                videos={filteredVideos}
+                transcripts={transcripts}
+                highlights={highlights}
+                clips={clips}
+                clipMetadata={clipMetadata}
+                copiedKey={copiedKey}
+                creatingClipId={creatingClipId}
+                downloadingClipId={downloadingClipId}
+                generatingMetadataId={generatingMetadataId}
+                narratingClipId={narratingClipId}
+                subtitleStyles={subtitleStyles}
+                ttsModes={ttsModes}
+                subtitlingClipId={subtitlingClipId}
+                analyzingId={analyzingId}
+                transcribingId={transcribingId}
+                highlightingId={highlightingId}
+                onAnalyze={onAnalyze}
+                onTranscript={onTranscript}
+                onHighlights={onHighlights}
+                onRefreshStatus={onRefreshStatus}
+                onApplyNarration={onApplyNarration}
+                onBurnSubtitles={onBurnSubtitles}
+                onCreateClip={onCreateClip}
+                onCopyText={onCopyText}
+                onDownloadClip={onDownloadClip}
+                onGenerateMetadata={onGenerateMetadata}
+                onStyleChange={onStyleChange}
+                onTtsModeChange={onTtsModeChange}
+              />
+            </div>
+          )
+        ) : null}
+
+        {tab === "clips" ? (
+          <ClipsLibrary onDownload={onDownloadClip} downloadingClipId={downloadingClipId} />
+        ) : null}
       </div>
     </section>
   );

@@ -99,9 +99,13 @@ export function QuickSettingsStep({
   }
 
   async function handleRender() {
-    if (!selectedVoice) {
-      onMessage("보이스를 선택해 주세요.");
+    const voiceId = selectedVoice || voices[0]?.id || "";
+    if (!voiceId) {
+      onMessage("사용 가능한 보이스가 없습니다. 잠시 후 다시 시도해 주세요.");
       return;
+    }
+    if (!selectedVoice && voiceId) {
+      setSelectedVoice(voiceId);
     }
     const speed = Number(speedDraft);
     if (!Number.isFinite(speed) || speed < 0.25 || speed > 4) {
@@ -110,7 +114,7 @@ export function QuickSettingsStep({
     }
     setSubmitting(true);
     try {
-      await onSaveDefaultVoice(selectedVoice, speed);
+      await onSaveDefaultVoice(voiceId, speed);
       onRender();
     } catch {
       /* onSave surfaces the error message */
@@ -120,16 +124,20 @@ export function QuickSettingsStep({
   }
 
   const blocked = busy || savingVoice || submitting || loading;
+  const selectedVoiceName = voices.find((voice) => voice.id === selectedVoice)?.name;
 
   return (
     <section className="flow-card">
       <p className="create-kicker">퀵 모드</p>
       <h1>보이스와 오디오를 정하세요</h1>
       <p className="flow-lead">
-        영상 스타일은 이전 단계에서 적용됩니다. 보이스·BGM을 고른 뒤 <strong>프로젝트 만들기</strong>를 누르세요.
+        영상 스타일은 이전 단계에서 적용됩니다. 보이스를 고르지 않으면 목록의 첫 보이스가 기본으로 쓰입니다.
       </p>
 
       {loading ? <p className="create-note">불러오는 중…</p> : null}
+      {!loading && selectedVoiceName ? (
+        <p className="create-note">선택됨: <strong>{selectedVoiceName}</strong> (다른 보이스를 눌러 바꿀 수 있어요)</p>
+      ) : null}
 
       <label className="create-field inline-field">
         <span>재생 속도</span>
@@ -146,6 +154,7 @@ export function QuickSettingsStep({
 
       <div>
         <h2 className="image-section-title">보이스</h2>
+        <p className="create-note">내 보이스 녹음/업로드(클로닝)는 아직 지원하지 않습니다. 카탈로그 보이스를 선택해 주세요.</p>
         <div className="voice-gallery">
           {voices.map((voice) => (
             <div key={voice.id} className={`voice-card ${selectedVoice === voice.id ? "is-selected" : ""}`}>

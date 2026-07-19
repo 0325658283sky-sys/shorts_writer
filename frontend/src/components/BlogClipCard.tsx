@@ -11,6 +11,7 @@ import {
   TOKEN_KEY,
 } from "../constants";
 import type { BlogClip, BlogClipVersion, ScriptTone, SubtitleStyle } from "../types";
+import { AliveProgressBar } from "./AliveProgressBar";
 import { MetadataBox } from "./MetadataBox";
 import { RenderSpecFooter } from "./RenderSpecFooter";
 
@@ -200,14 +201,7 @@ export function BlogClipCard({
         {blogClip.script_tone ? <span>톤: {SCRIPT_TONE_LABELS[blogClip.script_tone]}</span> : null}
       </div>
       {isInProgress ? (
-        <div className="blog-progress" aria-live="polite">
-          <div className="blog-progress-track">
-            <div className="blog-progress-fill" style={{ width: `${blogClip.progress_percent}%` }} />
-          </div>
-          <span className="blog-progress-label">
-            {stageLabel} ({blogClip.progress_percent}%)
-          </span>
-        </div>
+        <AliveProgressBar percent={blogClip.progress_percent} active={isInProgress} label={stageLabel} />
       ) : null}
       {isAwaitingScript ? (
         <div className="script-tone-picker" aria-label="나레이션 대본 톤 선택">

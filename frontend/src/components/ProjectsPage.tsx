@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type MouseEvent } from "react";
 import { BLOG_CLIP_STATUS_LABELS, SCRIPT_TONE_LABELS } from "../constants";
 import type {
   BlogClip,
@@ -11,6 +11,7 @@ import type {
   TtsMode,
   Video,
 } from "../types";
+import { BlogClipThumb } from "./BlogClipThumb";
 import { ClipsLibrary } from "./ClipsLibrary";
 import { VideoList } from "./VideoList";
 
@@ -36,6 +37,14 @@ function formatDate(value: string) {
   }).format(date);
 }
 
+function canDownloadBlogClip(blogClip: BlogClip): boolean {
+  return Boolean(blogClip.subtitled_video_path || blogClip.video_path);
+}
+
+function canEditBlogClip(blogClip: BlogClip): boolean {
+  return blogClip.status === "awaiting_boards" || blogClip.status === "completed";
+}
+
 export function ProjectsPage({
   blogClips,
   videos,
@@ -46,6 +55,7 @@ export function ProjectsPage({
   copiedKey,
   creatingClipId,
   downloadingClipId,
+  downloadingBlogClipId,
   generatingMetadataId,
   narratingClipId,
   subtitleStyles,
@@ -55,6 +65,8 @@ export function ProjectsPage({
   transcribingId,
   highlightingId,
   onOpenBlogClip,
+  onDownloadBlogClip,
+  onEditBlogClip,
   onCreateNew,
   onAnalyze,
   onTranscript,
@@ -68,6 +80,9 @@ export function ProjectsPage({
   onGenerateMetadata,
   onStyleChange,
   onTtsModeChange,
+  projectsTabRequest,
+  focusVideoId,
+  onProjectsTabRequestConsumed,
 }: {
   blogClips: BlogClip[];
   videos: Video[];
@@ -78,6 +93,7 @@ export function ProjectsPage({
   copiedKey: string | null;
   creatingClipId: number | null;
   downloadingClipId: number | null;
+  downloadingBlogClipId: number | null;
   generatingMetadataId: number | null;
   narratingClipId: number | null;
   subtitleStyles: Record<number, SubtitleStyle>;
@@ -87,6 +103,8 @@ export function ProjectsPage({
   transcribingId: number | null;
   highlightingId: number | null;
   onOpenBlogClip: (blogClip: BlogClip) => void;
+  onDownloadBlogClip: (blogClip: BlogClip) => void;
+  onEditBlogClip: (blogClip: BlogClip) => void;
   onCreateNew: () => void;
   onAnalyze: (videoId: number) => void;
   onTranscript: (videoId: number) => void;
@@ -100,9 +118,18 @@ export function ProjectsPage({
   onGenerateMetadata: (clip: Clip) => void;
   onStyleChange: (clipId: number, style: SubtitleStyle) => void;
   onTtsModeChange: (clipId: number, mode: TtsMode) => void;
+  projectsTabRequest?: ProjectTab | null;
+  focusVideoId?: number | null;
+  onProjectsTabRequestConsumed?: () => void;
 }) {
   const [tab, setTab] = useState<ProjectTab>("shorts");
   const [query, setQuery] = useState("");
+
+  useEffect(() => {
+    if (!projectsTabRequest) return;
+    setTab(projectsTabRequest);
+    onProjectsTabRequestConsumed?.();
+  }, [projectsTabRequest, onProjectsTabRequestConsumed]);
 
   const filteredBlogClips = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -119,6 +146,10 @@ export function ProjectsPage({
     if (!q) return videos;
     return videos.filter((video) => video.original_filename.toLowerCase().includes(q));
   }, [videos, query]);
+
+  function stopRow(event: MouseEvent) {
+    event.stopPropagation();
+  }
 
   return (
     <section className="projects-page" aria-label="프로젝트">
@@ -188,28 +219,67 @@ export function ProjectsPage({
             </div>
           ) : (
             <ul className="projects-list">
-              {filteredBlogClips.map((blogClip) => (
-                <li key={blogClip.id}>
-                  <button className="projects-row" type="button" onClick={() => onOpenBlogClip(blogClip)}>
-                    <div className="projects-row-main">
-                      <strong>{blogClip.blog_title ?? "제목 없는 쇼츠"}</strong>
-                      <span className="projects-row-meta">
-                        {formatDate(blogClip.updated_at || blogClip.created_at)}
-                        {blogClip.script_tone ? ` · ${SCRIPT_TONE_LABELS[blogClip.script_tone as ScriptTone]}` : ""}
-                        {blogClip.status === "awaiting_boards" && blogClip.wizard_step
-                          ? ` · ${WIZARD_STEP_LABELS[blogClip.wizard_step]}`
-                          : ""}
-                      </span>
+              {filteredBlogClips.map((blogClip) => {
+                const downloadable = canDownloadBlogClip(blogClip);
+                const editable = canEditBlogClip(blogClip);
+                const downloading = downloadingBlogClipId === blogClip.id;
+                return (
+                  <li key={blogClip.id}>
+                    <div
+                      className="projects-row"
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => onOpenBlogClip(blogClip)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          onOpenBlogClip(blogClip);
+                        }
+                      }}
+                    >
+                      <BlogClipThumb blogClipId={blogClip.id} title={blogClip.blog_title} />
+                      <div className="projects-row-main">
+                        <strong>{blogClip.blog_title ?? "제목 없는 쇼츠"}</strong>
+                        <span className="projects-row-meta">
+                          {formatDate(blogClip.updated_at || blogClip.created_at)}
+                          {blogClip.script_tone ? ` · ${SCRIPT_TONE_LABELS[blogClip.script_tone as ScriptTone]}` : ""}
+                          {blogClip.status === "awaiting_boards" && blogClip.wizard_step
+                            ? ` · ${WIZARD_STEP_LABELS[blogClip.wizard_step]}`
+                            : ""}
+                        </span>
+                        <span className={`status-badge status-${blogClip.status}`}>
+                          {BLOG_CLIP_STATUS_LABELS[blogClip.status]}
+                        </span>
+                      </div>
+                      <div className="projects-row-actions" onClick={stopRow}>
+                        <button
+                          className="small-button ghost-small"
+                          type="button"
+                          disabled={!downloadable || downloading}
+                          onClick={() => onDownloadBlogClip(blogClip)}
+                        >
+                          {downloading ? "다운로드 중" : "다운로드"}
+                        </button>
+                        <button
+                          className="small-button ghost-small"
+                          type="button"
+                          disabled={!editable}
+                          onClick={() => onEditBlogClip(blogClip)}
+                        >
+                          편집
+                        </button>
+                        <button
+                          className="small-button"
+                          type="button"
+                          onClick={() => onOpenBlogClip(blogClip)}
+                        >
+                          열기
+                        </button>
+                      </div>
                     </div>
-                    <div className="projects-row-aside">
-                      <span className={`status-badge status-${blogClip.status}`}>
-                        {BLOG_CLIP_STATUS_LABELS[blogClip.status]}
-                      </span>
-                      <span className="projects-row-open">열기</span>
-                    </div>
-                  </button>
-                </li>
-              ))}
+                  </li>
+                );
+              })}
             </ul>
           )
         ) : null}
@@ -226,6 +296,11 @@ export function ProjectsPage({
             </div>
           ) : (
             <div className="projects-video-wrap">
+              {focusVideoId ? (
+                <p className="create-note">
+                  방금 가져온 영상 #{focusVideoId} — 아래에서 <strong>분석하기</strong>로 다음 단계를 진행하세요.
+                </p>
+              ) : null}
               <VideoList
                 videos={filteredVideos}
                 transcripts={transcripts}
@@ -243,6 +318,7 @@ export function ProjectsPage({
                 analyzingId={analyzingId}
                 transcribingId={transcribingId}
                 highlightingId={highlightingId}
+                focusVideoId={focusVideoId}
                 onAnalyze={onAnalyze}
                 onTranscript={onTranscript}
                 onHighlights={onHighlights}

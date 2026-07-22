@@ -36,21 +36,45 @@
       "type": ["object", "null"],
       "additionalProperties": false,
       "properties": {
-        "layout": { "type": "string", "enum": ["fullscreen", "card"] },
+        "layout": {
+          "type": "string",
+          "enum": ["fullscreen", "letterbox", "header_stack", "card"]
+        },
+        "mediaFit": { "type": "string", "enum": ["cover", "contain"] },
+        "canvasBg": { "type": "string" },
         "caption": {
           "type": "string",
-          "enum": ["bottom_box", "card_title", "card_bottom", "dark_bar", "bold_center"]
+          "enum": ["center_stroke", "bottom_outline", "black_box", "white_pill"]
         },
         "header": {
           "type": "string",
-          "enum": ["none", "overlay", "card_white", "info_navy", "viral_black"]
+          "enum": ["none", "info_black", "info_navy", "viral_cyan", "card_white"]
         },
+        "titleColor": { "type": "string" },
         "accent": { "type": "string" },
         "transitionSec": { "type": "number", "minimum": 0, "maximum": 2 },
         "transitionType": { "type": "string", "enum": ["fade", "none", "slide"] },
         "kenBurns": { "type": "boolean" }
       }
     },
+    "overlay": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "titleFont": {
+          "type": "string",
+          "enum": ["pretendard", "paperlogy", "gmarket_sans", "suit", "jalnan"]
+        },
+        "captionFont": {
+          "type": "string",
+          "enum": ["pretendard", "paperlogy", "gmarket_sans", "suit", "jalnan"]
+        },
+        "title": { "$ref": "#/$defs/overlayLayer" },
+        "subtitle": { "$ref": "#/$defs/overlayLayer" },
+        "caption": { "$ref": "#/$defs/overlayLayer" }
+      }
+    },
+    "suppressText": { "type": "boolean" },
     "boards": {
       "type": "array",
       "minItems": 1,
@@ -58,6 +82,19 @@
     }
   },
   "$defs": {
+    "overlayLayer": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "x": { "type": "number", "minimum": 0, "maximum": 1 },
+        "y": { "type": "number", "minimum": 0, "maximum": 1 },
+        "fontSize": { "type": "integer", "minimum": 16, "maximum": 140 },
+        "color": { "type": "string" },
+        "align": { "type": "string", "enum": ["left", "center", "right"] },
+        "maxWidth": { "type": "number", "minimum": 0.2, "maximum": 1 },
+        "visible": { "type": "boolean" }
+      }
+    },
     "board": {
       "type": "object",
       "additionalProperties": false,
@@ -67,6 +104,10 @@
         "imageUrl": {
           "type": ["string", "null"],
           "description": "http(s) URL or path relative to remotion/public for staticFile()"
+        },
+        "animated": {
+          "type": "boolean",
+          "description": "True for animated GIF boards (needed when imageUrl has no .gif suffix)"
         },
         "text": { "type": "string" },
         "durationSec": { "type": "number", "exclusiveMinimum": 0, "maximum": 120 },

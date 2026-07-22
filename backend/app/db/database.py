@@ -240,6 +240,7 @@ def _create_blog_clips_table(conn: sqlite3.Connection) -> None:
             user_id INTEGER NOT NULL,
             source_url TEXT NOT NULL,
             blog_title TEXT,
+            blog_body_text TEXT,
             narration_script TEXT,
             script_tone TEXT,
             script_candidates_json TEXT,
@@ -257,7 +258,7 @@ def _create_blog_clips_table(conn: sqlite3.Connection) -> None:
             metadata_error TEXT,
             tts_speed REAL NOT NULL DEFAULT 1.0,
             bgm_asset_id INTEGER,
-            bgm_volume REAL NOT NULL DEFAULT 0.18,
+            bgm_volume REAL NOT NULL DEFAULT 0.32,
             active_version_id INTEGER,
             target_length TEXT NOT NULL DEFAULT 'short',
             narration_language TEXT NOT NULL DEFAULT 'original',
@@ -324,7 +325,7 @@ def _migrate_blog_clips_table(conn: sqlite3.Connection) -> None:
     if "bgm_asset_id" not in columns:
         conn.execute("ALTER TABLE blog_clips ADD COLUMN bgm_asset_id INTEGER")
     if "bgm_volume" not in columns:
-        conn.execute("ALTER TABLE blog_clips ADD COLUMN bgm_volume REAL NOT NULL DEFAULT 0.18")
+        conn.execute("ALTER TABLE blog_clips ADD COLUMN bgm_volume REAL NOT NULL DEFAULT 0.32")
     if "active_version_id" not in columns:
         conn.execute("ALTER TABLE blog_clips ADD COLUMN active_version_id INTEGER")
     if "target_length" not in columns:
@@ -349,6 +350,10 @@ def _migrate_blog_clips_table(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE blog_clips ADD COLUMN transition_sec REAL")
     if "transition_type" not in columns:
         conn.execute("ALTER TABLE blog_clips ADD COLUMN transition_type TEXT")
+    if "style_overlay_json" not in columns:
+        conn.execute("ALTER TABLE blog_clips ADD COLUMN style_overlay_json TEXT")
+    if "blog_body_text" not in columns:
+        conn.execute("ALTER TABLE blog_clips ADD COLUMN blog_body_text TEXT")
     conn.execute("UPDATE blog_clips SET progress_stage = 'done', progress_percent = 100 WHERE status = 'completed' AND progress_percent < 100")
     _migrate_blog_clips_awaiting_script_status(conn)
     _migrate_blog_clips_awaiting_boards_status(conn)
@@ -369,6 +374,10 @@ def _migrate_blog_clips_table(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE blog_clips ADD COLUMN transition_sec REAL")
     if "transition_type" not in columns:
         conn.execute("ALTER TABLE blog_clips ADD COLUMN transition_type TEXT")
+    if "style_overlay_json" not in columns:
+        conn.execute("ALTER TABLE blog_clips ADD COLUMN style_overlay_json TEXT")
+    if "blog_body_text" not in columns:
+        conn.execute("ALTER TABLE blog_clips ADD COLUMN blog_body_text TEXT")
 
 
 def _migrate_blog_clip_versions_table(conn: sqlite3.Connection) -> None:
@@ -393,6 +402,7 @@ def _migrate_blog_clips_awaiting_script_status(conn: sqlite3.Connection) -> None
         "user_id",
         "source_url",
         "blog_title",
+        "blog_body_text",
         "narration_script",
         "script_tone",
         "script_candidates_json",
@@ -447,6 +457,7 @@ def _migrate_blog_clips_awaiting_boards_status(conn: sqlite3.Connection) -> None
         "user_id",
         "source_url",
         "blog_title",
+        "blog_body_text",
         "narration_script",
         "script_tone",
         "script_candidates_json",
@@ -501,6 +512,7 @@ def _migrate_blog_clips_awaiting_images_status(conn: sqlite3.Connection) -> None
         "user_id",
         "source_url",
         "blog_title",
+        "blog_body_text",
         "narration_script",
         "script_tone",
         "script_candidates_json",

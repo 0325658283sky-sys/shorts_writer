@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { API_BASE_URL, authorizedRequest, request, uploadRequest } from "./api/client";
 import { AuthPanel } from "./components/AuthPanel";
 import { BlogClipFlow } from "./components/BlogClipFlow";
@@ -9,6 +9,13 @@ import {
   CLIP_STATUS_LABELS,
   TOKEN_KEY,
 } from "./constants";
+import {
+  parseAppRoute,
+  routeFromScreenState,
+  writeAppRoute,
+  type AppRoute,
+  type StudioTab,
+} from "./lib/appRoute";
 import type {
   BlogClip,
   Board,
@@ -62,6 +69,9 @@ export function App() {
   const [renderingFromFlowId, setRenderingFromFlowId] = useState<number | null>(null);
   const [editingBlogClipId, setEditingBlogClipId] = useState<number | null>(null);
   const [focusBlogClipId, setFocusBlogClipId] = useState<number | null>(null);
+  const [studioNav, setStudioNav] = useState<StudioTab>("create");
+  const [projectsTabRequest, setProjectsTabRequest] = useState<"shorts" | "videos" | "clips" | null>(null);
+  const [focusVideoId, setFocusVideoId] = useState<number | null>(null);
   const [blogBoardCounts, setBlogBoardCounts] = useState<Record<number, number>>({});
   const [generatingBlogMetadataId, setGeneratingBlogMetadataId] = useState<number | null>(null);
   const [downloadingBlogClipId, setDownloadingBlogClipId] = useState<number | null>(null);
@@ -82,12 +92,79 @@ export function App() {
 
   const editingBlogClip = blogClips.find((clip) => clip.id === editingBlogClipId) ?? null;
   const focusBlogClip = blogClips.find((clip) => clip.id === focusBlogClipId) ?? null;
+  const skipHashSyncRef = useRef(false);
+  const [routeReady, setRouteReady] = useState(false);
+
+  function applyAppRoute(route: AppRoute, clips: BlogClip[]) {
+    if (route.kind === "edit") {
+      const clip = clips.find((item) => item.id === route.clipId);
+      if (clip && clip.status === "awaiting_boards") {
+        setFocusBlogClipId(clip.id);
+        setEditingBlogClipId(clip.id);
+        return;
+      }
+      if (clip) {
+        setEditingBlogClipId(null);
+        setFocusBlogClipId(clip.id);
+        writeAppRoute({ kind: "flow", clipId: clip.id }, "replace");
+        return;
+      }
+    }
+    if (route.kind === "flow") {
+      const clip = clips.find((item) => item.id === route.clipId);
+      if (clip) {
+        setEditingBlogClipId(null);
+        setFocusBlogClipId(clip.id);
+        return;
+      }
+    }
+    setEditingBlogClipId(null);
+    setFocusBlogClipId(null);
+    const tab = route.kind === "studio" ? route.tab : "create";
+    setStudioNav(tab);
+    if (route.kind !== "studio") {
+      writeAppRoute({ kind: "studio", tab }, "replace");
+    }
+  }
+
+  function handleStudioNavChange(tab: StudioTab) {
+    if (tab === studioNav && focusBlogClipId == null && editingBlogClipId == null) return;
+    setFocusBlogClipId(null);
+    setEditingBlogClipId(null);
+    setStudioNav(tab);
+    skipHashSyncRef.current = true;
+    writeAppRoute({ kind: "studio", tab }, "push");
+  }
 
   useEffect(() => {
     const token = localStorage.getItem(TOKEN_KEY);
     if (!token) return;
     loadCurrentUser(token);
   }, []);
+
+  // Keep URL hash in sync so refresh/back restore Shorts screens and studio tabs.
+  useEffect(() => {
+    if (view !== "dashboard" || !user || !routeReady) return;
+    if (skipHashSyncRef.current) {
+      skipHashSyncRef.current = false;
+      return;
+    }
+    writeAppRoute(routeFromScreenState(editingBlogClipId, focusBlogClipId, studioNav), "replace");
+  }, [view, user, routeReady, editingBlogClipId, focusBlogClipId, studioNav]);
+
+  useEffect(() => {
+    if (view !== "dashboard" || !user || !routeReady) return;
+    function onHashChange() {
+      skipHashSyncRef.current = true;
+      applyAppRoute(parseAppRoute(window.location.hash), blogClips);
+    }
+    window.addEventListener("hashchange", onHashChange);
+    window.addEventListener("popstate", onHashChange);
+    return () => {
+      window.removeEventListener("hashchange", onHashChange);
+      window.removeEventListener("popstate", onHashChange);
+    };
+  }, [view, user, routeReady, blogClips]);
 
   async function loadVideos() {
     setVideos(await authorizedRequest<Video[]>("/videos"));
@@ -101,7 +178,7 @@ export function App() {
     setPlans(await request<Plan[]>("/plans"));
   }
 
-  async function loadBlogClips() {
+  async function loadBlogClips(): Promise<BlogClip[]> {
     const loaded = await authorizedRequest<BlogClip[]>("/blog-clips");
     setBlogClips(loaded);
     loaded.filter((clip) => clip.status === "pending" || clip.status === "processing").forEach((clip) => pollBlogClip(clip.id));
@@ -124,6 +201,7 @@ export function App() {
         return next;
       });
     }
+    return loaded;
   }
 
   function pollBlogClip(blogClipId: number) {
@@ -153,6 +231,7 @@ export function App() {
   }
 
   async function loadCurrentUser(token: string) {
+    setRouteReady(false);
     try {
       const me = await request<User>("/me", { headers: { Authorization: `Bearer ${token}` } });
       setUser(me);
@@ -165,13 +244,18 @@ export function App() {
       setUsage(null);
       setPlans([]);
       setView("login");
+      setRouteReady(false);
       return;
     }
 
     try {
-      await Promise.all([loadVideos(), loadUsage(), loadPlans(), loadBlogClips()]);
+      const [, , , clips] = await Promise.all([loadVideos(), loadUsage(), loadPlans(), loadBlogClips()]);
+      skipHashSyncRef.current = true;
+      applyAppRoute(parseAppRoute(window.location.hash), clips);
     } catch (error) {
       setUploadMessage(error instanceof Error ? error.message : "대시보드 데이터를 불러오지 못했습니다. 새로고침을 눌러보세요.");
+    } finally {
+      setRouteReady(true);
     }
   }
 
@@ -222,11 +306,14 @@ export function App() {
     try {
       const formData = new FormData();
       formData.append("file", selectedFile);
-      await uploadRequest<Video>("/videos/upload", formData);
+      const video = await uploadRequest<Video>("/videos/upload", formData);
       setSelectedFile(null);
       setYoutubeUrl("");
-      setUploadMessage("업로드가 완료되었습니다.");
+      setUploadMessage("업로드가 완료되었습니다. 다음 단계: 분석하기를 눌러주세요.");
       await Promise.all([loadVideos(), loadUsage(), loadPlans()]);
+      setFocusVideoId(video.id);
+      setProjectsTabRequest("videos");
+      handleStudioNavChange("projects");
     } catch (error) {
       setUploadMessage(error instanceof Error ? error.message : "업로드에 실패했습니다.");
     } finally {
@@ -243,13 +330,16 @@ export function App() {
     setIsImportingYoutube(true);
     setUploadMessage("");
     try {
-      await authorizedRequest<Video>("/videos/import-youtube", {
+      const video = await authorizedRequest<Video>("/videos/import-youtube", {
         method: "POST",
         body: JSON.stringify({ url: youtubeUrl.trim() }),
       });
       setYoutubeUrl("");
-      setUploadMessage("유튜브 영상을 가져왔습니다.");
+      setUploadMessage("유튜브 영상을 가져왔습니다. 다음 단계: 분석하기를 눌러주세요.");
       await Promise.all([loadVideos(), loadUsage(), loadPlans()]);
+      setFocusVideoId(video.id);
+      setProjectsTabRequest("videos");
+      handleStudioNavChange("projects");
     } catch (error) {
       setUploadMessage(error instanceof Error ? error.message : "유튜브 영상 가져오기에 실패했습니다.");
     } finally {
@@ -333,11 +423,20 @@ export function App() {
         method: "PATCH",
         body: JSON.stringify({ visual_style: visualStyle, apply_pack: true }),
       });
-      if (copy && (copy.style_title !== undefined || copy.style_subtitle !== undefined)) {
-        updated = await authorizedRequest<BlogClip>(`/blog-clips/${blogClip.id}/style-copy`, {
-          method: "PATCH",
-          body: JSON.stringify(copy),
-        });
+      // Keep server-generated hook titles unless the user edited the drafts before continue.
+      if (copy) {
+        const prevTitle = (blogClip.style_title || blogClip.blog_title || "").trim();
+        const prevSubtitle = (blogClip.style_subtitle || "").trim();
+        const nextTitle = (copy.style_title || "").trim();
+        const nextSubtitle = (copy.style_subtitle || "").trim();
+        const userEdited =
+          (nextTitle.length > 0 && nextTitle !== prevTitle) || nextSubtitle !== prevSubtitle;
+        if (userEdited) {
+          updated = await authorizedRequest<BlogClip>(`/blog-clips/${blogClip.id}/style-copy`, {
+            method: "PATCH",
+            body: JSON.stringify(copy),
+          });
+        }
       }
       setBlogClips((current) => current.map((item) => (item.id === updated.id ? updated : item)));
     } catch (error) {
@@ -423,6 +522,19 @@ export function App() {
     if (blogClip.status !== "awaiting_boards") return;
     setFocusBlogClipId(blogClip.id);
     setEditingBlogClipId(blogClip.id);
+  }
+
+  /** Projects list “편집”: board editor when awaiting boards, else open Flow result. */
+  function handleEditBlogClip(blogClip: BlogClip) {
+    setUploadMessage("");
+    if (blogClip.status === "awaiting_boards") {
+      handleOpenBoardEditor(blogClip);
+      return;
+    }
+    if (blogClip.status === "completed") {
+      setEditingBlogClipId(null);
+      setFocusBlogClipId(blogClip.id);
+    }
   }
 
   function handleOpenBlogClip(blogClip: BlogClip) {
@@ -701,9 +813,12 @@ export function App() {
     setSelectingBlogScriptId(null);
     setEditingBlogClipId(null);
     setFocusBlogClipId(null);
+    setRouteReady(false);
     setView("login");
     setMessage("");
     setUploadMessage("");
+    setStudioNav("create");
+    writeAppRoute({ kind: "studio", tab: "create" }, "replace");
   }
 
   if (editingBlogClip && editingBlogClip.status === "awaiting_boards") {
@@ -804,6 +919,9 @@ export function App() {
           onBlogScriptModelChange={setBlogScriptModel}
           onCopyText={handleCopyText}
           onOpenBlogClip={handleOpenBlogClip}
+          onDownloadBlogClip={handleDownloadBlogClip}
+          onEditBlogClip={handleEditBlogClip}
+          downloadingBlogClipId={downloadingBlogClipId}
           onAnalyze={handleAnalyze}
           onTranscript={handleTranscript}
           onHighlights={handleHighlights}
@@ -815,6 +933,11 @@ export function App() {
           onGenerateMetadata={handleGenerateMetadata}
           onStyleChange={(clipId, style) => setSubtitleStyles((current) => ({ ...current, [clipId]: style }))}
           onTtsModeChange={(clipId, mode) => setTtsModes((current) => ({ ...current, [clipId]: mode }))}
+          studioNav={studioNav}
+          onStudioNavChange={handleStudioNavChange}
+          projectsTabRequest={projectsTabRequest}
+          focusVideoId={focusVideoId}
+          onProjectsTabRequestConsumed={() => setProjectsTabRequest(null)}
         />
       </main>
     );

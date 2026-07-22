@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     openai_transcription_model: str = "whisper-1"
     openai_highlight_model: str = "gpt-4o-mini"
     openai_metadata_model: str = "gpt-4o-mini"
+    # On-screen Shorts hook titles — prefer a stronger model than bulk script drafts.
+    openai_title_model: str = "gpt-4o"
     tts_provider: str = "openai"
     tts_api_key: str | None = None
     openai_tts_model: str = "gpt-4o-mini-tts"
@@ -28,6 +30,12 @@ class Settings(BaseSettings):
     highlight_max_seconds: int = 60
     blog_image_min_count: int = 3
     blog_image_max_count: int = 8
+    # How many blog images to download as selectable candidates (GIFs often appear
+    # after many stills in Naver HTML). Selection UI still caps at blog_image_max_count.
+    blog_image_candidate_max_count: int = 36
+    # When narration has more sentences than selected images, create extra boards
+    # (same image reused with different captions) up to this cap.
+    blog_board_max_count: int = 12
     blog_fetch_timeout_seconds: int = 20
     # Pexels stock photos for board image search (Stage 20). Empty = search disabled (400).
     pexels_api_key: str | None = None

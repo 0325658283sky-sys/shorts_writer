@@ -21,6 +21,7 @@ from app.db.schemas import (
     BlogClipVersionResponse,
     BlogClipMotionSettingsRequest,
     BlogClipStyleCopyRequest,
+    BlogClipStyleOverlayRequest,
     BlogClipVisualStyleRequest,
     BlogClipWizardStepRequest,
     BlogShortsPropsResponse,
@@ -73,8 +74,11 @@ from app.services.blog_service import (
     update_blog_clip_board,
     update_blog_clip_default_voice,
     update_blog_clip_tts_settings,
+    blog_clip_style_overlay,
+    regenerate_blog_clip_style_titles,
     update_blog_clip_motion_settings,
     update_blog_clip_style_copy,
+    update_blog_clip_style_overlay,
     update_blog_clip_visual_style,
     update_blog_clip_wizard_step,
 )
@@ -119,6 +123,7 @@ def _to_blog_clip_response(blog_clip: BlogClip) -> BlogClipResponse:
         visual_style=blog_clip.visual_style,
         style_title=blog_clip.style_title,
         style_subtitle=blog_clip.style_subtitle,
+        style_overlay=blog_clip_style_overlay(blog_clip),
         transition_sec=blog_clip.transition_sec,
         transition_type=blog_clip.transition_type,
         render_spec=blog_clip_render_spec(blog_clip),
@@ -457,6 +462,32 @@ def update_blog_clip_style_copy_endpoint(
     return _to_blog_clip_response(blog_clip)
 
 
+@router.patch("/{blog_clip_id}/style-overlay", response_model=BlogClipResponse)
+def update_blog_clip_style_overlay_endpoint(
+    blog_clip_id: int,
+    request: BlogClipStyleOverlayRequest,
+    current_user: User = Depends(get_current_user),
+    conn: sqlite3.Connection = Depends(get_connection),
+) -> BlogClipResponse:
+    blog_clip = update_blog_clip_style_overlay(
+        conn,
+        current_user.id,
+        blog_clip_id,
+        request.overlay.model_dump(exclude_none=True),
+    )
+    return _to_blog_clip_response(blog_clip)
+
+
+@router.post("/{blog_clip_id}/style-titles/generate", response_model=BlogClipResponse)
+def regenerate_blog_clip_style_titles_endpoint(
+    blog_clip_id: int,
+    current_user: User = Depends(get_current_user),
+    conn: sqlite3.Connection = Depends(get_connection),
+) -> BlogClipResponse:
+    blog_clip = regenerate_blog_clip_style_titles(conn, current_user.id, blog_clip_id)
+    return _to_blog_clip_response(blog_clip)
+
+
 @router.patch("/{blog_clip_id}/motion-settings", response_model=BlogClipResponse)
 def update_blog_clip_motion_settings_endpoint(
     blog_clip_id: int,
@@ -623,6 +654,25 @@ def download_blog_clip(
     return FileResponse(path=path, media_type="video/mp4", filename=f"new-cut-blog-{blog_clip.id}.mp4")
 
 
+@router.get("/{blog_clip_id}/stream")
+def stream_blog_clip(
+    blog_clip_id: int,
+    current_user: User = Depends(get_current_user),
+    conn: sqlite3.Connection = Depends(get_connection),
+) -> FileResponse:
+    """Inline MP4 stream for CompletedShortPlayer (hub-ready)."""
+    blog_clip = get_blog_clip_for_user(conn, current_user.id, blog_clip_id)
+    if blog_clip is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Blog short not found.")
+    path = blog_clip_download_path(blog_clip)
+    return FileResponse(
+        path=path,
+        media_type="video/mp4",
+        filename=f"new-cut-blog-{blog_clip.id}.mp4",
+        content_disposition_type="inline",
+    )
+
+
 @router.get("/{blog_clip_id}/versions", response_model=list[BlogClipVersionResponse])
 def list_blog_clip_versions_endpoint(
     blog_clip_id: int,
@@ -706,6 +756,26 @@ def download_blog_clip_version(
         path=path,
         media_type="video/mp4",
         filename=f"new-cut-blog-{blog_clip_id}-v{version_id}.mp4",
+    )
+
+
+@router.get("/{blog_clip_id}/versions/{version_id}/stream")
+def stream_blog_clip_version(
+    blog_clip_id: int,
+    version_id: int,
+    current_user: User = Depends(get_current_user),
+    conn: sqlite3.Connection = Depends(get_connection),
+) -> FileResponse:
+    """Inline MP4 stream for a specific version."""
+    version = get_blog_clip_version_for_user(conn, current_user.id, blog_clip_id, version_id)
+    if version is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Version not found.")
+    path = blog_clip_version_download_path(version)
+    return FileResponse(
+        path=path,
+        media_type="video/mp4",
+        filename=f"new-cut-blog-{blog_clip_id}-v{version_id}.mp4",
+        content_disposition_type="inline",
     )
 
 

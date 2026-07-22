@@ -7,13 +7,14 @@ from fastapi.responses import FileResponse
 from app.api.users import get_current_user
 from app.db.database import get_connection
 from app.db.models import AudioAsset, User
-from app.db.schemas import AudioAssetResponse
+from app.db.schemas import AudioAssetResponse, BgmMoodResponse
 from app.services.audio_service import (
     assert_audio_asset_usable,
     create_user_audio_asset,
     delete_user_audio_asset,
     list_audio_assets,
 )
+from app.services.bgm_mood_catalog import list_bgm_moods
 
 router = APIRouter(prefix="/audio-assets", tags=["audio-assets"])
 
@@ -40,6 +41,14 @@ def list_audio_assets_endpoint(
 ) -> list[AudioAssetResponse]:
     assets = list_audio_assets(conn, current_user.id, kind=kind)
     return [_to_asset_response(asset) for asset in assets]
+
+
+@router.get("/bgm-moods", response_model=list[BgmMoodResponse])
+def list_bgm_moods_endpoint(
+    current_user: User = Depends(get_current_user),
+) -> list[BgmMoodResponse]:
+    _ = current_user
+    return [BgmMoodResponse(**mood) for mood in list_bgm_moods()]
 
 
 @router.post("", response_model=AudioAssetResponse, status_code=201)

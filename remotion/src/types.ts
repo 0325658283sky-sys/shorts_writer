@@ -7,6 +7,12 @@ export type BlogBoardProps = {
   boardId?: number | null;
   /** http(s) URL, or path under remotion/public for staticFile() */
   imageUrl?: string | null;
+  /**
+   * True when the board media is an animated GIF.
+   * Required for blob:/API URLs that do not end in `.gif` — otherwise Remotion `<Img>`
+   * plays the GIF on wall-clock time even while the Player is paused.
+   */
+  animated?: boolean;
   text: string;
   /** Seconds this board is on screen */
   durationSec: number;
@@ -14,13 +20,54 @@ export type BlogBoardProps = {
   speaker?: string | null;
 };
 
-export type VisualStyleSlug = "fullscreen" | "card_news" | "info_dark" | "bold_hook";
+export type VisualStyleSlug =
+  | "impact_full"
+  | "info_black"
+  | "info_navy"
+  | "viral_cyan"
+  | "card_white"
+  /** @deprecated legacy aliases */
+  | "fullscreen"
+  | "card_news"
+  | "info_dark"
+  | "bold_hook";
+
 export type TransitionType = "fade" | "none" | "slide";
 
+export type OverlayAlign = "left" | "center" | "right";
+
+export type StyleOverlayLayer = {
+  x: number;
+  y: number;
+  fontSize: number;
+  color: string;
+  align: OverlayAlign;
+  maxWidth: number;
+  visible: boolean;
+};
+
+export type ShortsFontId =
+  | "pretendard"
+  | "paperlogy"
+  | "gmarket_sans"
+  | "suit"
+  | "jalnan";
+
+export type StyleOverlayProps = {
+  titleFont?: ShortsFontId | string | null;
+  captionFont?: ShortsFontId | string | null;
+  title?: Partial<StyleOverlayLayer> | null;
+  subtitle?: Partial<StyleOverlayLayer> | null;
+  caption?: Partial<StyleOverlayLayer> | null;
+};
+
 export type BlogShortsStyleProps = {
-  layout: "fullscreen" | "card";
-  caption: "bottom_box" | "card_title" | "card_bottom" | "dark_bar" | "bold_center";
-  header: "none" | "overlay" | "card_white" | "info_navy" | "viral_black";
+  layout: "fullscreen" | "letterbox" | "header_stack" | "card";
+  mediaFit: "cover" | "contain";
+  canvasBg: string;
+  caption: "center_stroke" | "bottom_outline" | "black_box" | "white_pill";
+  header: "none" | "info_black" | "info_navy" | "viral_cyan" | "card_white";
+  titleColor: string;
   accent: string;
   transitionSec: number;
   transitionType: TransitionType;
@@ -42,6 +89,9 @@ export type BlogShortsProps = {
   narrationUrl?: string | null;
   visualStyle?: VisualStyleSlug | string | null;
   style?: BlogShortsStyleProps | null;
+  overlay?: StyleOverlayProps | null;
+  /** Hide text layers (preview HTML editor draws them instead). */
+  suppressText?: boolean;
   boards: BlogBoardProps[];
 };
 
@@ -53,12 +103,15 @@ export const DEFAULT_BLOG_SHORTS_PROPS: BlogShortsProps = {
   transitionSec: 0.35,
   transitionType: "fade",
   source: "dummy",
-  visualStyle: "fullscreen",
+  visualStyle: "impact_full",
   style: {
     layout: "fullscreen",
-    caption: "bottom_box",
-    header: "overlay",
-    accent: "#FFE566",
+    mediaFit: "cover",
+    canvasBg: "#000000",
+    caption: "center_stroke",
+    header: "none",
+    titleColor: "#ffffff",
+    accent: "#ffffff",
     transitionSec: 0.35,
     transitionType: "fade",
     kenBurns: true,

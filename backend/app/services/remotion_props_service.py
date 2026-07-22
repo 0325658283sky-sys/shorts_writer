@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import shutil
 import sqlite3
 from pathlib import Path
@@ -11,6 +12,7 @@ from fastapi import HTTPException, status
 from app.core.config import settings
 from app.db.models import BlogClip, BlogClipBoard
 from app.services.visual_style_catalog import (
+    merge_style_overlay,
     normalize_transition_type,
     normalize_visual_style,
     remotion_style_payload,
@@ -149,10 +151,17 @@ def _props_from_boards(
         else:
             duration_sec = resolve_board_duration_sec(board)
 
+        animated = False
+        if materialize and src is not None:
+            animated = src.suffix.lower() == ".gif"
+        elif board.image_path:
+            animated = Path(board.image_path).suffix.lower() == ".gif"
+
         board_props.append(
             {
                 "boardId": board.id,
                 "imageUrl": image_url,
+                "animated": animated,
                 "text": board.text or "",
                 "durationSec": duration_sec,
                 "backgroundColor": None,
@@ -184,6 +193,16 @@ def _props_from_boards(
         clip_type if clip_type else style.get("transitionType")
     )
     style = {**style, "transitionSec": transition_sec, "transitionType": transition_type}
+    raw_overlay = None
+    raw_json = getattr(blog_clip, "style_overlay_json", None)
+    if raw_json:
+        try:
+            parsed = json.loads(raw_json)
+            if isinstance(parsed, dict):
+                raw_overlay = parsed
+        except (TypeError, json.JSONDecodeError):
+            raw_overlay = None
+    overlay = merge_style_overlay(visual_style, raw_overlay)
     return {
         "blogClipId": blog_clip.id,
         "title": title,
@@ -195,6 +214,7 @@ def _props_from_boards(
         "narrationUrl": narration_url,
         "visualStyle": visual_style,
         "style": style,
+        "overlay": overlay,
         "boards": board_props,
     }
 

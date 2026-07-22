@@ -1,5 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { authorizedBlob, authorizedRequest } from "../api/client";
+import {
+  FALLBACK_BGM_MOODS,
+  findAssetForMood,
+  findMoodForAsset,
+  type BgmMood,
+} from "../lib/bgmMoods";
 import type { AudioAsset, BlogClip, Voice } from "../types";
 
 export function QuickSettingsStep({
@@ -27,6 +33,7 @@ export function QuickSettingsStep({
 }) {
   const [voices, setVoices] = useState<Voice[]>([]);
   const [bgmAssets, setBgmAssets] = useState<AudioAsset[]>([]);
+  const [moods, setMoods] = useState<BgmMood[]>(FALLBACK_BGM_MOODS);
   const [loading, setLoading] = useState(true);
   const [selectedVoice, setSelectedVoice] = useState(blogClip.default_voice ?? "");
   const [speedDraft, setSpeedDraft] = useState(String(blogClip.tts_speed || 1));
@@ -46,11 +53,13 @@ export function QuickSettingsStep({
     Promise.all([
       authorizedRequest<Voice[]>("/voices"),
       authorizedRequest<AudioAsset[]>("/audio-assets?kind=bgm"),
+      authorizedRequest<BgmMood[]>("/audio-assets/bgm-moods").catch(() => FALLBACK_BGM_MOODS),
     ])
-      .then(([loadedVoices, bgm]) => {
+      .then(([loadedVoices, bgm, loadedMoods]) => {
         if (cancelled) return;
         setVoices(loadedVoices);
         setBgmAssets(bgm);
+        setMoods(loadedMoods.length ? loadedMoods : FALLBACK_BGM_MOODS);
         setSelectedVoice((current) => {
           if (current && loadedVoices.some((voice) => voice.id === current)) return current;
           if (blogClip.default_voice && loadedVoices.some((voice) => voice.id === blogClip.default_voice)) {
@@ -186,7 +195,7 @@ export function QuickSettingsStep({
           />
           <span>
             <strong>자동 BGM</strong>
-            <span className="muted"> 길이·톤에 맞는 시스템 배경음악</span>
+            <span className="muted"> 분위기·톤·스타일에 맞는 시스템 배경음악</span>
           </span>
         </label>
         <label className="toggle-row">
@@ -201,6 +210,37 @@ export function QuickSettingsStep({
             <span className="muted"> 보드 전환 시 짧은 효과음</span>
           </span>
         </label>
+      </div>
+
+      <div>
+        <h2 className="image-section-title">이 분위기로 BGM</h2>
+        <p className="create-note">칩을 누르면 매핑된 시스템 BGM이 적용되고 자동 BGM은 꺼집니다.</p>
+        <div className="template-scroller" role="group" aria-label="BGM 분위기">
+          {moods.map((mood) => {
+            const activeAsset = bgmAssets.find((asset) => asset.id === blogClip.bgm_asset_id);
+            const selected = findMoodForAsset([mood], activeAsset)?.id === mood.id;
+            return (
+              <button
+                key={mood.id}
+                type="button"
+                className={`template-chip ${selected ? "is-selected" : ""}`}
+                disabled={blocked}
+                title={mood.keywords.join(", ")}
+                onClick={() => {
+                  const asset = findAssetForMood(bgmAssets, mood);
+                  if (!asset) {
+                    onMessage(`「${mood.label}」에 맞는 시스템 BGM이 없습니다.`);
+                    return;
+                  }
+                  void onAudioSettings({ bgm_asset_id: asset.id, auto_bgm: false });
+                }}
+              >
+                <strong>{mood.label}</strong>
+                <span className="muted">{mood.description}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       <div>

@@ -906,6 +906,14 @@ other outputs.
 Errors: `404` blog clip not found, or found but the output file is missing on
 disk, `409` if no output has been rendered yet.
 
+### `GET /blog-clips/{blog_clip_id}/stream`
+
+Same file as download, but `Content-Disposition: inline` for in-app playback
+(`CompletedShortPlayer` / future AlphaCut center slot). Auth via Bearer token;
+the frontend fetches a blob URL.
+
+Errors: same as download.
+
 ### `GET /blog-clips/{blog_clip_id}/versions`
 
 Authenticated. Lists version rows for the clip (newest/oldest by id ascending).
@@ -952,6 +960,10 @@ If the version is active, parent metadata fields are synced too.
 ### `GET /blog-clips/{blog_clip_id}/versions/{version_id}/download`
 
 Streams that version's `.mp4` (`new-cut-blog-{id}-v{version_id}.mp4`).
+
+### `GET /blog-clips/{blog_clip_id}/versions/{version_id}/stream`
+
+Inline variant of the version download (`Content-Disposition: inline`).
 
 **`BlogClipVersionResponse` shape:**
 

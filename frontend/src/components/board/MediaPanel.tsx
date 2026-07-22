@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { authorizedBlob, authorizedRequest } from "../../api/client";
-import type { Board, StockSearchResponse, Voice } from "../../types";
+import type { BlogClip, Board, StockSearchResponse, Voice } from "../../types";
 import { BgmPanel } from "./BgmPanel";
 import { VisualStylePanel } from "../VisualStylePanel";
 import { useBoardImageUrl } from "./useBoardImageUrl";
@@ -38,15 +38,19 @@ export function MediaPanel({
   ttsSpeed,
   onTtsSpeedChange,
   onAssignSpeaker,
+  onApplyVoiceToAll,
   assigningSpeaker,
   appliedVisualStyle,
   styleTitle,
   styleSubtitle,
+  styleOverlay,
   transitionSec,
   transitionType,
   onApplyVisualStyle,
   onStyleCopyChange,
   onMotionChange,
+  onTitlesGenerated,
+  onOverlayUpdated,
   applyingVisualStyle,
   savingStyleCopy,
   savingMotion,
@@ -71,10 +75,12 @@ export function MediaPanel({
   ttsSpeed: number;
   onTtsSpeedChange: (speed: number) => void;
   onAssignSpeaker: (voiceId: string | null) => Promise<void>;
+  onApplyVoiceToAll: (voiceId: string) => Promise<void>;
   assigningSpeaker: boolean;
   appliedVisualStyle?: string | null;
   styleTitle?: string | null;
   styleSubtitle?: string | null;
+  styleOverlay?: BlogClip["style_overlay"];
   transitionSec?: number | null;
   transitionType?: string | null;
   onApplyVisualStyle: (style: string) => Promise<void>;
@@ -83,6 +89,8 @@ export function MediaPanel({
     transition_sec?: number;
     transition_type?: "fade" | "none" | "slide";
   }) => Promise<void>;
+  onTitlesGenerated?: (clip: BlogClip) => void;
+  onOverlayUpdated?: (clip: BlogClip) => void;
   applyingVisualStyle: boolean;
   savingStyleCopy: boolean;
   savingMotion: boolean;
@@ -324,7 +332,9 @@ export function MediaPanel({
 
       {tab === "voice" ? (
         <div className="media-tab-body">
-          <p className="muted">보드별로 보이스를 지정하고, 전체 재생 속도를 조절합니다.</p>
+          <p className="muted">
+            보드별로 보이스를 지정하거나, <strong>모든 보드에 적용</strong>으로 일괄 설정하세요. 재생 속도는 클립 전체에 적용됩니다.
+          </p>
           <label className="voice-speed">
             재생 속도
             <input
@@ -336,7 +346,7 @@ export function MediaPanel({
               onChange={(event) => setSpeedDraft(event.target.value)}
               onBlur={handleSpeedBlur}
             />
-            <span className="muted">0.25–4.0 (기본 1.0)</span>
+            <span className="muted">0.25–4.0 (기본 1.0 · 전체 보드)</span>
           </label>
           {selectedBoard ? (
             <p className="muted">
@@ -366,7 +376,15 @@ export function MediaPanel({
                       disabled={!selectedBoard || assigningSpeaker || active}
                       onClick={() => void handleAssign(voice.id)}
                     >
-                      {active ? "적용됨" : "이 보드에 적용"}
+                      {active ? "적용됨" : "이 보드에"}
+                    </button>
+                    <button
+                      className="small-button"
+                      type="button"
+                      disabled={assigningSpeaker}
+                      onClick={() => void onApplyVoiceToAll(voice.id)}
+                    >
+                      모든 보드에
                     </button>
                   </div>
                 </li>
@@ -375,7 +393,7 @@ export function MediaPanel({
           </ul>
           {selectedBoard?.speaker ? (
             <button className="ghost-button" type="button" disabled={assigningSpeaker} onClick={() => void handleAssign(null)}>
-              기본 보이스로 되돌리기
+              이 보드만 기본 보이스로
             </button>
           ) : null}
         </div>
@@ -383,14 +401,18 @@ export function MediaPanel({
 
       {tab === "style" ? (
         <VisualStylePanel
+          blogClipId={blogClipId}
           appliedStyle={appliedVisualStyle}
           styleTitle={styleTitle}
           styleSubtitle={styleSubtitle}
+          styleOverlay={styleOverlay}
           transitionSec={transitionSec}
           transitionType={transitionType}
           onApply={onApplyVisualStyle}
           onStyleCopyChange={onStyleCopyChange}
           onMotionChange={onMotionChange}
+          onTitlesGenerated={onTitlesGenerated}
+          onOverlayUpdated={onOverlayUpdated}
           applying={applyingVisualStyle}
           savingCopy={savingStyleCopy}
           savingMotion={savingMotion}

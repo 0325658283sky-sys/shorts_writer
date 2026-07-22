@@ -1,5 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { authorizedBlob, authorizedRequest, uploadRequest } from "../../api/client";
+import {
+  FALLBACK_BGM_MOODS,
+  findAssetForMood,
+  findMoodForAsset,
+  moodMatchesAsset,
+  type BgmMood,
+} from "../../lib/bgmMoods";
 import type { AudioAsset, Board } from "../../types";
 
 export function BgmPanel({
@@ -19,6 +26,8 @@ export function BgmPanel({
 }) {
   const [bgmAssets, setBgmAssets] = useState<AudioAsset[]>([]);
   const [sfxAssets, setSfxAssets] = useState<AudioAsset[]>([]);
+  const [moods, setMoods] = useState<BgmMood[]>(FALLBACK_BGM_MOODS);
+  const [selectedMoodId, setSelectedMoodId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [volumeDraft, setVolumeDraft] = useState(String(bgmVolume));
@@ -33,12 +42,14 @@ export function BgmPanel({
     setLoading(true);
     setError("");
     try {
-      const [bgm, sfx] = await Promise.all([
+      const [bgm, sfx, loadedMoods] = await Promise.all([
         authorizedRequest<AudioAsset[]>("/audio-assets?kind=bgm"),
         authorizedRequest<AudioAsset[]>("/audio-assets?kind=sfx"),
+        authorizedRequest<BgmMood[]>("/audio-assets/bgm-moods").catch(() => FALLBACK_BGM_MOODS),
       ]);
       setBgmAssets(bgm);
       setSfxAssets(sfx);
+      setMoods(loadedMoods.length ? loadedMoods : FALLBACK_BGM_MOODS);
     } catch (err) {
       setError(err instanceof Error ? err.message : "오디오 목록을 불러오지 못했습니다.");
     } finally {
@@ -57,6 +68,27 @@ export function BgmPanel({
   useEffect(() => {
     setVolumeDraft(String(bgmVolume));
   }, [bgmVolume]);
+
+  useEffect(() => {
+    const active = bgmAssets.find((asset) => asset.id === bgmAssetId) ?? null;
+    const matched = findMoodForAsset(moods, active);
+    setSelectedMoodId(matched?.id ?? null);
+  }, [bgmAssetId, bgmAssets, moods]);
+
+  async function handleMoodSelect(mood: BgmMood) {
+    setError("");
+    setSelectedMoodId(mood.id);
+    const asset = findAssetForMood(bgmAssets, mood);
+    if (!asset) {
+      setError(`「${mood.label}」에 맞는 시스템 BGM이 없습니다.`);
+      return;
+    }
+    try {
+      await onBgmChange(asset.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "분위기 BGM 적용에 실패했습니다.");
+    }
+  }
 
   async function handlePreview(assetId: number) {
     setError("");
@@ -118,6 +150,25 @@ export function BgmPanel({
 
       <section className="stock-search" aria-label="BGM">
         <h3 className="stock-search-title">BGM</h3>
+        <p className="muted">한국 쇼츠 분위기 — 칩을 누르면 매핑된 시스템 BGM이 적용됩니다.</p>
+        <div className="template-scroller" role="group" aria-label="BGM 분위기">
+          {moods.map((mood) => {
+            const selected = selectedMoodId === mood.id;
+            return (
+              <button
+                key={mood.id}
+                type="button"
+                className={`template-chip ${selected ? "is-selected" : ""}`}
+                disabled={saving || loading}
+                title={mood.keywords.join(", ")}
+                onClick={() => void handleMoodSelect(mood)}
+              >
+                <strong>{mood.label}</strong>
+                <span className="muted">{mood.description}</span>
+              </button>
+            );
+          })}
+        </div>
         <label className="voice-speed">
           BGM 볼륨 (0–0.55)
           <input
@@ -134,11 +185,19 @@ export function BgmPanel({
         <ul className="template-list">
           {bgmAssets.map((asset) => {
             const active = bgmAssetId === asset.id;
+            const selectedMood = moods.find((m) => m.id === selectedMoodId);
+            const moodHighlight = Boolean(selectedMood && moodMatchesAsset(selectedMood, asset));
             return (
-              <li key={asset.id} className={`template-card ${active ? "active" : ""}`}>
+              <li
+                key={asset.id}
+                className={`template-card ${active ? "active" : ""} ${moodHighlight && !active ? "mood-match" : ""}`}
+              >
                 <div className="template-card-copy">
                   <strong>{asset.name}</strong>
-                  <span className="muted">{asset.is_system ? "시스템" : "내 업로드"}</span>
+                  <span className="muted">
+                    {asset.is_system ? "시스템" : "내 업로드"}
+                    {asset.slug ? ` · ${asset.slug}` : ""}
+                  </span>
                 </div>
                 <div className="template-card-actions">
                   <button className="ghost-small" type="button" onClick={() => void handlePreview(asset.id)}>

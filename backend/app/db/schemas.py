@@ -205,12 +205,33 @@ class BlogShortsBoardProps(BaseModel):
 
 class BlogShortsStyleProps(BaseModel):
     layout: str = "fullscreen"
-    caption: str = "bottom_box"
+    mediaFit: str = "cover"
+    canvasBg: str = "#000000"
+    caption: str = "center_stroke"
     header: str = "none"
+    titleColor: str = "#ffffff"
     accent: str = "#FFE566"
     transitionSec: float = 0.35
     transitionType: Literal["fade", "none", "slide"] = "fade"
     kenBurns: bool = True
+
+
+class StyleOverlayLayer(BaseModel):
+    x: float | None = None
+    y: float | None = None
+    fontSize: int | None = None
+    color: str | None = None
+    align: Literal["left", "center", "right"] | None = None
+    maxWidth: float | None = None
+    visible: bool | None = None
+
+
+class StyleOverlayProps(BaseModel):
+    titleFont: str | None = None
+    captionFont: str | None = None
+    title: StyleOverlayLayer | None = None
+    subtitle: StyleOverlayLayer | None = None
+    caption: StyleOverlayLayer | None = None
 
 
 class BlogShortsPropsResponse(BaseModel):
@@ -224,8 +245,9 @@ class BlogShortsPropsResponse(BaseModel):
     transitionType: Literal["fade", "none", "slide"] = "fade"
     source: Literal["dummy", "blog_clip"] = "blog_clip"
     narrationUrl: str | None = None
-    visualStyle: str = "fullscreen"
+    visualStyle: str = "impact_full"
     style: BlogShortsStyleProps | None = None
+    overlay: StyleOverlayProps | None = None
     boards: list[BlogShortsBoardProps]
 
 
@@ -263,7 +285,18 @@ class BlogClipDefaultVoiceRequest(BaseModel):
 
 
 WizardStep = Literal["video_style", "edit_mode", "quick", "ready", "boards", "voice", "style"]
-VisualStyleSlug = Literal["fullscreen", "card_news", "info_dark", "bold_hook"]
+VisualStyleSlug = Literal[
+    "impact_full",
+    "info_black",
+    "info_navy",
+    "viral_cyan",
+    "card_white",
+    # legacy aliases (normalized server-side)
+    "fullscreen",
+    "card_news",
+    "info_dark",
+    "bold_hook",
+]
 
 
 class BlogClipWizardStepRequest(BaseModel):
@@ -279,6 +312,10 @@ class BlogClipVisualStyleRequest(BaseModel):
 class BlogClipStyleCopyRequest(BaseModel):
     style_title: str | None = None
     style_subtitle: str | None = None
+
+
+class BlogClipStyleOverlayRequest(BaseModel):
+    overlay: StyleOverlayProps
 
 
 class BlogClipMotionSettingsRequest(BaseModel):
@@ -313,6 +350,14 @@ class AudioAssetResponse(BaseModel):
     duration_seconds: float | None = None
     created_at: str
     updated_at: str
+
+
+class BgmMoodResponse(BaseModel):
+    id: str
+    label: str
+    description: str
+    keywords: list[str]
+    slugs: list[str]
 
 
 class VoiceResponse(BaseModel):
@@ -450,6 +495,7 @@ class BlogClipResponse(BaseModel):
     visual_style: str = "fullscreen"
     style_title: str | None = None
     style_subtitle: str | None = None
+    style_overlay: dict | None = None
     transition_sec: float | None = None
     transition_type: str | None = None
     # Temporary debug/ops payload from the last successful render (engine, duration, …).

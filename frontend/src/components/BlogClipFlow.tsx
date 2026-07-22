@@ -297,6 +297,7 @@ export function BlogClipFlow({
               onSelect={handleQuickVisualStyleSelect}
               onBack={() => goToBoardsStep("edit_mode")}
               onMessage={onMessage}
+              onClipUpdated={onBlogClipUpdated}
             />
           ) : null}
 
@@ -355,9 +356,9 @@ export function BlogClipFlow({
           {isCompleted ? (
             <section className="flow-result">
               <div className="flow-card flow-result-hero">
-                <p className="create-kicker">완료</p>
+                <p className="create-kicker">결과 보기</p>
                 <h1>{blogClip.blog_title ?? "쇼츠가 완성되었습니다"}</h1>
-                <p className="flow-lead">다운로드·메타데이터·다른 톤 버전은 아래에서 이어서 할 수 있어요.</p>
+                <p className="flow-lead">아래에서 바로 재생한 뒤 다운로드하거나, 메타·다른 톤 버전을 이어서 만들 수 있어요.</p>
               </div>
               <BlogClipCard
                 blogClip={blogClip}

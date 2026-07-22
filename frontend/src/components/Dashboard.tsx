@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import type { StudioTab } from "../lib/appRoute";
 import type {
   BlogClip,
   Clip,
@@ -16,10 +17,8 @@ import type {
   Video,
 } from "../types";
 import { CreateStudio, type CreateSource } from "./CreateStudio";
+import { MembershipPage } from "./MembershipPage";
 import { ProjectsPage } from "./ProjectsPage";
-import { UsagePanel } from "./UsagePanel";
-
-type StudioNav = "create" | "projects" | "usage";
 
 export function Dashboard({
   user,
@@ -66,6 +65,9 @@ export function Dashboard({
   onBlogScriptModelChange,
   onCopyText,
   onOpenBlogClip,
+  onDownloadBlogClip,
+  onEditBlogClip,
+  downloadingBlogClipId,
   onAnalyze,
   onTranscript,
   onHighlights,
@@ -77,6 +79,11 @@ export function Dashboard({
   onGenerateMetadata,
   onStyleChange,
   onTtsModeChange,
+  studioNav,
+  onStudioNavChange,
+  projectsTabRequest,
+  focusVideoId,
+  onProjectsTabRequestConsumed,
 }: {
   user: User;
   usage: Usage | null;
@@ -122,6 +129,9 @@ export function Dashboard({
   onBlogScriptModelChange: (value: ScriptModel) => void;
   onCopyText: (key: string, text: string) => void;
   onOpenBlogClip: (blogClip: BlogClip) => void;
+  onDownloadBlogClip: (blogClip: BlogClip) => void;
+  onEditBlogClip: (blogClip: BlogClip) => void;
+  downloadingBlogClipId: number | null;
   onAnalyze: (videoId: number) => void;
   onTranscript: (videoId: number) => void;
   onHighlights: (videoId: number) => void;
@@ -133,8 +143,12 @@ export function Dashboard({
   onGenerateMetadata: (clip: Clip) => void;
   onStyleChange: (clipId: number, style: SubtitleStyle) => void;
   onTtsModeChange: (clipId: number, mode: TtsMode) => void;
+  studioNav: StudioTab;
+  onStudioNavChange: (tab: StudioTab) => void;
+  projectsTabRequest?: "shorts" | "videos" | "clips" | null;
+  focusVideoId?: number | null;
+  onProjectsTabRequestConsumed?: () => void;
 }) {
-  const [nav, setNav] = useState<StudioNav>("create");
   const [source, setSource] = useState<CreateSource>("blog");
   const activePlan = plans.find((plan) => plan.id === usage?.plan);
 
@@ -149,15 +163,15 @@ export function Dashboard({
           <nav className="studio-nav" aria-label="스튜디오 메뉴">
             <button
               type="button"
-              className={`studio-nav-link ${nav === "create" ? "is-active" : ""}`}
-              onClick={() => setNav("create")}
+              className={`studio-nav-link ${studioNav === "create" ? "is-active" : ""}`}
+              onClick={() => onStudioNavChange("create")}
             >
               만들기
             </button>
             <button
               type="button"
-              className={`studio-nav-link ${nav === "projects" ? "is-active" : ""}`}
-              onClick={() => setNav("projects")}
+              className={`studio-nav-link ${studioNav === "projects" ? "is-active" : ""}`}
+              onClick={() => onStudioNavChange("projects")}
             >
               프로젝트
               {blogClips.length + videos.length > 0 ? (
@@ -166,10 +180,10 @@ export function Dashboard({
             </button>
             <button
               type="button"
-              className={`studio-nav-link ${nav === "usage" ? "is-active" : ""}`}
-              onClick={() => setNav("usage")}
+              className={`studio-nav-link ${studioNav === "usage" ? "is-active" : ""}`}
+              onClick={() => onStudioNavChange("usage")}
             >
-              사용량
+              요금제
             </button>
           </nav>
         </div>
@@ -178,7 +192,7 @@ export function Dashboard({
             type="button"
             className="usage-chip"
             title={activePlan?.name}
-            onClick={() => setNav("usage")}
+            onClick={() => onStudioNavChange("usage")}
           >
             <span>{usage?.plan_name ?? "요금제"}</span>
             <strong>
@@ -193,7 +207,7 @@ export function Dashboard({
       </header>
 
       <main className="studio-main">
-        {nav === "create" ? (
+        {studioNav === "create" ? (
           <>
             <CreateStudio
               source={source}
@@ -226,7 +240,7 @@ export function Dashboard({
             ) : null}
           </>
         ) : null}
-        {nav === "projects" ? (
+        {studioNav === "projects" ? (
           <>
             {uploadMessage ? (
               <p className="studio-toast" role="status">
@@ -243,6 +257,7 @@ export function Dashboard({
               copiedKey={copiedKey}
               creatingClipId={creatingClipId}
               downloadingClipId={downloadingClipId}
+              downloadingBlogClipId={downloadingBlogClipId}
               generatingMetadataId={generatingMetadataId}
               narratingClipId={narratingClipId}
               subtitleStyles={subtitleStyles}
@@ -252,7 +267,9 @@ export function Dashboard({
               transcribingId={transcribingId}
               highlightingId={highlightingId}
               onOpenBlogClip={onOpenBlogClip}
-              onCreateNew={() => setNav("create")}
+              onDownloadBlogClip={onDownloadBlogClip}
+              onEditBlogClip={onEditBlogClip}
+              onCreateNew={() => onStudioNavChange("create")}
               onAnalyze={onAnalyze}
               onTranscript={onTranscript}
               onHighlights={onHighlights}
@@ -265,10 +282,13 @@ export function Dashboard({
               onGenerateMetadata={onGenerateMetadata}
               onStyleChange={onStyleChange}
               onTtsModeChange={onTtsModeChange}
+              projectsTabRequest={projectsTabRequest}
+              focusVideoId={focusVideoId}
+              onProjectsTabRequestConsumed={onProjectsTabRequestConsumed}
             />
           </>
         ) : null}
-        {nav === "usage" ? <UsagePanel usage={usage} plans={plans} /> : null}
+        {studioNav === "usage" ? <MembershipPage usage={usage} /> : null}
       </main>
     </div>
   );

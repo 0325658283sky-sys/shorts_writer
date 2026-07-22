@@ -21,6 +21,7 @@ from app.db.models import BlogClip, BlogClipBoard, BlogClipImageCandidate, BlogC
 from app.services.audio_service import (
     DEFAULT_SFX_VOLUME,
     assert_audio_asset_usable,
+    DEFAULT_BGM_VOLUME,
     clamp_bgm_volume,
     pick_default_bgm,
     pick_default_sfx,
@@ -108,6 +109,8 @@ _USER_AGENT = (
 )
 
 _MIN_IMAGE_BYTES = 15_000
+_MIN_GIF_BYTES = 2_000
+_GIF_MAGIC_PREFIXES = (b"GIF87a", b"GIF89a")
 _CONTENT_TYPE_EXTENSIONS = {
     "image/jpeg": ".jpg",
     "image/jpg": ".jpg",
@@ -160,6 +163,7 @@ def _row_to_blog_clip(row: sqlite3.Row) -> BlogClip:
         user_id=row["user_id"],
         source_url=row["source_url"],
         blog_title=row["blog_title"],
+        blog_body_text=row["blog_body_text"] if "blog_body_text" in keys else None,
         narration_script=row["narration_script"],
         script_tone=row["script_tone"],
         script_candidates_json=row["script_candidates_json"],
@@ -177,7 +181,7 @@ def _row_to_blog_clip(row: sqlite3.Row) -> BlogClip:
         metadata_error=row["metadata_error"],
         tts_speed=float(row["tts_speed"]) if "tts_speed" in keys and row["tts_speed"] is not None else 1.0,
         bgm_asset_id=row["bgm_asset_id"] if "bgm_asset_id" in keys else None,
-        bgm_volume=float(row["bgm_volume"]) if "bgm_volume" in keys and row["bgm_volume"] is not None else 0.30,
+        bgm_volume=float(row["bgm_volume"]) if "bgm_volume" in keys and row["bgm_volume"] is not None else 0.32,
         active_version_id=row["active_version_id"] if "active_version_id" in keys else None,
         target_length=row["target_length"] if "target_length" in keys and row["target_length"] else "short",
         narration_language=(
@@ -199,6 +203,7 @@ def _row_to_blog_clip(row: sqlite3.Row) -> BlogClip:
         ),
         style_title=row["style_title"] if "style_title" in keys else None,
         style_subtitle=row["style_subtitle"] if "style_subtitle" in keys else None,
+        style_overlay_json=row["style_overlay_json"] if "style_overlay_json" in keys else None,
         transition_sec=(
             float(row["transition_sec"])
             if "transition_sec" in keys and row["transition_sec"] is not None
@@ -212,12 +217,13 @@ def _row_to_blog_clip(row: sqlite3.Row) -> BlogClip:
 
 
 _BLOG_CLIP_COLUMNS = """
-    id, user_id, source_url, blog_title, narration_script, script_tone, script_candidates_json,
+    id, user_id, source_url, blog_title, blog_body_text, narration_script, script_tone, script_candidates_json,
     subtitle_style, subtitle_template_id, video_path, subtitled_video_path, status, progress_stage,
     progress_percent, error_message, title_candidates_json, description, hashtags_json,
     metadata_error, tts_speed, bgm_asset_id, bgm_volume, active_version_id, target_length,
     narration_language, script_model, default_voice, auto_bgm, auto_sfx, wizard_step, visual_style,
-    style_title, style_subtitle, transition_sec, transition_type, render_spec_json, created_at, updated_at
+    style_title, style_subtitle, style_overlay_json, transition_sec, transition_type, render_spec_json,
+    created_at, updated_at
 """
 
 
@@ -498,33 +504,36 @@ def _build_tone_render_boards(
     template_boards: list[BlogClipBoard],
 ) -> list[BlogClipBoard]:
     if template_boards:
-        texts = _split_script_into_board_texts(script, len(template_boards))
+        image_paths = [board.image_path for board in template_boards]
+        texts, assigned = _plan_board_texts_and_images(script, image_paths)
+        # Preserve speaker/sfx from the source board that owns each recycled image slot.
+        template_by_path = {board.image_path: board for board in template_boards}
         return [
             BlogClipBoard(
                 id=0,
                 blog_clip_id=blog_clip_id,
                 order_index=index,
-                image_path=board.image_path,
+                image_path=assigned[index],
                 text=texts[index],
-                speaker=board.speaker,
+                speaker=(template_by_path.get(assigned[index]) or template_boards[index % len(template_boards)]).speaker,
                 duration_seconds=None,
-                sfx_asset_id=board.sfx_asset_id,
+                sfx_asset_id=(template_by_path.get(assigned[index]) or template_boards[index % len(template_boards)]).sfx_asset_id,
                 created_at="",
                 updated_at="",
             )
-            for index, board in enumerate(template_boards)
+            for index in range(len(texts))
         ]
 
-    image_paths = _list_saved_blog_images(user_id, blog_clip_id)
+    image_paths = [str(path) for path in _list_saved_blog_images(user_id, blog_clip_id)]
     if not image_paths:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="No images available to render this version.")
-    texts = _split_script_into_board_texts(script, len(image_paths))
+    texts, assigned = _plan_board_texts_and_images(script, image_paths)
     return [
         BlogClipBoard(
             id=0,
             blog_clip_id=blog_clip_id,
             order_index=index,
-            image_path=str(image_path),
+            image_path=assigned[index],
             text=texts[index],
             speaker=None,
             duration_seconds=None,
@@ -532,7 +541,7 @@ def _build_tone_render_boards(
             created_at="",
             updated_at="",
         )
-        for index, image_path in enumerate(image_paths)
+        for index in range(len(texts))
     ]
 
 
@@ -774,6 +783,8 @@ def _split_script_into_board_texts(script: str, board_count: int) -> list[str]:
 
     Empty later boards used to happen because each board compared *its own*
     chunk length to a *cumulative* target — early boards absorbed everything.
+    Prefer calling `_plan_board_texts_and_images` so board_count grows with
+    sentence units (image reuse) instead of packing many units onto one board.
     """
     if board_count <= 0:
         return []
@@ -832,6 +843,36 @@ def _split_script_into_board_texts(script: str, board_count: int) -> list[str]:
     return texts[:board_count]
 
 
+def _plan_board_texts_and_images(
+    script: str,
+    image_paths: list[str],
+    *,
+    max_boards: int | None = None,
+) -> tuple[list[str], list[str]]:
+    """Pair short caption units with images; reuse images when units outnumber them.
+
+    Prefer one narration unit per board so users can swap images board-by-board
+    instead of reading a long paragraph on a single scarce image.
+    """
+    paths = [str(path) for path in image_paths if str(path).strip()]
+    if not paths:
+        return [], []
+
+    cap = max_boards if max_boards is not None else int(getattr(settings, "blog_board_max_count", 12) or 12)
+    cap = max(len(paths), min(cap, 24))
+    units = _split_script_into_units(script)
+    if units:
+        # Grow boards up to unit count (capped) so we do not cram many sentences
+        # onto fewer images.
+        board_count = min(max(len(paths), len(units)), cap)
+    else:
+        board_count = len(paths)
+
+    texts = _split_script_into_board_texts(script, board_count)
+    assigned = [paths[index % len(paths)] for index in range(board_count)]
+    return texts, assigned
+
+
 def _normalize_board_order_indices(conn: sqlite3.Connection, blog_clip_id: int) -> None:
     rows = conn.execute(
         "SELECT id FROM blog_clip_boards WHERE blog_clip_id = ? ORDER BY order_index ASC, id ASC",
@@ -851,7 +892,7 @@ def _generate_initial_boards(
     blog_clip_id: int,
     script: str,
 ) -> list[BlogClipBoard]:
-    image_paths = _list_selected_blog_images(conn, user_id, blog_clip_id)
+    image_paths = [str(path) for path in _list_selected_blog_images(conn, user_id, blog_clip_id)]
     if len(image_paths) < settings.blog_image_min_count:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -861,15 +902,15 @@ def _generate_initial_boards(
             ),
         )
 
-    texts = _split_script_into_board_texts(script, len(image_paths))
+    texts, assigned = _plan_board_texts_and_images(script, image_paths)
     conn.execute("DELETE FROM blog_clip_boards WHERE blog_clip_id = ?", (blog_clip_id,))
-    for index, (image_path, text) in enumerate(zip(image_paths, texts)):
+    for index, (image_path, text) in enumerate(zip(assigned, texts)):
         conn.execute(
             """
             INSERT INTO blog_clip_boards (blog_clip_id, order_index, image_path, text, speaker, duration_seconds)
             VALUES (?, ?, ?, ?, NULL, NULL)
             """,
-            (blog_clip_id, index, str(image_path), text),
+            (blog_clip_id, index, image_path, text),
         )
     conn.commit()
     return list_blog_clip_boards(conn, user_id, blog_clip_id)
@@ -1135,6 +1176,7 @@ def update_blog_clip_default_voice(
             (voice, blog_clip_id),
         )
     conn.commit()
+    _invalidate_preview_audio(user_id, blog_clip_id)
     refreshed = get_blog_clip_for_user(conn, user_id, blog_clip_id)
     if refreshed is None:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Default voice update failed.")
@@ -1202,11 +1244,22 @@ def _apply_auto_audio_for_render(
 ) -> BlogClip:
     """Resolve auto_bgm / auto_sfx onto concrete asset IDs before Phase 2."""
     if blog_clip.auto_bgm and blog_clip.bgm_asset_id is None:
-        bgm = pick_default_bgm(conn, blog_clip.script_tone, blog_clip.target_length)
+        bgm = pick_default_bgm(
+            conn,
+            blog_clip.script_tone,
+            blog_clip.target_length,
+            blog_clip.visual_style,
+        )
         if bgm is not None:
             conn.execute(
                 "UPDATE blog_clips SET bgm_asset_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                 (bgm.id, blog_clip.id),
+            )
+        else:
+            logger.warning(
+                "auto_bgm enabled but no system BGM asset available for blog_clip=%s "
+                "(seed storage/audio/system or pick a BGM manually)",
+                blog_clip.id,
             )
 
     if blog_clip.auto_sfx:
@@ -1270,6 +1323,7 @@ def update_blog_clip_visual_style(
     from app.services.tts_service import is_known_voice
     from app.services.visual_style_catalog import (
         ALLOWED_VISUAL_STYLES,
+        default_style_overlay,
         normalize_visual_style,
         resolve_visual_style,
     )
@@ -1282,19 +1336,48 @@ def update_blog_clip_visual_style(
     if slug not in ALLOWED_VISUAL_STYLES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="visual_style must be fullscreen, card_news, info_dark, or bold_hook.",
+            detail="visual_style must be impact_full, info_black, info_navy, viral_cyan, or card_white.",
         )
     slug = normalize_visual_style(slug)
     style = resolve_visual_style(slug)
     transition_sec = float(style.get("transitionSec", 0.35))
     transition_type = str(style.get("transitionType") or "fade")
 
+    hook = generate_style_hook_titles(
+        blog_title=blog_clip.blog_title or "",
+        script=blog_clip.narration_script or "",
+        visual_style=slug,
+        blog_body=blog_clip.blog_body_text or "",
+        model=blog_clip.script_model,
+    )
+    # Reset layout defaults for the new template, but keep user-chosen fonts.
+    from app.services.visual_style_catalog import merge_style_overlay, normalize_font_id
+
+    previous_overlay = blog_clip_style_overlay(blog_clip) or {}
+    overlay = default_style_overlay(slug)
+    if previous_overlay.get("titleFont"):
+        overlay["titleFont"] = normalize_font_id(str(previous_overlay.get("titleFont")))
+    if previous_overlay.get("captionFont"):
+        overlay["captionFont"] = normalize_font_id(str(previous_overlay.get("captionFont")))
+    overlay = merge_style_overlay(slug, overlay)
+    overlay_json = json.dumps(overlay, ensure_ascii=False)
+
     set_parts = [
         "visual_style = ?",
         "transition_sec = ?",
         "transition_type = ?",
+        "style_title = ?",
+        "style_subtitle = ?",
+        "style_overlay_json = ?",
     ]
-    params: list[Any] = [slug, transition_sec, transition_type]
+    params: list[Any] = [
+        slug,
+        transition_sec,
+        transition_type,
+        hook.get("style_title"),
+        hook.get("style_subtitle"),
+        overlay_json,
+    ]
     if apply_pack:
         bgm_slug = style.get("recommendedBgmSlug")
         if bgm_slug:
@@ -1303,6 +1386,9 @@ def update_blog_clip_visual_style(
                 set_parts.append("bgm_asset_id = ?")
                 params.append(bgm.id)
                 set_parts.append("auto_bgm = 1")
+                # Keep pack BGM audible under TTS ducking (legacy default 0.18 was too quiet).
+                set_parts.append("bgm_volume = ?")
+                params.append(max(float(blog_clip.bgm_volume or 0), DEFAULT_BGM_VOLUME))
         if "recommendedAutoSfx" in style:
             set_parts.append("auto_sfx = ?")
             params.append(1 if style.get("recommendedAutoSfx") else 0)
@@ -1316,7 +1402,21 @@ def update_blog_clip_visual_style(
         f"UPDATE blog_clips SET {', '.join(set_parts)} WHERE id = ?",
         params,
     )
+    # Stamp pack voice onto every board so final TTS matches the style pack.
+    if apply_pack:
+        pack_voice = style.get("recommendedVoice")
+        if pack_voice and is_known_voice(str(pack_voice)):
+            conn.execute(
+                """
+                UPDATE blog_clip_boards
+                SET speaker = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE blog_clip_id = ?
+                """,
+                (str(pack_voice), blog_clip_id),
+            )
     conn.commit()
+    if apply_pack:
+        _invalidate_preview_audio(user_id, blog_clip_id)
     refreshed = get_blog_clip_for_user(conn, user_id, blog_clip_id)
     if refreshed is None:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Visual style update failed.")
@@ -1369,6 +1469,87 @@ def update_blog_clip_motion_settings(
     refreshed = get_blog_clip_for_user(conn, user_id, blog_clip_id)
     if refreshed is None:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Motion settings update failed.")
+    return refreshed
+
+
+def blog_clip_style_overlay(blog_clip: BlogClip) -> dict[str, Any] | None:
+    raw = getattr(blog_clip, "style_overlay_json", None)
+    if not raw:
+        return None
+    try:
+        parsed = json.loads(raw)
+    except (TypeError, json.JSONDecodeError):
+        return None
+    return parsed if isinstance(parsed, dict) else None
+
+
+def update_blog_clip_style_overlay(
+    conn: sqlite3.Connection,
+    user_id: int,
+    blog_clip_id: int,
+    overlay: dict[str, Any],
+) -> BlogClip:
+    from app.services.visual_style_catalog import merge_style_overlay, sanitize_style_overlay
+
+    blog_clip = get_blog_clip_for_user(conn, user_id, blog_clip_id)
+    if blog_clip is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Blog short not found.")
+    _require_awaiting_boards_for_mutation(blog_clip)
+    existing = blog_clip_style_overlay(blog_clip) or {}
+    patch = sanitize_style_overlay(overlay)
+    combined: dict[str, Any] = dict(existing)
+    for font_key in ("titleFont", "captionFont"):
+        if font_key in patch:
+            combined[font_key] = patch[font_key]
+    for layer_key in ("title", "subtitle", "caption"):
+        if layer_key not in patch:
+            continue
+        prev_layer = existing.get(layer_key) if isinstance(existing.get(layer_key), dict) else {}
+        combined[layer_key] = {**prev_layer, **patch[layer_key]}
+    full = merge_style_overlay(blog_clip.visual_style, combined)
+    conn.execute(
+        """
+        UPDATE blog_clips
+        SET style_overlay_json = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+        """,
+        (json.dumps(full, ensure_ascii=False), blog_clip_id),
+    )
+    conn.commit()
+    refreshed = get_blog_clip_for_user(conn, user_id, blog_clip_id)
+    if refreshed is None:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Style overlay update failed.")
+    return refreshed
+
+
+def regenerate_blog_clip_style_titles(
+    conn: sqlite3.Connection,
+    user_id: int,
+    blog_clip_id: int,
+) -> BlogClip:
+    blog_clip = get_blog_clip_for_user(conn, user_id, blog_clip_id)
+    if blog_clip is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Blog short not found.")
+    _require_awaiting_boards_for_mutation(blog_clip)
+    hook = generate_style_hook_titles(
+        blog_title=blog_clip.blog_title or "",
+        script=blog_clip.narration_script or "",
+        visual_style=blog_clip.visual_style,
+        blog_body=blog_clip.blog_body_text or "",
+        model=blog_clip.script_model,
+    )
+    conn.execute(
+        """
+        UPDATE blog_clips
+        SET style_title = ?, style_subtitle = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+        """,
+        (hook.get("style_title"), hook.get("style_subtitle"), blog_clip_id),
+    )
+    conn.commit()
+    refreshed = get_blog_clip_for_user(conn, user_id, blog_clip_id)
+    if refreshed is None:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Style title regenerate failed.")
     return refreshed
 
 
@@ -1510,8 +1691,54 @@ def _resolve_image_src(img: Tag, base_url: str) -> str | None:
     return urljoin(base_url, src)
 
 
+def _url_looks_like_gif(url: str) -> bool:
+    path = (urlparse(url).path or "").lower()
+    return path.endswith(".gif") or ".gif?" in url.lower() or ".gif&" in url.lower()
+
+
+def _is_gif_payload(content: bytes) -> bool:
+    return any(content.startswith(prefix) for prefix in _GIF_MAGIC_PREFIXES)
+
+
+def _naver_type_param(url: str) -> str | None:
+    match = re.search(r"[?&]type=([^&]+)", url, flags=re.IGNORECASE)
+    return match.group(1).lower() if match else None
+
+
+def _is_naver_video_proxy_url(url: str) -> bool:
+    """Naver serves animated GIF modules as MP4 via type=mp4w* — skip those."""
+    media_type = _naver_type_param(url)
+    return bool(media_type and media_type.startswith("mp4"))
+
+
+def _strip_naver_type_param(url: str) -> str:
+    cleaned = re.sub(r"([?&])type=[^&]*", "", url, flags=re.IGNORECASE)
+    cleaned = cleaned.replace("?&", "?").rstrip("?&")
+    return cleaned
+
+
+def _image_dedupe_key(url: str) -> str:
+    """Collapse Naver CDN variants (blur preview / size types) to one asset key."""
+    parsed = urlparse(_strip_naver_type_param(url))
+    host = (parsed.netloc or "").lower().replace("mblogvideo-phinf.pstatic.net", "postfiles.pstatic.net")
+    return f"{host}{parsed.path}".lower()
+
+
+def _resolve_media_url(raw: str | None, base_url: str) -> str | None:
+    if not raw or not isinstance(raw, str):
+        return None
+    value = raw.strip()
+    if not value or value.startswith("data:"):
+        return None
+    return urljoin(base_url, value)
+
+
 def _prefer_high_res_image_url(url: str) -> str:
     """Prefer the largest common Naver CDN width (w966) over editor thumbnails (w466)."""
+    # Animated GIFs: drop type=w80_blur / resize params so we download the real GIF.
+    if _url_looks_like_gif(url):
+        return _strip_naver_type_param(url)
+
     host = (urlparse(url).netloc or "").lower()
     if "pstatic.net" not in host and "blogfiles.naver.net" not in host:
         return url
@@ -1527,15 +1754,73 @@ def _prefer_high_res_image_url(url: str) -> str:
     return f"{url}{separator}type=w966"
 
 
+def _append_unique_image_url(image_urls: list[str], url: str | None, *, seen_keys: set[str] | None = None) -> None:
+    if not url or _is_naver_video_proxy_url(url):
+        return
+    preferred = _prefer_high_res_image_url(url)
+    key = _image_dedupe_key(preferred)
+    if seen_keys is not None:
+        if key in seen_keys:
+            return
+        seen_keys.add(key)
+    elif any(_image_dedupe_key(existing) == key for existing in image_urls):
+        return
+    if preferred not in image_urls:
+        image_urls.append(preferred)
+
+
+def _extract_gif_attachment_urls(container: Tag, base_url: str) -> list[str]:
+    """Collect .gif URLs from links, <source>, and video poster attributes (GIF only)."""
+    gif_urls: list[str] = []
+    seen: set[str] = set()
+
+    for anchor in container.find_all("a", href=True):
+        resolved = _resolve_media_url(anchor.get("href"), base_url)
+        if resolved and _url_looks_like_gif(resolved):
+            _append_unique_image_url(gif_urls, resolved, seen_keys=seen)
+
+    for source in container.find_all("source", src=True):
+        resolved = _resolve_media_url(source.get("src"), base_url)
+        if resolved and _url_looks_like_gif(resolved):
+            _append_unique_image_url(gif_urls, resolved, seen_keys=seen)
+
+    for video in container.find_all("video"):
+        for attr in ("poster", "data-src", "src"):
+            resolved = _resolve_media_url(video.get(attr), base_url)
+            if resolved and _url_looks_like_gif(resolved):
+                _append_unique_image_url(gif_urls, resolved, seen_keys=seen)
+        for source in video.find_all("source", src=True):
+            resolved = _resolve_media_url(source.get("src"), base_url)
+            if resolved and _url_looks_like_gif(resolved):
+                _append_unique_image_url(gif_urls, resolved, seen_keys=seen)
+
+    # Naver SE modules sometimes stash media URLs on wrapper data attributes.
+    for node in container.select(".se-module-video, .se-module-image, [data-linkdata], [data-attachment]"):
+        for attr in ("data-src", "data-lazy-src", "data-original", "data-url", "data-linkdata", "data-attachment"):
+            raw = node.get(attr)
+            if not raw:
+                continue
+            # data-linkdata can be a small JSON blob containing a URL.
+            if isinstance(raw, str) and raw.strip().startswith("{"):
+                match = re.search(r"https?://[^\"'\s]+\.gif(?:\?[^\"'\s]*)?", raw, flags=re.IGNORECASE)
+                if match:
+                    _append_unique_image_url(gif_urls, match.group(0), seen_keys=seen)
+                continue
+            resolved = _resolve_media_url(raw if isinstance(raw, str) else None, base_url)
+            if resolved and _url_looks_like_gif(resolved):
+                _append_unique_image_url(gif_urls, resolved, seen_keys=seen)
+
+    return gif_urls
+
+
 def _extract_image_urls(container: Tag, base_url: str) -> list[str]:
     image_urls: list[str] = []
+    seen: set[str] = set()
     for img in container.find_all("img"):
         resolved = _resolve_image_src(img, base_url)
-        if not resolved:
-            continue
-        preferred = _prefer_high_res_image_url(resolved)
-        if preferred not in image_urls:
-            image_urls.append(preferred)
+        _append_unique_image_url(image_urls, resolved, seen_keys=seen)
+    for gif_url in _extract_gif_attachment_urls(container, base_url):
+        _append_unique_image_url(image_urls, gif_url, seen_keys=seen)
     return image_urls
 
 
@@ -1692,6 +1977,21 @@ def fetch_blog_content(url: str) -> BlogContent:
     return fetch_generic_blog_content(url)
 
 
+def _resolve_downloaded_image(content: bytes, content_type: str) -> tuple[bytes, str] | None:
+    """Normalize content-type from headers/magic bytes; reject tiny non-GIF payloads."""
+    normalized_type = (content_type or "").split(";")[0].strip().lower()
+    if _is_gif_payload(content):
+        if len(content) < _MIN_GIF_BYTES:
+            return None
+        return content, "image/gif"
+
+    if normalized_type not in _CONTENT_TYPE_EXTENSIONS:
+        return None
+    if len(content) < _MIN_IMAGE_BYTES:
+        return None
+    return content, normalized_type
+
+
 def _download_image_bytes(url: str) -> tuple[bytes, str] | None:
     """Return (content, content_type) or None on failure / tiny payload."""
     try:
@@ -1701,21 +2001,20 @@ def _download_image_bytes(url: str) -> tuple[bytes, str] | None:
     if response.status_code != 200:
         return None
     content_type = response.headers.get("Content-Type", "").split(";")[0].strip().lower()
-    if content_type not in _CONTENT_TYPE_EXTENSIONS:
-        return None
-    if len(response.content) < _MIN_IMAGE_BYTES:
-        return None
-    return response.content, content_type
+    return _resolve_downloaded_image(response.content, content_type)
 
 
 def download_blog_images(image_urls: list[str], dest_dir: Path) -> list[tuple[Path, str]]:
-    """Download images; return (local_path, source_url) pairs up to blog_image_max_count."""
+    """Download selectable candidates up to blog_image_candidate_max_count."""
     dest_dir.mkdir(parents=True, exist_ok=True)
     saved: list[tuple[Path, str]] = []
+    candidate_limit = max(settings.blog_image_max_count, settings.blog_image_candidate_max_count)
 
     for url in image_urls:
-        if len(saved) >= settings.blog_image_max_count:
+        if len(saved) >= candidate_limit:
             break
+        if _is_naver_video_proxy_url(url):
+            continue
         preferred = _prefer_high_res_image_url(url)
         downloaded = _download_image_bytes(preferred)
         source_used = preferred
@@ -1822,20 +2121,31 @@ def _extract_json_object(raw: str) -> dict[str, Any]:
 def _narration_hook_guidance() -> str:
     """Extra rules for the promotional 'hook' tone (Shorts/Reels style ads)."""
     return """
-Extra rules ONLY for the "hook" key (promotional Shorts voiceover):
+Extra rules ONLY for the "hook" key (promotional Shorts voiceover + on-screen captions):
 - Goal: sound like the short product/service promo clips people scroll past every day
   (car wrap/tint/detailing, beauty, food, local shops, gadgets, B2B services, etc.—
   match whatever the blog is actually about; do not force a car theme).
 - Structure (must follow):
   1) HOOK (first sentence, ~1–3 seconds): pick ONE formula that fits the blog facts:
-     question | bold twist | number/fact | mini story | curiosity gap | result-first.
-  2) VALUE: what it is / why it matters, in plain spoken language.
+     curiosity gap | FOMO/time-change ("won't see this again", "in a few years") |
+     twist/contrast | concrete scene | result-first | question | number/fact.
+     The opening MUST work as an on-screen Shorts title angle — same tension viewers would read
+     on the video header (e.g. "몇 년 뒤에는 못 볼 한남동 풍경"), NOT a bland topic label
+     like "한남동의 미래", "○의 매력", "알아보자".
+  2) VALUE: what it is / why it matters — continue the SAME hook angle.
   3) PROOF or DETAIL: one concrete point from the blog (process, before/after vibe,
      material, price range, tip)—only if present in the source.
   4) SOFT CTA: invite inquiry, visit, save, or try—without fake urgency or fake discounts.
+- On-screen caption style (critical):
+  · Write as a SEQUENCE of short spoken lines (about 5–8 sentences for short length).
+  · EACH sentence must feel hooky on its own when shown as a subtitle board
+    (punch, curiosity, concrete payoff)—not a dry lecture or long explanation dump.
+  · Prefer one idea per sentence; end sentences with . ! ? so boards can split 1:1.
+  · Avoid long compound sentences that pack many facts into one board.
 - Voice: punchy, spoken, confident, slightly salesy but not spammy. Short sentences.
 - Avoid weak openings like "오늘은", "이번 글에서는", "안녕하세요", or reading the title.
 - Do NOT invent stats, reviews, rankings, "No.1", guarantees, or prices missing from the blog.
+- Grounded tension from the post is OK (change, scarcity of a view/scene); fake hype is not.
 - If the post is educational, still frame the hook as a problem → solution promo for that tip.
 """.strip()
 
@@ -1929,7 +2239,8 @@ Blog text:
                     "role": "system",
                     "content": (
                         "You write voiceover narration for vertical Shorts/Reels. "
-                        "For the hook tone, write like a polished product or local-service promo short. "
+                        "For the hook tone, write like a polished product or local-service promo short "
+                        "made of short punchy caption sentences (one idea each) that also work on-screen. "
                         "Respond with JSON only."
                     ),
                 },
@@ -2010,6 +2321,321 @@ def _parse_metadata_json(raw_text: str) -> dict[str, Any]:
     if len(titles) != 3 or not description or len(hashtags) != 10:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="GPT returned incomplete metadata.")
     return {"title_candidates": titles, "description": description, "hashtags": hashtags}
+
+
+_ABSTRACT_LABEL_TITLE_RE = re.compile(
+    r"(의\s*(미래|매력|비밀|모든\s*것|이야기|변화)|알아보자|알아보기|총정리|완벽\s*가이드|추천\s*$)",
+    re.IGNORECASE,
+)
+_HOOK_SIGNAL_TITLE_RE = re.compile(
+    r"(못\s*볼|몇\s*년|사라지|알고\s*보니|숨겨진|진짜|전후|왜\s|필수|뒤엔|뒤에는|반전|충격|\d+|\?)",
+)
+
+
+def _plain_on_screen_chars(text: str) -> str:
+    """Count visible title chars (ignore emphasis markers / whitespace)."""
+    return re.sub(r"[*\s]", "", text or "")
+
+
+def is_abstract_label_title(title: str) -> bool:
+    """True for topic-label titles like '한남동의 미래' (not scroll-stopping hooks)."""
+    plain = _plain_on_screen_chars(title)
+    if not plain:
+        return True
+    if re.search(r".+의\s*(미래|매력)$", plain):
+        return True
+    if _ABSTRACT_LABEL_TITLE_RE.search(plain):
+        return True
+    # Very short place+noun with no hook signal.
+    if len(plain) <= 8 and not _HOOK_SIGNAL_TITLE_RE.search(title or ""):
+        return True
+    return False
+
+
+def _extract_place_hints(blog_title: str, blog_body: str) -> list[str]:
+    text = f"{blog_title or ''}\n{(blog_body or '')[:1200]}"
+    hints = re.findall(r"[가-힣]{2,12}(?:동|구|시|군|읍|면|리|역|로|가)", text)
+    for part in re.split(r"[\s\-–—:/|·,.!?]+", blog_title or ""):
+        cleaned = part.strip()
+        if len(cleaned) >= 2:
+            hints.append(cleaned)
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for hint in hints:
+        if hint in seen:
+            continue
+        seen.add(hint)
+        ordered.append(hint)
+        if len(ordered) >= 12:
+            break
+    return ordered
+
+
+def score_hook_title_candidate(
+    title: str,
+    subtitle: str | None = None,
+    *,
+    place_hints: list[str] | None = None,
+) -> float:
+    """Higher is better. Prefers FOMO/curiosity hooks over abstract topic labels."""
+    combined = f"{title or ''}\n{subtitle or ''}".strip()
+    plain = _plain_on_screen_chars(combined)
+    if not plain:
+        return -100.0
+
+    score = 0.0
+    length = len(plain)
+    if 18 <= length <= 40:
+        score += 25.0
+    elif 12 <= length < 18:
+        score += 10.0
+    elif length < 10:
+        score -= 22.0
+    elif length > 48:
+        score -= 12.0
+    else:
+        score += 4.0
+
+    if is_abstract_label_title(title or ""):
+        score -= 45.0
+    if _ABSTRACT_LABEL_TITLE_RE.search(plain):
+        score -= 15.0
+    if _HOOK_SIGNAL_TITLE_RE.search(combined):
+        score += 32.0
+
+    for hint in place_hints or []:
+        if hint and hint in combined:
+            score += 10.0
+            break
+
+    # Mild bonus for two-line / subtitle payoff structure.
+    if subtitle and str(subtitle).strip():
+        score += 4.0
+    if "\n" in (title or ""):
+        score += 3.0
+
+    return score
+
+
+def _normalize_style_title_pair(
+    title: str | None,
+    subtitle: str | None,
+    slug: str,
+) -> dict[str, str | None]:
+    cleaned_title = (title or "").strip() or None
+    cleaned_subtitle = (subtitle or "").strip() or None
+    if not cleaned_title:
+        return {"style_title": None, "style_subtitle": None}
+    if slug == "impact_full":
+        cleaned_subtitle = None
+    if slug == "card_white" and cleaned_subtitle and "\n" not in cleaned_title:
+        cleaned_title = f"{cleaned_title}\n{cleaned_subtitle}"[:56]
+        cleaned_subtitle = None
+    return {
+        "style_title": cleaned_title[:56],
+        "style_subtitle": (cleaned_subtitle[:40] if cleaned_subtitle else None),
+    }
+
+
+def _heuristic_style_hook_titles(
+    blog_title: str,
+    visual_style: str,
+    *,
+    blog_body: str = "",
+) -> dict[str, str | None]:
+    """Offline fallback when OpenAI is unavailable — prefer FOMO/place hooks over labels."""
+    from app.services.visual_style_catalog import normalize_visual_style
+
+    slug = normalize_visual_style(visual_style)
+    places = _extract_place_hints(blog_title, blog_body)
+    place = places[0] if places else ""
+    body_lower = (blog_body or "")[:800]
+
+    if place and any(token in body_lower for token in ("사라", "재개발", "변화", "못 보", "풍경", "공사")):
+        hook = f"몇 년 뒤에는 못 볼 {place} 풍경"
+    elif place:
+        hook = f"알고 보니 달라진 {place}"
+    else:
+        raw = re.sub(r"\s+", " ", (blog_title or "").strip())
+        hook = raw[:28] if raw else "지금 봐야 할 장면"
+
+    if is_abstract_label_title(hook) and place:
+        hook = f"몇 년 뒤에는 못 볼 {place} 풍경"
+
+    if slug == "impact_full":
+        return {"style_title": hook[:40], "style_subtitle": None}
+    if slug == "card_white":
+        mid = max(8, len(hook) // 2)
+        return {
+            "style_title": f"{hook[:mid].strip()}\n{hook[mid:].strip()}"[:56],
+            "style_subtitle": None,
+        }
+    # Two-line templates: split into setup / payoff when possible.
+    if "못 볼" in hook and place:
+        return {
+            "style_title": f"몇 년 뒤에는 못 볼"[:28],
+            "style_subtitle": f"{place} 풍경"[:28],
+        }
+    chars = list(hook)
+    mid = max(8, min(16, len(chars) // 2))
+    return {
+        "style_title": "".join(chars[:mid]).strip()[:28],
+        "style_subtitle": "".join(chars[mid:]).strip()[:28] or None,
+    }
+
+
+def _resolve_title_model(model: str | None) -> str:
+    preferred = (getattr(settings, "openai_title_model", None) or "gpt-4o").strip()
+    if preferred in ALLOWED_SCRIPT_MODELS:
+        return preferred
+    return _resolve_script_model(model)
+
+
+def _pick_best_style_title_candidate(
+    candidates: list[dict[str, str | None]],
+    *,
+    slug: str,
+    place_hints: list[str],
+    blog_title: str,
+    blog_body: str,
+) -> dict[str, str | None]:
+    scored: list[tuple[float, dict[str, str | None]]] = []
+    for item in candidates:
+        normalized = _normalize_style_title_pair(item.get("style_title"), item.get("style_subtitle"), slug)
+        if not normalized.get("style_title"):
+            continue
+        score = score_hook_title_candidate(
+            normalized["style_title"] or "",
+            normalized.get("style_subtitle"),
+            place_hints=place_hints,
+        )
+        scored.append((score, normalized))
+    if scored:
+        scored.sort(key=lambda pair: pair[0], reverse=True)
+        return scored[0][1]
+    return _heuristic_style_hook_titles(blog_title, slug, blog_body=blog_body)
+
+
+def generate_style_hook_titles(
+    blog_title: str,
+    script: str,
+    visual_style: str,
+    *,
+    blog_body: str | None = None,
+    model: str | None = None,
+) -> dict[str, str | None]:
+    """Generate on-video style_title / style_subtitle tuned to viral Shorts hooks."""
+    from app.services.visual_style_catalog import normalize_visual_style, title_style_hint
+
+    slug = normalize_visual_style(visual_style)
+    hint = title_style_hint(slug)
+    body = (blog_body or "").strip()
+    place_hints = _extract_place_hints(blog_title, body)
+    if not settings.openai_api_key:
+        return _heuristic_style_hook_titles(blog_title, slug, blog_body=body)
+
+    title_model = _resolve_title_model(model)
+    client = OpenAI(api_key=settings.openai_api_key)
+    system_prompt = (
+        "You write on-screen titles for vertical Korean Shorts (Super-Shorts style). "
+        "Return only valid JSON. Match the source language (prefer Korean). "
+        "No emoji spam, no hashtags. "
+        "Grounded tension implied by the post is allowed; fabricated rankings/stats/lies are not."
+    )
+    user_prompt = f"""
+Create scroll-stopping on-video header titles for a Shorts template.
+
+Visual style: {slug}
+Style rules: {hint}
+
+Return JSON exactly like:
+{{
+  "angles":["curiosity/FOMO angle 1","angle 2","angle 3"],
+  "candidates":[
+    {{"style_title":"...","style_subtitle":"...","angle":"..."}},
+    {{"style_title":"...","style_subtitle":"...","angle":"..."}},
+    {{"style_title":"...","style_subtitle":"...","angle":"..."}},
+    {{"style_title":"...","style_subtitle":"...","angle":"..."}},
+    {{"style_title":"...","style_subtitle":"...","angle":"..."}}
+  ]
+}}
+
+Hard rules:
+- Generate exactly 5 diverse candidates (different hook angles).
+- Each candidate MUST use at least one of: curiosity gap, time/change FOMO, twist/contrast,
+  concrete number/scene, or result-first.
+- FORBIDDEN topic labels: place/topic + abstract noun only
+  (e.g. "한남동의 미래", "○의 매력", "알아보자", "총정리").
+- GOOD examples (pattern only — invent from THIS post, do not copy blindly):
+  · "몇 년 뒤에는 못 볼 한남동 풍경"
+  · "알고 보니 바뀌는 ○○ 풍경"
+  · "이 골목, 곧 사라질지도"
+  · "가기 전에 알아야 할 ○○"
+  · "사진으로만 남을 ○○"
+- BAD examples: "한남동의 미래", "여행 추천", "맛집 총정리"
+- Length: prefer ~18–28 chars for a single line, or two lines totaling ~28–40 chars.
+- style_subtitle may be "" when the style says empty.
+- If narration opening already has a strong hook, keep that SAME angle in titles.
+- Do not invent "1위", fake stats, or claims missing from the blog/script.
+- You may wrap one emphasis word in *asterisks* inside style_title (optional).
+
+Blog title: {blog_title or "(none)"}
+
+Blog body (key excerpt):
+{(body or "")[:2200] or "(none)"}
+
+Narration script (excerpt — align titles with the hook opening if present):
+{(script or "")[:1200] or "(none)"}
+""".strip()
+
+    try:
+        response = client.chat.completions.create(
+            model=title_model,
+            response_format={"type": "json_object"},
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+        )
+    except Exception:
+        return _heuristic_style_hook_titles(blog_title, slug, blog_body=body)
+
+    raw_text = response.choices[0].message.content if response.choices else None
+    if not raw_text:
+        return _heuristic_style_hook_titles(blog_title, slug, blog_body=body)
+    try:
+        parsed = json.loads(raw_text)
+    except json.JSONDecodeError:
+        return _heuristic_style_hook_titles(blog_title, slug, blog_body=body)
+
+    candidates_raw = parsed.get("candidates")
+    candidates: list[dict[str, str | None]] = []
+    if isinstance(candidates_raw, list):
+        for item in candidates_raw:
+            if not isinstance(item, dict):
+                continue
+            candidates.append(
+                {
+                    "style_title": str(item.get("style_title") or "").strip() or None,
+                    "style_subtitle": str(item.get("style_subtitle") or "").strip() or None,
+                }
+            )
+    # Backward-compatible single-object response.
+    if not candidates and parsed.get("style_title"):
+        candidates.append(
+            {
+                "style_title": str(parsed.get("style_title") or "").strip() or None,
+                "style_subtitle": str(parsed.get("style_subtitle") or "").strip() or None,
+            }
+        )
+
+    return _pick_best_style_title_candidate(
+        candidates,
+        slug=slug,
+        place_hints=place_hints,
+        blog_title=blog_title,
+        blog_body=body,
+    )
 
 
 def generate_blog_metadata(blog_title: str, script: str, *, model: str | None = None) -> dict[str, Any]:
@@ -2388,8 +3014,13 @@ def _update_blog_clip_awaiting_images(
     blog_clip_id: int,
     blog_title: str,
     candidates: dict[str, str],
+    *,
+    blog_body_text: str | None = None,
 ) -> None:
     status_value, progress_stage, progress_percent = PROGRESS_AWAITING_IMAGES
+    body = (blog_body_text or "").strip() or None
+    if body and len(body) > 12000:
+        body = body[:12000]
     conn.execute(
         """
         UPDATE blog_clips
@@ -2397,6 +3028,7 @@ def _update_blog_clip_awaiting_images(
             progress_stage = ?,
             progress_percent = ?,
             blog_title = ?,
+            blog_body_text = ?,
             script_candidates_json = ?,
             error_message = NULL,
             updated_at = CURRENT_TIMESTAMP
@@ -2407,6 +3039,7 @@ def _update_blog_clip_awaiting_images(
             progress_stage,
             progress_percent,
             blog_title,
+            body,
             json.dumps(candidates, ensure_ascii=False),
             blog_clip_id,
         ),
@@ -2433,15 +3066,17 @@ def _replace_blog_clip_image_candidates(
     downloaded: list[tuple[Path, str]],
 ) -> None:
     conn.execute("DELETE FROM blog_clip_image_candidates WHERE blog_clip_id = ?", (blog_clip_id,))
+    # Pre-select only up to the selectable max; extra downloads stay as unselected candidates.
+    default_selected = min(len(downloaded), settings.blog_image_max_count)
     for index, (path, source_url) in enumerate(downloaded):
         conn.execute(
             """
             INSERT INTO blog_clip_image_candidates (
                 blog_clip_id, order_index, storage_path, source_url, selected
             )
-            VALUES (?, ?, ?, ?, 1)
+            VALUES (?, ?, ?, ?, ?)
             """,
-            (blog_clip_id, index, str(path), source_url),
+            (blog_clip_id, index, str(path), source_url, 1 if index < default_selected else 0),
         )
     conn.commit()
 
@@ -2711,8 +3346,16 @@ def select_blog_clip_script(conn: sqlite3.Connection, user_id: int, blog_clip_id
 
     _generate_initial_boards(conn, user_id, blog_clip_id, script)
 
+    # On-screen titles: generate Shorts hooks aligned with the chosen narration opening.
+    hook = generate_style_hook_titles(
+        blog_title=blog_clip.blog_title or "",
+        script=script,
+        visual_style=blog_clip.visual_style,
+        blog_body=blog_clip.blog_body_text or "",
+        model=blog_clip.script_model,
+    )
+
     status_value, progress_stage, progress_percent = PROGRESS_AWAITING_BOARDS
-    seed_title = (blog_clip.blog_title or "").strip() or None
     conn.execute(
         """
         UPDATE blog_clips
@@ -2720,11 +3363,19 @@ def select_blog_clip_script(conn: sqlite3.Connection, user_id: int, blog_clip_id
             progress_stage = ?,
             progress_percent = ?,
             wizard_step = 'edit_mode',
-            style_title = COALESCE(NULLIF(TRIM(style_title), ''), ?),
+            style_title = ?,
+            style_subtitle = ?,
             updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
         """,
-        (status_value, progress_stage, progress_percent, seed_title, blog_clip_id),
+        (
+            status_value,
+            progress_stage,
+            progress_percent,
+            hook.get("style_title"),
+            hook.get("style_subtitle"),
+            blog_clip_id,
+        ),
     )
     conn.commit()
 
@@ -2773,13 +3424,62 @@ def run_blog_clip_pipeline(blog_clip_id: int, user_id: int, url: str, style: str
                 narration_language=narration_language,
                 model=script_model,
             )
-            _update_blog_clip_awaiting_images(conn, blog_clip_id, blog_content.title, candidates)
+            _update_blog_clip_awaiting_images(
+                conn,
+                blog_clip_id,
+                blog_content.title,
+                candidates,
+                blog_body_text=blog_content.text,
+            )
         except HTTPException as exc:
             _update_blog_clip_failed(conn, blog_clip_id, str(exc.detail))
         except Exception:
             _update_blog_clip_failed(conn, blog_clip_id, "Unexpected blog short generation failure.")
     finally:
         next(connection_generator, None)
+
+
+def _assert_remotion_wysiwyg_props(
+    blog_clip: BlogClip,
+    boards: list[BlogClipBoard],
+    props: dict[str, Any],
+) -> None:
+    """Fail loud when Remotion props diverge from editor media (GIF/overlay/fonts)."""
+    prop_boards = props.get("boards") or []
+    if len(prop_boards) != len(boards):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Remotion props board count mismatch ({len(prop_boards)} != {len(boards)}).",
+        )
+
+    for board, prop in zip(boards, prop_boards, strict=True):
+        path = (board.image_path or "").lower()
+        expects_gif = path.endswith(".gif")
+        animated = bool(prop.get("animated"))
+        if expects_gif and not animated:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Board {board.id} is a GIF but Remotion props.animated is false.",
+            )
+
+    overlay = props.get("overlay") or blog_clip_style_overlay(blog_clip)
+    logger.info(
+        "wysiwyg_guard clip=%s style=%s title=%r overlay=%s bgm=%s animated_boards=%s",
+        blog_clip.id,
+        props.get("visualStyle") or blog_clip.visual_style,
+        props.get("styleTitle") or blog_clip.style_title,
+        bool(overlay),
+        blog_clip.bgm_asset_id,
+        sum(1 for item in prop_boards if item.get("animated")),
+    )
+
+
+def _ensure_render_output_playable(video_path: Path) -> None:
+    if not video_path.is_file() or video_path.stat().st_size < 1024:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Rendered video file is missing or too small to play.",
+        )
 
 
 def _render_boards_media(
@@ -2795,6 +3495,21 @@ def _render_boards_media(
 
     Returns (script, video_path, subtitled_path, render_spec).
     """
+    # Fresh row + auto BGM/SFX so style_overlay / bgm_asset_id match the latest editor save.
+    blog_clip = _apply_auto_audio_for_render(conn, user_id, blog_clip)
+    refreshed = get_blog_clip_for_user(conn, user_id, blog_clip.id)
+    if refreshed is not None:
+        blog_clip = refreshed
+    prepare_overlay = blog_clip_style_overlay(blog_clip) or {}
+    logger.info(
+        "render_prepare clip=%s overlay=%s fonts_title=%s fonts_caption=%s bgm=%s",
+        blog_clip.id,
+        bool(prepare_overlay),
+        prepare_overlay.get("titleFont"),
+        prepare_overlay.get("captionFont"),
+        blog_clip.bgm_asset_id,
+    )
+
     script = " ".join(board.text.strip() for board in boards if board.text.strip()).strip()
     if not script:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="At least one board must contain narration text.")
@@ -2841,6 +3556,11 @@ def _render_boards_media(
         try:
             # Prefer Naver w966 (etc.) over tiny editor thumbnails before Remotion encode.
             upgrade_blog_clip_images_to_high_res(conn, user_id, blog_clip.id)
+            # Re-read boards + clip after image upgrade / TTS duration persist / overlay flush.
+            boards = list_blog_clip_boards(conn, user_id, blog_clip.id)
+            latest_clip = get_blog_clip_for_user(conn, user_id, blog_clip.id)
+            if latest_clip is not None:
+                blog_clip = latest_clip
             props = build_remotion_render_props(
                 conn,
                 user_id,
@@ -2849,7 +3569,9 @@ def _render_boards_media(
                 board_durations,
                 mixed_audio_path,
             )
+            _assert_remotion_wysiwyg_props(blog_clip, boards, props)
             render_blog_shorts_with_remotion(props, video_path)
+            _ensure_render_output_playable(video_path)
             # Captions are composed inside Remotion — no separate ASS burn-in.
             spec = _build_render_spec(
                 engine="remotion",
@@ -2868,12 +3590,22 @@ def _render_boards_media(
                 raise
             fallback_reason = str(exc)
             logger.warning(
-                "Remotion render failed for blog_clip=%s; falling back to FFmpeg: %s",
+                "Remotion render failed for blog_clip=%s; falling back to FFmpeg "
+                "(visual style / transition / style headers are not applied on FFmpeg): %s",
                 blog_clip.id,
                 exc,
             )
             # Fall through to FFmpeg slideshow + ASS.
 
+    # Reload boards so persisted TTS durations are available if anything reads them.
+    boards = list_blog_clip_boards(conn, user_id, blog_clip.id)
+    image_paths = [board.image_path for board in boards]
+    if requested_engine == "remotion" and fallback_reason:
+        logger.warning(
+            "wysiwyg_fallback clip=%s reason=%s — style/fonts/GIF composition may not match preview",
+            blog_clip.id,
+            fallback_reason,
+        )
     create_image_slideshow(image_paths, mixed_audio_path, str(video_path), board_durations)
 
     events = _board_subtitle_events(boards, board_durations)
@@ -2890,6 +3622,7 @@ def _render_boards_media(
         subtitled_video_path = video_path
         captions = "none"
 
+    _ensure_render_output_playable(Path(subtitled_video_path))
     spec = _build_render_spec(
         engine="ffmpeg",
         requested_engine=requested_engine,

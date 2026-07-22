@@ -179,6 +179,7 @@ class BlogClip:
     user_id: int
     source_url: str
     blog_title: str | None
+    blog_body_text: str | None
     narration_script: str | None
     script_tone: str | None
     script_candidates_json: str | None
@@ -208,6 +209,7 @@ class BlogClip:
     visual_style: str
     style_title: str | None
     style_subtitle: str | None
+    style_overlay_json: str | None
     transition_sec: float | None
     transition_type: str | None
     render_spec_json: str | None

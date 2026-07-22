@@ -46,10 +46,10 @@ export function RenderSpecFooter({
   if (spec.fallback_reason) rows.push(["폴백 사유", spec.fallback_reason]);
 
   return (
-    <details className="render-spec-footer">
+    <details className="render-spec-footer" open={Boolean(spec.fallback_used)}>
       <summary>
         {title}: <strong>{engineLabel(spec.engine)}</strong>
-        {spec.fallback_used ? " · fallback" : ""}
+        {spec.fallback_used ? " · ⚠ 스타일 미적용(fallback)" : ""}
         {spec.duration_seconds != null ? ` · ${spec.duration_seconds}s` : ""}
         {spec.resolution ? ` · ${spec.resolution}` : ""}
       </summary>

@@ -12,6 +12,7 @@ import {
 } from "../constants";
 import type { BlogClip, BlogClipVersion, ScriptTone, SubtitleStyle } from "../types";
 import { AliveProgressBar } from "./AliveProgressBar";
+import { CompletedShortPlayer } from "./CompletedShortPlayer";
 import { MetadataBox } from "./MetadataBox";
 import { RenderSpecFooter } from "./RenderSpecFooter";
 
@@ -241,6 +242,16 @@ export function BlogClipCard({
         <p className="narration-script">{blogClip.narration_script}</p>
       ) : null}
       {blogClip.error_message ? <p className="error-text">{blogClip.error_message}</p> : null}
+      {isCompleted && canDownload ? (
+        <div className="completed-result-block">
+          <p className="muted completed-result-label">완성본 미리보기</p>
+          <CompletedShortPlayer
+            blogClipId={blogClip.id}
+            versionId={blogClip.active_version_id}
+            label="완성 쇼츠 미리보기"
+          />
+        </div>
+      ) : null}
       {canDownload ? (
         <div className="subtitle-controls">
           <button
@@ -249,7 +260,7 @@ export function BlogClipCard({
             onClick={() => onDownloadBlogClip(blogClip)}
             disabled={downloadingBlogClipId === blogClip.id}
           >
-            {downloadingBlogClipId === blogClip.id ? "다운로드 중" : "활성 버전 다운로드"}
+            {downloadingBlogClipId === blogClip.id ? "다운로드 중" : "다운로드"}
           </button>
           <button
             className="small-button metadata-button"
@@ -271,6 +282,23 @@ export function BlogClipCard({
           hashtags={blogClip.hashtags}
           onCopyText={onCopyText}
         />
+      ) : null}
+
+      {isCompleted && blogClip.render_spec?.fallback_used ? (
+        <p className="form-message render-fallback-warning" role="alert">
+          <strong>템플릿·폰트가 적용되지 않았을 수 있습니다.</strong>
+          {" "}
+          Remotion 실패로 FFmpeg 폴백 렌더입니다(스타일 헤더·오버레이·커스텀 폰트 미적용).
+          Remotion 서비스(:3100)를 켠 뒤 다시 렌더하세요.
+          {blogClip.render_spec.fallback_reason
+            ? ` 사유: ${blogClip.render_spec.fallback_reason}`
+            : ""}
+        </p>
+      ) : null}
+      {isCompleted && blogClip.render_spec?.engine === "ffmpeg" && !blogClip.render_spec?.fallback_used ? (
+        <p className="form-message render-fallback-warning" role="status">
+          FFmpeg 엔진으로 렌더되었습니다. 비주얼 템플릿·온스크린 폰트는 Remotion 경로에서만 적용됩니다.
+        </p>
       ) : null}
 
       {isCompleted ? (

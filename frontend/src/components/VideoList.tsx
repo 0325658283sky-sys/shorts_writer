@@ -20,6 +20,7 @@ export function VideoList({
   analyzingId,
   transcribingId,
   highlightingId,
+  focusVideoId,
   onAnalyze,
   onTranscript,
   onHighlights,
@@ -49,6 +50,7 @@ export function VideoList({
   analyzingId: number | null;
   transcribingId: number | null;
   highlightingId: number | null;
+  focusVideoId?: number | null;
   onAnalyze: (videoId: number) => void;
   onTranscript: (videoId: number) => void;
   onHighlights: (videoId: number) => void;
@@ -68,12 +70,19 @@ export function VideoList({
         <p className="muted">아직 업로드된 영상이 없습니다.</p>
       ) : (
         videos.map((video) => (
-          <article className="video-item" key={video.id}>
+          <article
+            className={`video-item ${focusVideoId === video.id ? "is-focused" : ""}`}
+            key={video.id}
+            id={focusVideoId === video.id ? `video-focus-${video.id}` : undefined}
+          >
             <div className="video-copy">
               <h3>{video.original_filename}</h3>
               <p>
                 {formatBytes(video.file_size)} · {video.created_at}
               </p>
+              {focusVideoId === video.id ? (
+                <p className="create-note">다음: 분석 → 음성 인식 → 하이라이트 → 클립 만들기</p>
+              ) : null}
               {video.audio_path ? <p>오디오 추출 완료</p> : null}
               {video.error_message ? <p className="error-text">{video.error_message}</p> : null}
               {transcripts[video.id]?.text ? <p className="transcript-preview">{transcripts[video.id].text}</p> : null}
@@ -104,12 +113,12 @@ export function VideoList({
             <div className="video-actions">
               <span className={`status-badge status-${video.status}`}>{VIDEO_STATUS_LABELS[video.status]}</span>
               <button
-                className="small-button"
+                className={`small-button ${focusVideoId === video.id ? "cta-button" : ""}`}
                 type="button"
                 onClick={() => onAnalyze(video.id)}
                 disabled={analyzingId === video.id || video.status === "extracting_audio"}
               >
-                {analyzingId === video.id ? "분석 중" : "분석"}
+                {analyzingId === video.id ? "분석 중" : focusVideoId === video.id ? "분석하기" : "분석"}
               </button>
               <button
                 className="small-button"

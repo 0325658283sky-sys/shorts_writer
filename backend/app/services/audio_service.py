@@ -24,7 +24,7 @@ SYSTEM_AUDIO_ROOT = AUDIO_ROOT / "system"
 USER_AUDIO_ROOT = AUDIO_ROOT / "users"
 ALLOWED_AUDIO_KINDS = {"bgm", "sfx"}
 ALLOWED_AUDIO_EXTENSIONS = {".mp3", ".wav", ".m4a", ".aac", ".ogg"}
-DEFAULT_BGM_VOLUME = 0.30
+DEFAULT_BGM_VOLUME = 0.32
 DEFAULT_SFX_VOLUME = 0.50
 BGM_VOLUME_MIN = 0.0
 BGM_VOLUME_MAX = 0.55  # hard cap so BGM cannot bury TTS
@@ -33,16 +33,7 @@ _ASSET_COLUMNS = """
     id, user_id, kind, name, slug, storage_path, duration_seconds, created_at, updated_at
 """
 
-# Preference order for auto-pick by tone / length.
-_BGM_BY_TONE = {
-    "hook": ["promo_pulse", "bright_lift", "light_warm", "soft_pad"],
-    "summary": ["soft_pad", "calm_drone", "light_warm", "promo_pulse"],
-    "detailed": ["light_warm", "calm_drone", "soft_pad", "bright_lift"],
-}
-_BGM_BY_LENGTH = {
-    "short": ["promo_pulse", "bright_lift", "soft_pad", "light_warm"],
-    "long": ["calm_drone", "light_warm", "soft_pad", "promo_pulse"],
-}
+# Preference order for auto-pick moved to bgm_mood_catalog (KR Shorts moods).
 _SFX_ROTATION = ["tick", "pop", "whoosh", "click", "swell"]
 
 
@@ -131,18 +122,19 @@ def pick_default_bgm(
     conn: sqlite3.Connection,
     script_tone: str | None,
     target_length: str,
+    visual_style: str | None = None,
+    *,
+    mood_id: str | None = None,
 ) -> AudioAsset | None:
-    """Pick a system BGM from tone + length (W4 auto_bgm)."""
-    candidates: list[str] = []
-    if script_tone and script_tone in _BGM_BY_TONE:
-        candidates.extend(_BGM_BY_TONE[script_tone])
-    length_key = target_length if target_length in _BGM_BY_LENGTH else "short"
-    for slug in _BGM_BY_LENGTH[length_key]:
-        if slug not in candidates:
-            candidates.append(slug)
-    for slug in ("soft_pad", "light_warm", "promo_pulse", "bright_lift", "calm_drone"):
-        if slug not in candidates:
-            candidates.append(slug)
+    """Pick a system BGM from KR Shorts mood (style/tone) + length bias."""
+    from app.services.bgm_mood_catalog import resolve_candidate_slugs
+
+    _mood, candidates = resolve_candidate_slugs(
+        script_tone=script_tone,
+        visual_style=visual_style,
+        target_length=target_length,
+        mood_id=mood_id,
+    )
     for slug in candidates:
         asset = get_system_audio_by_slug(conn, slug)
         if asset is not None:

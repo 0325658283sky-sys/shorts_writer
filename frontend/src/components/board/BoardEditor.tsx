@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { authorizedRequest } from "../../api/client";
 import { SCRIPT_TONE_LABELS } from "../../constants";
 import type { BlogClip, Board } from "../../types";
 import { BoardList } from "./BoardList";
 import { MediaPanel } from "./MediaPanel";
-import { RemotionPreviewPane } from "./RemotionPreviewPane";
+import { RemotionPreviewPane, type RemotionPreviewPaneHandle } from "./RemotionPreviewPane";
 
 export function BoardEditor({
   blogClip,
@@ -34,13 +34,14 @@ export function BoardEditor({
   const [applyingStock, setApplyingStock] = useState(false);
   const [assigningSpeaker, setAssigningSpeaker] = useState(false);
   const [ttsSpeed, setTtsSpeed] = useState(blogClip.tts_speed ?? 1);
-  const [visualStyle, setVisualStyle] = useState(blogClip.visual_style || "fullscreen");
+  const [visualStyle, setVisualStyle] = useState(blogClip.visual_style || "impact_full");
   const [applyingVisualStyle, setApplyingVisualStyle] = useState(false);
   const [savingStyleCopy, setSavingStyleCopy] = useState(false);
   const [savingMotion, setSavingMotion] = useState(false);
   const [bgmAssetId, setBgmAssetId] = useState<number | null>(blogClip.bgm_asset_id ?? null);
   const [bgmVolume, setBgmVolume] = useState(blogClip.bgm_volume ?? 0.3);
   const [audioSaving, setAudioSaving] = useState(false);
+  const previewPaneRef = useRef<RemotionPreviewPaneHandle>(null);
 
   const selectedBoard = useMemo(() => boards.find((board) => board.id === selectedBoardId) ?? null, [boards, selectedBoardId]);
 
@@ -76,7 +77,7 @@ export function BoardEditor({
 
   useEffect(() => {
     setClip(blogClip);
-    setVisualStyle(blogClip.visual_style || "fullscreen");
+    setVisualStyle(blogClip.visual_style || "impact_full");
   }, [blogClip]);
 
   useEffect(() => {
@@ -85,7 +86,7 @@ export function BoardEditor({
       return;
     }
     setTtsSpeed(blogClip.tts_speed ?? 1);
-    setVisualStyle(blogClip.visual_style || "fullscreen");
+    setVisualStyle(blogClip.visual_style || "impact_full");
     setBgmAssetId(blogClip.bgm_asset_id ?? null);
     setBgmVolume(blogClip.bgm_volume ?? 0.3);
     void loadBoards();
@@ -292,6 +293,33 @@ export function BoardEditor({
     }
   }
 
+  async function handleApplyVoiceToAll(voiceId: string) {
+    if (assigningSpeaker) return;
+    setAssigningSpeaker(true);
+    setError("");
+    try {
+      const updated = await authorizedRequest<BlogClip>(`/blog-clips/${blogClip.id}/default-voice`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          voice_id: voiceId,
+          tts_speed: ttsSpeed,
+          apply_to_all_boards: true,
+        }),
+      });
+      setClip(updated);
+      setTtsSpeed(updated.tts_speed);
+      onClipUpdated?.(updated);
+      const loaded = await authorizedRequest<Board[]>(`/blog-clips/${blogClip.id}/boards`);
+      setBoards(loaded);
+      onMessage(`보이스 ${voiceId}를 모든 보드에 적용했습니다.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "일괄 보이스 적용에 실패했습니다.");
+      throw err;
+    } finally {
+      setAssigningSpeaker(false);
+    }
+  }
+
   async function handleTtsSpeedChange(speed: number) {
     setError("");
     try {
@@ -320,7 +348,9 @@ export function BoardEditor({
       setBgmAssetId(updated.bgm_asset_id ?? null);
       setClip(updated);
       onClipUpdated?.(updated);
-      onMessage("영상 스타일과 추천 오디오 팩을 적용했습니다.");
+      const loaded = await authorizedRequest<Board[]>(`/blog-clips/${blogClip.id}/boards`);
+      setBoards(loaded);
+      onMessage("영상 스타일·훅 타이틀·추천 보이스/BGM 팩을 적용했습니다.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "영상 스타일 적용에 실패했습니다.");
       throw err;
@@ -452,10 +482,12 @@ export function BoardEditor({
       setError("하나 이상의 보드에 나레이션 문구가 필요합니다.");
       return;
     }
-    await saveText();
     setRendering(true);
     setError("");
     try {
+      // Persist board text + in-preview title/font/overlay so Remotion sees the same look.
+      await saveText();
+      await previewPaneRef.current?.flushPendingEdits();
       const updated = await authorizedRequest<BlogClip>(`/blog-clips/${blogClip.id}/render`, { method: "POST" });
       onRendered(updated);
       onMessage("보드 구성을 확정했습니다. 영상 렌더링을 시작합니다.");
@@ -513,6 +545,7 @@ export function BoardEditor({
             adding={adding}
           />
           <RemotionPreviewPane
+            ref={previewPaneRef}
             blogClip={clip}
             boards={boards}
             selectedBoardId={selectedBoardId}
@@ -522,6 +555,21 @@ export function BoardEditor({
             onSelectBoard={selectBoard}
             onDurationCommit={(boardId, durationSec) => void commitBoardDuration(boardId, durationSec)}
             onBoardsSynced={() => void loadBoards()}
+            onBoardDurationsSynced={(updates) => {
+              const byId = new Map(updates.map((item) => [item.boardId, item.durationSec]));
+              setBoards((current) =>
+                current.map((board) => {
+                  const next = byId.get(board.id);
+                  return next == null ? board : { ...board, duration_seconds: next };
+                }),
+              );
+            }}
+            onClipUpdated={(updated) => {
+              setClip(updated);
+              setVisualStyle(updated.visual_style || "impact_full");
+              onClipUpdated?.(updated);
+            }}
+            onMessage={onMessage}
             bgmAssetId={bgmAssetId}
             bgmVolume={bgmVolume}
           />
@@ -535,15 +583,25 @@ export function BoardEditor({
             ttsSpeed={ttsSpeed}
             onTtsSpeedChange={(speed) => void handleTtsSpeedChange(speed)}
             onAssignSpeaker={handleAssignSpeaker}
+            onApplyVoiceToAll={handleApplyVoiceToAll}
             assigningSpeaker={assigningSpeaker}
             appliedVisualStyle={visualStyle}
             styleTitle={clip.style_title ?? clip.blog_title}
             styleSubtitle={clip.style_subtitle}
+            styleOverlay={clip.style_overlay}
             transitionSec={clip.transition_sec}
             transitionType={clip.transition_type}
             onApplyVisualStyle={handleApplyVisualStyle}
             onStyleCopyChange={handleStyleCopyChange}
             onMotionChange={handleMotionChange}
+            onTitlesGenerated={(updated) => {
+              setClip(updated);
+              onClipUpdated?.(updated);
+            }}
+            onOverlayUpdated={(updated) => {
+              setClip(updated);
+              onClipUpdated?.(updated);
+            }}
             applyingVisualStyle={applyingVisualStyle}
             savingStyleCopy={savingStyleCopy}
             savingMotion={savingMotion}

@@ -45,7 +45,8 @@ def test_props_from_boards_applies_clip_transition_overrides(conn):
     assert props["transitionSec"] == 0.8
     assert props["transitionType"] == "none"
     assert props["style"]["transitionType"] == "none"
-    assert props["visualStyle"] == "fullscreen"
+    assert props["visualStyle"] == "impact_full"
+    assert props["style"]["caption"] == "center_stroke"
     assert len(props["boards"]) == 2
     assert props["boards"][0]["durationSec"] == 3.0
     assert props["boards"][1]["durationSec"] == DEFAULT_BOARD_DURATION_SEC
@@ -69,7 +70,8 @@ def test_props_from_boards_uses_catalog_transition_when_clip_unset(conn):
     )
     assert props["transitionSec"] == 0.25
     assert props["transitionType"] == "slide"
-    assert props["style"]["header"] == "viral_black"
+    assert props["visualStyle"] == "viral_cyan"
+    assert props["style"]["header"] == "viral_cyan"
 
 
 def test_build_blog_shorts_props_requires_boards(conn, awaiting_boards_clip):
@@ -92,7 +94,8 @@ def test_build_blog_shorts_props_with_boards(conn, awaiting_boards_clip):
     )
     conn.commit()
     props = build_blog_shorts_props(conn, 1, awaiting_boards_clip, materialize=False)
-    assert props["visualStyle"] == "card_news"
+    assert props["visualStyle"] == "card_white"
+    assert props["style"]["caption"] == "white_pill"
     assert props["transitionSec"] == 0.4
     assert props["boards"][0]["text"] == "보드 A"
     assert props["boards"][0]["durationSec"] == 2.0
@@ -111,3 +114,36 @@ def test_build_remotion_render_props_rejects_duration_mismatch(conn):
             narration_audio_path="/tmp/missing.mp3",
         )
     assert exc.value.status_code == 500
+
+
+def test_props_materialize_preserves_gif_extension(conn, tmp_path, monkeypatch):
+    from app.services import blog_service, remotion_props_service
+
+    public_root = tmp_path / "remotion-public"
+    public_root.mkdir()
+    monkeypatch.setattr(remotion_props_service, "remotion_public_dir", lambda: public_root)
+
+    image_root = tmp_path / "blog-images"
+    monkeypatch.setattr(blog_service, "BLOG_IMAGE_ROOT", image_root)
+
+    clip = make_blog_clip(id=42)
+    gif_dir = image_root / "1" / "42"
+    gif_dir.mkdir(parents=True)
+    gif_path = gif_dir / "motion.gif"
+    gif_path.write_bytes(b"GIF89a" + (b"\x00" * 64))
+
+    boards = [make_board(id=7, image_path=str(gif_path), text="움짤")]
+    props = _props_from_boards(
+        conn,
+        user_id=1,
+        blog_clip=clip,
+        boards=boards,
+        materialize=True,
+        duration_overrides=None,
+        narration_audio_path=None,
+    )
+    image_url = props["boards"][0]["imageUrl"]
+    assert image_url is not None
+    assert image_url.endswith(".gif")
+    assert props["boards"][0]["animated"] is True
+    assert (public_root / image_url).is_file()

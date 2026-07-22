@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
 import { authorizedRequest } from "../api/client";
+import { FontRolePicker } from "./FontRolePicker";
+import { normalizeVisualStyleSlug } from "../lib/blogShortsProps";
+import { DEFAULT_SHORTS_FONT_ID, normalizeShortsFontId } from "../lib/shortsFonts";
 import type { BlogClip, VisualStyle, VisualStyleSlug } from "../types";
 
 export function VideoStyleStep({
@@ -8,6 +11,7 @@ export function VideoStyleStep({
   onSelect,
   onBack,
   onMessage,
+  onClipUpdated,
 }: {
   blogClip: BlogClip;
   saving: boolean;
@@ -17,18 +21,33 @@ export function VideoStyleStep({
   ) => Promise<void>;
   onBack?: () => void;
   onMessage: (message: string) => void;
+  onClipUpdated?: (clip: BlogClip) => void;
 }) {
   const [styles, setStyles] = useState<VisualStyle[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selected, setSelected] = useState(blogClip.visual_style || "fullscreen");
+  const [selected, setSelected] = useState(normalizeVisualStyleSlug(blogClip.visual_style));
   const [titleDraft, setTitleDraft] = useState(blogClip.style_title || blogClip.blog_title || "");
   const [subtitleDraft, setSubtitleDraft] = useState(blogClip.style_subtitle || "");
-
+  const [titleFont, setTitleFont] = useState(
+    normalizeShortsFontId(blogClip.style_overlay?.titleFont ?? DEFAULT_SHORTS_FONT_ID),
+  );
+  const [captionFont, setCaptionFont] = useState(
+    normalizeShortsFontId(blogClip.style_overlay?.captionFont ?? DEFAULT_SHORTS_FONT_ID),
+  );
   useEffect(() => {
-    setSelected(blogClip.visual_style || "fullscreen");
+    setSelected(normalizeVisualStyleSlug(blogClip.visual_style));
     setTitleDraft(blogClip.style_title || blogClip.blog_title || "");
     setSubtitleDraft(blogClip.style_subtitle || "");
-  }, [blogClip.visual_style, blogClip.style_title, blogClip.style_subtitle, blogClip.blog_title]);
+    setTitleFont(normalizeShortsFontId(blogClip.style_overlay?.titleFont ?? DEFAULT_SHORTS_FONT_ID));
+    setCaptionFont(normalizeShortsFontId(blogClip.style_overlay?.captionFont ?? DEFAULT_SHORTS_FONT_ID));
+  }, [
+    blogClip.visual_style,
+    blogClip.style_title,
+    blogClip.style_subtitle,
+    blogClip.blog_title,
+    blogClip.style_overlay?.titleFont,
+    blogClip.style_overlay?.captionFont,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
@@ -38,8 +57,9 @@ export function VideoStyleStep({
         if (cancelled) return;
         setStyles(loaded);
         setSelected((current) => {
-          if (current && loaded.some((item) => item.slug === current)) return current;
-          return loaded[0]?.slug ?? "fullscreen";
+          const normalized = normalizeVisualStyleSlug(current);
+          if (normalized && loaded.some((item) => item.slug === normalized)) return normalized;
+          return loaded[0]?.slug ?? "impact_full";
         });
       })
       .catch((error) => {
@@ -59,6 +79,16 @@ export function VideoStyleStep({
         style_title: titleDraft,
         style_subtitle: subtitleDraft,
       });
+      const withFonts = await authorizedRequest<BlogClip>(`/blog-clips/${blogClip.id}/style-overlay`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          overlay: {
+            titleFont,
+            captionFont,
+          },
+        }),
+      });
+      onClipUpdated?.(withFonts);
     } catch {
       /* parent surfaces error */
     }
@@ -69,7 +99,7 @@ export function VideoStyleStep({
       <p className="create-kicker">퀵 모드 · 영상 스타일</p>
       <h1>영상 스타일을 선택해 주세요</h1>
       <p className="flow-lead">
-        상단 타이틀·보조설명을 정한 뒤 스타일을 고르면 추천 보이스·BGM이 함께 적용되고, 보이스 설정으로 이어갑니다.
+        템플릿 썸네일을 고르면 타이틀·자막·미디어 비율이 맞춰집니다. 추천 보이스·BGM도 함께 적용됩니다.
         강조 단어는 <code>*이렇게*</code> 감싸세요.
       </p>
 
@@ -94,8 +124,19 @@ export function VideoStyleStep({
         />
       </label>
 
+      <FontRolePicker
+        titleFont={titleFont}
+        captionFont={captionFont}
+        disabled={saving}
+        onChange={(next) => {
+          setTitleFont(next.titleFont);
+          setCaptionFont(next.captionFont);
+        }}
+      />
+
       {loading ? <p className="create-note">스타일 불러오는 중…</p> : null}
 
+      <p className="style-gallery-label">템플릿</p>
       <div className="style-gallery">
         {styles.map((style) => (
           <button

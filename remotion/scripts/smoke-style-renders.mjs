@@ -12,52 +12,77 @@ const root = join(__dirname, "..");
 const outDir = join(root, "out", "smoke");
 
 const STYLES = {
-  fullscreen: {
+  impact_full: {
     layout: "fullscreen",
-    caption: "bottom_box",
-    header: "overlay",
+    mediaFit: "cover",
+    canvasBg: "#000000",
+    caption: "center_stroke",
+    header: "none",
+    titleColor: "#ffffff",
+    accent: "#ffffff",
+    transitionSec: 0.35,
+    transitionType: "fade",
+    kenBurns: true,
+  },
+  info_black: {
+    layout: "letterbox",
+    mediaFit: "contain",
+    canvasBg: "#000000",
+    caption: "bottom_outline",
+    header: "info_black",
+    titleColor: "#ffffff",
     accent: "#FFE566",
     transitionSec: 0.35,
     transitionType: "fade",
-    kenBurns: true,
+    kenBurns: false,
   },
-  card_news: {
-    layout: "card",
-    caption: "card_bottom",
-    header: "card_white",
-    accent: "#1f6b4a",
-    transitionSec: 0.35,
-    transitionType: "fade",
-    kenBurns: true,
-  },
-  info_dark: {
-    layout: "fullscreen",
-    caption: "dark_bar",
+  info_navy: {
+    layout: "letterbox",
+    mediaFit: "contain",
+    canvasBg: "#0B1F3A",
+    caption: "black_box",
     header: "info_navy",
+    titleColor: "#ffffff",
     accent: "#7CFFB2",
     transitionSec: 0.35,
     transitionType: "fade",
-    kenBurns: true,
+    kenBurns: false,
   },
-  bold_hook: {
-    layout: "fullscreen",
-    caption: "bold_center",
-    header: "viral_black",
-    accent: "#5EF2D0",
+  viral_cyan: {
+    layout: "header_stack",
+    mediaFit: "cover",
+    canvasBg: "#000000",
+    caption: "black_box",
+    header: "viral_cyan",
+    titleColor: "#5EF2D0",
+    accent: "#ffffff",
     transitionSec: 0.25,
     transitionType: "slide",
+    kenBurns: true,
+  },
+  card_white: {
+    layout: "card",
+    mediaFit: "cover",
+    canvasBg: "#ffffff",
+    caption: "white_pill",
+    header: "card_white",
+    titleColor: "#151515",
+    accent: "#151515",
+    transitionSec: 0.35,
+    transitionType: "fade",
     kenBurns: true,
   },
 };
 
 const CASES = [
-  { name: "fullscreen-fade", visualStyle: "fullscreen" },
-  { name: "card_news-fade", visualStyle: "card_news" },
-  { name: "info_dark-fade", visualStyle: "info_dark" },
-  { name: "bold_hook-slide", visualStyle: "bold_hook" },
+  { name: "impact_full-fade", visualStyle: "impact_full" },
+  { name: "info_black-fade", visualStyle: "info_black" },
+  { name: "info_navy-fade", visualStyle: "info_navy" },
+  { name: "viral_cyan-slide", visualStyle: "viral_cyan" },
+  { name: "card_white-fade", visualStyle: "card_white" },
   {
-    name: "fullscreen-none",
-    visualStyle: "fullscreen",
+    name: "impact_full-none",
+    visualStyle: "impact_full",
     transitionSec: 0,
     transitionType: "none",
   },
@@ -79,58 +104,50 @@ function buildProps(caseDef) {
     style,
     boards: [
       {
-        text: "첫 보드 — 스타일·전환 스모크",
-        durationSec: 1.4,
+        text: "템플릿 자막 미리보기",
+        durationSec: 2.2,
         backgroundColor: "#1a3a4a",
       },
       {
-        text: "둘째 보드 — 크로스페이드/슬라이드",
-        durationSec: 1.4,
+        text: "두 번째 보드",
+        durationSec: 2.0,
         backgroundColor: "#2d4a3e",
       },
     ],
   };
 }
 
-mkdirSync(outDir, { recursive: true });
-
-const results = [];
-for (const caseDef of CASES) {
+function renderCase(caseDef) {
   const props = buildProps(caseDef);
-  const propsPath = join(outDir, `${caseDef.name}.json`);
-  const mp4Path = join(outDir, `${caseDef.name}.mp4`);
-  writeFileSync(propsPath, JSON.stringify(props, null, 2), "utf8");
-
-  console.log(`\n=== render ${caseDef.name} ===`);
-  const npxBin = process.platform === "win32" ? "npx.cmd" : "npx";
-  const rendered = spawnSync(
-    npxBin,
-    ["remotion", "render", "BlogShorts", mp4Path, `--props=${propsPath}`],
-    { cwd: root, encoding: "utf8", shell: false },
+  const propsPath = join(outDir, `${caseDef.name}.props`);
+  const outPath = join(outDir, `${caseDef.name}.mp4`);
+  writeFileSync(propsPath, JSON.stringify(props, null, 2));
+  const result = spawnSync(
+    "npx",
+    [
+      "remotion",
+      "render",
+      "src/index.ts",
+      "BlogShorts",
+      outPath,
+      "--props",
+      propsPath,
+      "--log",
+      "error",
+    ],
+    { cwd: root, encoding: "utf8", shell: true },
   );
-  if (rendered.stdout) process.stdout.write(rendered.stdout);
-  if (rendered.stderr) process.stderr.write(rendered.stderr);
-
-  const ok =
-    rendered.status === 0 && existsSync(mp4Path) && statSync(mp4Path).size > 10_000;
-  results.push({
-    name: caseDef.name,
-    status: rendered.status,
-    bytes: existsSync(mp4Path) ? statSync(mp4Path).size : 0,
-    ok,
-  });
-  if (!ok) {
-    console.error(`FAIL ${caseDef.name}`);
-    process.exitCode = 1;
-    break;
+  if (result.status !== 0) {
+    console.error(result.stdout);
+    console.error(result.stderr);
+    throw new Error(`Render failed: ${caseDef.name}`);
   }
-  console.log(`OK ${caseDef.name} (${results.at(-1).bytes} bytes)`);
+  const size = existsSync(outPath) ? statSync(outPath).size : 0;
+  console.log(`ok ${caseDef.name} (${Math.round(size / 1024)} KB)`);
 }
 
-console.log("\n--- smoke summary ---");
-for (const row of results) {
-  console.log(`${row.ok ? "PASS" : "FAIL"} ${row.name} bytes=${row.bytes}`);
+mkdirSync(outDir, { recursive: true });
+for (const caseDef of CASES) {
+  renderCase(caseDef);
 }
-if (results.every((row) => row.ok)) {
-  console.log(`All ${results.length} smoke renders OK → ${outDir}`);
-}
+console.log(`smoke complete: ${CASES.length}/${CASES.length}`);

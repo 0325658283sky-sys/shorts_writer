@@ -9,7 +9,16 @@ export type NarrationLanguage = "original" | "ko" | "en" | "ja";
 export type ScriptModel = "gpt-4o-mini" | "gpt-4o";
 export type TtsMode = "original_audio" | "ai_narration";
 export type WizardBoardsStep = "video_style" | "edit_mode" | "quick" | "ready";
-export type VisualStyleSlug = "fullscreen" | "card_news" | "info_dark" | "bold_hook";
+export type VisualStyleSlug =
+  | "impact_full"
+  | "info_black"
+  | "info_navy"
+  | "viral_cyan"
+  | "card_white"
+  | "fullscreen"
+  | "card_news"
+  | "info_dark"
+  | "bold_hook";
 export type TransitionType = "fade" | "none" | "slide";
 
 export type VisualStyle = {
@@ -20,6 +29,11 @@ export type VisualStyle = {
   previewImage?: string | null;
   layout: string;
   caption: string;
+  mediaFit?: string;
+  canvasBg?: string;
+  header?: string;
+  titleColor?: string;
+  accent?: string;
   transitionSec: number;
   transitionType?: TransitionType | string;
   kenBurns: boolean;
@@ -188,6 +202,37 @@ export type BlogClip = {
   visual_style?: VisualStyleSlug | string;
   style_title?: string | null;
   style_subtitle?: string | null;
+  style_overlay?: {
+    titleFont?: string;
+    captionFont?: string;
+    title?: Partial<{
+      x: number;
+      y: number;
+      fontSize: number;
+      color: string;
+      align: "left" | "center" | "right";
+      maxWidth: number;
+      visible: boolean;
+    }>;
+    subtitle?: Partial<{
+      x: number;
+      y: number;
+      fontSize: number;
+      color: string;
+      align: "left" | "center" | "right";
+      maxWidth: number;
+      visible: boolean;
+    }>;
+    caption?: Partial<{
+      x: number;
+      y: number;
+      fontSize: number;
+      color: string;
+      align: "left" | "center" | "right";
+      maxWidth: number;
+      visible: boolean;
+    }>;
+  } | null;
   transition_sec?: number | null;
   transition_type?: TransitionType | string | null;
   render_spec?: RenderSpec | null;

@@ -1,6 +1,7 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo } from "react";
 import {
   AbsoluteFill,
+  AnimatedImage,
   Audio,
   Img,
   Sequence,
@@ -10,49 +11,127 @@ import {
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
-import type { BlogBoardProps, BlogShortsProps, BlogShortsStyleProps, TransitionType } from "./types";
+import { ensureShortsFontsLoaded, normalizeShortsFontId, shortsFontCss } from "./fonts";
+import type {
+  BlogBoardProps,
+  BlogShortsProps,
+  BlogShortsStyleProps,
+  StyleOverlayLayer,
+  StyleOverlayProps,
+  TransitionType,
+} from "./types";
 
 const FPS = 30;
 export const BLOG_SHORTS_WIDTH = 1080;
 export const BLOG_SHORTS_HEIGHT = 1920;
 
+const LEGACY_STYLE_SLUGS: Record<string, string> = {
+  fullscreen: "impact_full",
+  card_news: "card_white",
+  info_dark: "info_navy",
+  bold_hook: "viral_cyan",
+};
+
+const DEFAULT_OVERLAYS: Record<string, Record<"title" | "subtitle" | "caption", StyleOverlayLayer>> = {
+  // Calibrated to reference Shorts samples (1080×1920).
+  impact_full: {
+    title: { x: 0.5, y: 0.08, fontSize: 72, color: "#ffffff", align: "center", maxWidth: 0.86, visible: false },
+    subtitle: { x: 0.5, y: 0.14, fontSize: 56, color: "#ffffff", align: "center", maxWidth: 0.86, visible: false },
+    caption: { x: 0.5, y: 0.42, fontSize: 92, color: "#ffffff", align: "center", maxWidth: 0.82, visible: true },
+  },
+  // Two-line header: title/subtitle 110px, tight stack (ref sample).
+  info_black: {
+    title: { x: 0.5, y: 0.055, fontSize: 110, color: "#ffffff", align: "center", maxWidth: 0.92, visible: true },
+    subtitle: { x: 0.5, y: 0.118, fontSize: 110, color: "#FFE566", align: "center", maxWidth: 0.92, visible: true },
+    caption: { x: 0.5, y: 0.70, fontSize: 48, color: "#ffffff", align: "center", maxWidth: 0.88, visible: true },
+  },
+  info_navy: {
+    title: { x: 0.5, y: 0.055, fontSize: 110, color: "#ffffff", align: "center", maxWidth: 0.92, visible: true },
+    subtitle: { x: 0.5, y: 0.118, fontSize: 110, color: "#7CFFB2", align: "center", maxWidth: 0.92, visible: true },
+    caption: { x: 0.5, y: 0.685, fontSize: 46, color: "#ffffff", align: "center", maxWidth: 0.86, visible: true },
+  },
+  viral_cyan: {
+    title: { x: 0.5, y: 0.05, fontSize: 110, color: "#5EF2D0", align: "center", maxWidth: 0.92, visible: true },
+    subtitle: { x: 0.5, y: 0.113, fontSize: 110, color: "#ffffff", align: "center", maxWidth: 0.92, visible: true },
+    caption: { x: 0.5, y: 0.64, fontSize: 46, color: "#ffffff", align: "center", maxWidth: 0.84, visible: true },
+  },
+  card_white: {
+    title: { x: 0.5, y: 0.05, fontSize: 110, color: "#151515", align: "center", maxWidth: 0.9, visible: true },
+    subtitle: { x: 0.5, y: 0.113, fontSize: 110, color: "#151515", align: "center", maxWidth: 0.9, visible: false },
+    caption: { x: 0.5, y: 0.72, fontSize: 44, color: "#151515", align: "center", maxWidth: 0.84, visible: true },
+  },
+};
+
 const STYLE_BY_VISUAL: Record<string, BlogShortsStyleProps> = {
-  fullscreen: {
+  impact_full: {
     layout: "fullscreen",
-    caption: "bottom_box",
-    header: "overlay",
+    mediaFit: "cover",
+    canvasBg: "#000000",
+    caption: "center_stroke",
+    header: "none",
+    titleColor: "#ffffff",
+    accent: "#ffffff",
+    transitionSec: 0.35,
+    transitionType: "fade",
+    kenBurns: true,
+  },
+  info_black: {
+    layout: "letterbox",
+    mediaFit: "cover",
+    canvasBg: "#000000",
+    caption: "bottom_outline",
+    header: "info_black",
+    titleColor: "#ffffff",
     accent: "#FFE566",
     transitionSec: 0.35,
     transitionType: "fade",
-    kenBurns: true,
+    kenBurns: false,
   },
-  card_news: {
-    layout: "card",
-    caption: "card_bottom",
-    header: "card_white",
-    accent: "#1f6b4a",
-    transitionSec: 0.35,
-    transitionType: "fade",
-    kenBurns: true,
-  },
-  info_dark: {
-    layout: "fullscreen",
-    caption: "dark_bar",
+  info_navy: {
+    layout: "letterbox",
+    mediaFit: "cover",
+    canvasBg: "#0B1F3A",
+    caption: "black_box",
     header: "info_navy",
+    titleColor: "#ffffff",
     accent: "#7CFFB2",
     transitionSec: 0.35,
     transitionType: "fade",
-    kenBurns: true,
+    kenBurns: false,
   },
-  bold_hook: {
-    layout: "fullscreen",
-    caption: "bold_center",
-    header: "viral_black",
-    accent: "#5EF2D0",
+  viral_cyan: {
+    layout: "header_stack",
+    mediaFit: "cover",
+    canvasBg: "#000000",
+    caption: "black_box",
+    header: "viral_cyan",
+    titleColor: "#5EF2D0",
+    accent: "#ffffff",
     transitionSec: 0.25,
     transitionType: "slide",
     kenBurns: true,
   },
+  card_white: {
+    layout: "card",
+    mediaFit: "cover",
+    canvasBg: "#ffffff",
+    caption: "white_pill",
+    header: "card_white",
+    titleColor: "#151515",
+    accent: "#151515",
+    transitionSec: 0.35,
+    transitionType: "fade",
+    kenBurns: true,
+  },
+};
+
+const HEADER_BAND: Record<BlogShortsStyleProps["header"], { height: number; bg: string }> = {
+  none: { height: 0, bg: "transparent" },
+  // Tall enough for 110px title + subtitle stack + small gap before media.
+  info_black: { height: 520, bg: "#000000" },
+  info_navy: { height: 520, bg: "#0B1F3A" },
+  viral_cyan: { height: 540, bg: "#000000" },
+  card_white: { height: 520, bg: "#ffffff" },
 };
 
 /** Parse `*accent*` markers in title text into colored spans. */
@@ -96,20 +175,80 @@ function boardFrames(durationSec: number): number {
   return Math.max(1, Math.round(durationSec * FPS));
 }
 
+function normalizeStyleSlug(slug?: string | null): string {
+  const key = (slug || "impact_full").trim().toLowerCase();
+  return LEGACY_STYLE_SLUGS[key] ?? key;
+}
+
 function resolveStyle(props: BlogShortsProps): BlogShortsStyleProps {
-  if (props.style?.layout && props.style?.caption) {
-    return {
-      layout: props.style.layout,
-      caption: props.style.caption,
-      header: props.style.header ?? "none",
-      accent: props.style.accent ?? "#FFE566",
-      transitionSec: props.style.transitionSec ?? props.transitionSec ?? 0.35,
-      transitionType: props.style.transitionType ?? props.transitionType ?? "fade",
-      kenBurns: props.style.kenBurns ?? true,
-    };
+  const fallbackKey = normalizeStyleSlug(props.visualStyle);
+  const fallback = STYLE_BY_VISUAL[fallbackKey] ?? STYLE_BY_VISUAL.impact_full;
+  if (!props.style) return fallback;
+
+  const layout = (props.style.layout as BlogShortsStyleProps["layout"]) || fallback.layout;
+  const caption = normalizeCaption(props.style.caption) || fallback.caption;
+  const header = normalizeHeader(props.style.header) || fallback.header;
+
+  return {
+    layout,
+    mediaFit: props.style.mediaFit ?? fallback.mediaFit,
+    canvasBg: props.style.canvasBg ?? fallback.canvasBg,
+    caption,
+    header,
+    titleColor: props.style.titleColor ?? fallback.titleColor,
+    accent: props.style.accent ?? fallback.accent,
+    transitionSec: props.style.transitionSec ?? props.transitionSec ?? fallback.transitionSec,
+    transitionType: props.style.transitionType ?? props.transitionType ?? fallback.transitionType,
+    kenBurns: props.style.kenBurns ?? fallback.kenBurns,
+  };
+}
+
+function normalizeCaption(value?: string | null): BlogShortsStyleProps["caption"] | null {
+  if (!value) return null;
+  const map: Record<string, BlogShortsStyleProps["caption"]> = {
+    center_stroke: "center_stroke",
+    bottom_outline: "bottom_outline",
+    black_box: "black_box",
+    white_pill: "white_pill",
+    bold_center: "center_stroke",
+    bottom_box: "bottom_outline",
+    dark_bar: "black_box",
+    card_bottom: "white_pill",
+    card_title: "white_pill",
+  };
+  return map[value] ?? null;
+}
+
+function normalizeHeader(value?: string | null): BlogShortsStyleProps["header"] | null {
+  if (!value) return null;
+  const map: Record<string, BlogShortsStyleProps["header"]> = {
+    none: "none",
+    info_black: "info_black",
+    info_navy: "info_navy",
+    viral_cyan: "viral_cyan",
+    card_white: "card_white",
+    overlay: "none",
+    viral_black: "viral_cyan",
+  };
+  return map[value] ?? null;
+}
+
+function mergeOverlay(slug: string, custom?: StyleOverlayProps | null) {
+  const base = DEFAULT_OVERLAYS[slug] ?? DEFAULT_OVERLAYS.impact_full;
+  const out = {
+    titleFont: normalizeShortsFontId(custom?.titleFont),
+    captionFont: normalizeShortsFontId(custom?.captionFont),
+    title: { ...base.title },
+    subtitle: { ...base.subtitle },
+    caption: { ...base.caption },
+  };
+  if (!custom) return out;
+  for (const key of ["title", "subtitle", "caption"] as const) {
+    const layer = custom[key];
+    if (!layer) continue;
+    out[key] = { ...out[key], ...layer };
   }
-  const key = props.visualStyle ?? "fullscreen";
-  return STYLE_BY_VISUAL[key] ?? STYLE_BY_VISUAL.fullscreen;
+  return out;
 }
 
 export function totalBlogShortsFrames(props: BlogShortsProps): number {
@@ -134,269 +273,143 @@ export function boardStartFrames(props: BlogShortsProps): number[] {
   return starts;
 }
 
-function StyleHeader({
-  header,
-  title,
-  subtitle,
-  accent,
-}: {
-  header: BlogShortsStyleProps["header"];
-  title?: string | null;
-  subtitle?: string | null;
-  accent: string;
-}) {
-  if (!title?.trim() || header === "none") return null;
+function layerBoxStyle(layer: StyleOverlayLayer): React.CSSProperties {
+  const justify =
+    layer.align === "left" ? "flex-start" : layer.align === "right" ? "flex-end" : "center";
+  return {
+    position: "absolute",
+    left: `${layer.x * 100}%`,
+    top: `${layer.y * 100}%`,
+    width: `${layer.maxWidth * 100}%`,
+    transform: "translate(-50%, 0)",
+    display: "flex",
+    justifyContent: justify,
+    zIndex: 6,
+    pointerEvents: "none",
+  };
+}
 
-  if (header === "card_white") {
-    return (
-      <div
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 5,
-          padding: "72px 48px 36px",
-          backgroundColor: "#ffffff",
-        }}
-      >
-        <div
-          style={{
-            color: "#151515",
-            fontSize: 46,
-            fontWeight: 900,
-            fontFamily: "Pretendard, Noto Sans KR, sans-serif",
-            lineHeight: 1.3,
-            letterSpacing: "-0.03em",
-          }}
-        >
-          <AccentTitle text={title} accent={accent} baseColor="#151515" />
-        </div>
-        {subtitle?.trim() ? (
-          <div
-            style={{
-              marginTop: 12,
-              color: accent,
-              fontSize: 32,
-              fontWeight: 700,
-              fontFamily: "Pretendard, Noto Sans KR, sans-serif",
-              lineHeight: 1.35,
-            }}
-          >
-            {subtitle}
-          </div>
-        ) : null}
-      </div>
-    );
-  }
+function textAlign(layer: StyleOverlayLayer): React.CSSProperties["textAlign"] {
+  return layer.align;
+}
 
-  if (header === "info_navy") {
-    return (
-      <div
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 5,
-          padding: "72px 48px 40px",
-          backgroundColor: "#0B1F3A",
-        }}
-      >
-        <div
-          style={{
-            color: "#ffffff",
-            fontSize: 44,
-            fontWeight: 850,
-            fontFamily: "Pretendard, Noto Sans KR, sans-serif",
-            lineHeight: 1.3,
-            letterSpacing: "-0.02em",
-          }}
-        >
-          <AccentTitle text={title} accent={accent} baseColor="#ffffff" />
-        </div>
-        {subtitle?.trim() ? (
-          <div
-            style={{
-              marginTop: 10,
-              color: accent,
-              fontSize: 34,
-              fontWeight: 700,
-              fontFamily: "Pretendard, Noto Sans KR, sans-serif",
-            }}
-          >
-            {subtitle}
-          </div>
-        ) : null}
-      </div>
-    );
-  }
-
-  if (header === "viral_black") {
-    return (
-      <div
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 5,
-          padding: "72px 48px 36px",
-          backgroundColor: "#000000",
-        }}
-      >
-        <div
-          style={{
-            color: "#ffffff",
-            fontSize: 44,
-            fontWeight: 900,
-            fontFamily: "Pretendard, Noto Sans KR, sans-serif",
-            lineHeight: 1.3,
-            letterSpacing: "-0.03em",
-          }}
-        >
-          <AccentTitle text={title} accent={accent} baseColor="#ffffff" />
-        </div>
-        {subtitle?.trim() ? (
-          <div
-            style={{
-              marginTop: 10,
-              color: accent,
-              fontSize: 34,
-              fontWeight: 800,
-              fontFamily: "Pretendard, Noto Sans KR, sans-serif",
-            }}
-          >
-            {subtitle}
-          </div>
-        ) : null}
-      </div>
-    );
-  }
-
-  // overlay
+function StyleHeaderBand({ header }: { header: BlogShortsStyleProps["header"] }) {
+  const band = HEADER_BAND[header];
+  if (!band.height) return null;
   return (
     <div
       style={{
         position: "absolute",
-        top: 96,
-        left: 56,
-        right: 56,
-        zIndex: 5,
-        color: "#ffffff",
-        fontFamily: "Pretendard, Noto Sans KR, sans-serif",
-        textShadow: "0 2px 14px rgba(0,0,0,0.55)",
+        top: 0,
+        left: 0,
+        right: 0,
+        height: band.height,
+        backgroundColor: band.bg,
+        zIndex: 3,
       }}
-    >
-      <div style={{ fontSize: 44, fontWeight: 900, lineHeight: 1.25, letterSpacing: "-0.02em" }}>
-        <AccentTitle text={title} accent={accent} baseColor="#ffffff" />
-      </div>
-      {subtitle?.trim() ? (
-        <div style={{ marginTop: 10, fontSize: 32, fontWeight: 700, color: accent }}>{subtitle}</div>
+    />
+  );
+}
+
+function TitleLayers({
+  title,
+  subtitle,
+  accent,
+  overlay,
+}: {
+  title?: string | null;
+  subtitle?: string | null;
+  accent: string;
+  overlay: ReturnType<typeof mergeOverlay>;
+}) {
+  const titleFont = shortsFontCss(overlay.titleFont, "title");
+  return (
+    <>
+      {title?.trim() && overlay.title.visible ? (
+        <div style={layerBoxStyle(overlay.title)}>
+          <div
+            style={{
+              color: overlay.title.color,
+              fontSize: overlay.title.fontSize,
+              fontWeight: titleFont.fontWeight,
+              fontFamily: titleFont.fontFamily,
+              lineHeight: 1.08,
+              letterSpacing: "-0.03em",
+              textAlign: textAlign(overlay.title),
+              whiteSpace: "pre-wrap",
+              width: "100%",
+            }}
+          >
+            <AccentTitle text={title} accent={accent} baseColor={overlay.title.color} />
+          </div>
+        </div>
       ) : null}
-    </div>
+      {subtitle?.trim() && overlay.subtitle.visible ? (
+        <div style={layerBoxStyle(overlay.subtitle)}>
+          <div
+            style={{
+              color: overlay.subtitle.color,
+              fontSize: overlay.subtitle.fontSize,
+              fontWeight: titleFont.fontWeight,
+              fontFamily: titleFont.fontFamily,
+              lineHeight: 1.08,
+              letterSpacing: "-0.03em",
+              textAlign: textAlign(overlay.subtitle),
+              whiteSpace: "pre-wrap",
+              width: "100%",
+            }}
+          >
+            {subtitle}
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }
 
 function CaptionBlock({
   text,
   caption,
+  layer,
+  captionFontId,
   captionY,
   captionOpacity,
 }: {
   text: string;
   caption: BlogShortsStyleProps["caption"];
+  layer: StyleOverlayLayer;
+  captionFontId: string;
   captionY: number;
   captionOpacity: number;
 }) {
-  if (caption === "card_title" || caption === "card_bottom") {
-    return (
-      <div
-        style={{
-          position: "absolute",
-          left: 48,
-          right: 48,
-          bottom: caption === "card_bottom" ? 120 : 180,
-          transform: `translateY(${captionY}px)`,
-          opacity: captionOpacity,
-          zIndex: 4,
-        }}
-      >
-        <div
-          style={{
-            padding: "22px 26px",
-            borderRadius: caption === "card_bottom" ? 20 : 28,
-            backgroundColor: caption === "card_bottom" ? "rgba(255,255,255,0.96)" : "rgba(255,255,255,0.96)",
-            color: "#151515",
-            fontSize: caption === "card_bottom" ? 40 : 46,
-            fontWeight: 800,
-            fontFamily: "Pretendard, Noto Sans KR, sans-serif",
-            lineHeight: 1.35,
-            letterSpacing: "-0.02em",
-            boxShadow: "0 18px 40px rgba(0,0,0,0.28)",
-          }}
-        >
-          {text}
-        </div>
-      </div>
-    );
-  }
+  if (!layer.visible || !text.trim()) return null;
+  const captionFont = shortsFontCss(captionFontId, "caption");
 
-  if (caption === "dark_bar") {
-    return (
-      <div
-        style={{
-          position: "absolute",
-          left: 0,
-          right: 0,
-          bottom: 0,
-          transform: `translateY(${captionY}px)`,
-          opacity: captionOpacity,
-          padding: "40px 56px 220px",
-          background: "linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.82) 45%, rgba(0,0,0,0.92) 100%)",
-          zIndex: 4,
-        }}
-      >
-        <div
-          style={{
-            color: "#f4f4f4",
-            fontSize: 44,
-            fontWeight: 650,
-            fontFamily: "Pretendard, Noto Sans KR, sans-serif",
-            lineHeight: 1.4,
-            letterSpacing: "-0.01em",
-            textAlign: "left",
-          }}
-        >
-          {text}
-        </div>
-      </div>
-    );
-  }
+  const box: React.CSSProperties = {
+    ...layerBoxStyle(layer),
+    transform: `translate(-50%, ${captionY}px)`,
+    opacity: captionOpacity,
+    zIndex: 7,
+  };
 
-  if (caption === "bold_center") {
+  if (caption === "center_stroke") {
     return (
-      <div
-        style={{
-          position: "absolute",
-          left: 48,
-          right: 48,
-          top: "46%",
-          transform: `translateY(${captionY}px)`,
-          opacity: captionOpacity,
-          textAlign: "center",
-          zIndex: 4,
-        }}
-      >
+      <div style={box}>
         <div
           style={{
-            color: "#ffffff",
-            fontSize: 60,
-            fontWeight: 900,
-            fontFamily: "Pretendard, Noto Sans KR, sans-serif",
+            color: layer.color,
+            fontSize: layer.fontSize,
+            fontWeight: captionFont.fontWeight,
+            fontFamily: captionFont.fontFamily,
             lineHeight: 1.25,
             letterSpacing: "-0.03em",
-            textShadow: "0 4px 28px rgba(0,0,0,0.65)",
+            textAlign: textAlign(layer),
+            whiteSpace: "pre-wrap",
+            width: "100%",
+            WebkitTextStroke: "9px #000000",
+            paintOrder: "stroke fill",
+            textShadow:
+              "0 0 0 #000, 3px 3px 0 #000, -3px 3px 0 #000, 3px -3px 0 #000, -3px -3px 0 #000",
           }}
         >
           {text}
@@ -405,39 +418,148 @@ function CaptionBlock({
     );
   }
 
+  if (caption === "bottom_outline") {
+    return (
+      <div style={box}>
+        <div
+          style={{
+            color: layer.color,
+            fontSize: layer.fontSize,
+            fontWeight: captionFont.fontWeight,
+            fontFamily: captionFont.fontFamily,
+            lineHeight: 1.35,
+            letterSpacing: "-0.02em",
+            textAlign: textAlign(layer),
+            whiteSpace: "pre-wrap",
+            width: "100%",
+            textShadow:
+              "0 2px 0 #000, 2px 0 0 #000, -2px 0 0 #000, 0 -2px 0 #000, 0 3px 10px rgba(0,0,0,0.55)",
+          }}
+        >
+          {text}
+        </div>
+      </div>
+    );
+  }
+
+  if (caption === "black_box") {
+    return (
+      <div style={box}>
+        <div
+          style={{
+            display: "inline-block",
+            maxWidth: "100%",
+            padding: "12px 20px",
+            backgroundColor: "#000000",
+            color: layer.color,
+            fontSize: layer.fontSize,
+            fontWeight: captionFont.fontWeight,
+            fontFamily: captionFont.fontFamily,
+            lineHeight: 1.35,
+            letterSpacing: "-0.02em",
+            textAlign: textAlign(layer),
+            whiteSpace: "pre-wrap",
+          }}
+        >
+          {text}
+        </div>
+      </div>
+    );
+  }
+
+  // white_pill
   return (
-    <div
-      style={{
-        position: "absolute",
-        left: 56,
-        right: 56,
-        bottom: 220,
-        transform: `translateY(${captionY}px)`,
-        opacity: captionOpacity,
-        zIndex: 4,
-      }}
-    >
+    <div style={box}>
       <div
         style={{
           display: "inline-block",
           maxWidth: "100%",
-          padding: "18px 22px",
-          borderRadius: 14,
-          backgroundColor: "rgba(0, 0, 0, 0.55)",
-          color: "#ffffff",
-          fontSize: 48,
-          fontWeight: 700,
-          fontFamily: "Pretendard, Noto Sans KR, sans-serif",
+          padding: "14px 26px",
+          borderRadius: 999,
+          backgroundColor: "#ffffff",
+          color: layer.color,
+          fontSize: layer.fontSize,
+          fontWeight: captionFont.fontWeight,
+          fontFamily: captionFont.fontFamily,
           lineHeight: 1.35,
           letterSpacing: "-0.02em",
-          textAlign: "center",
-          width: "100%",
-          boxSizing: "border-box",
+          textAlign: textAlign(layer),
+          whiteSpace: "pre-wrap",
+          boxShadow: "0 10px 28px rgba(0,0,0,0.18)",
         }}
       >
         {text}
       </div>
     </div>
+  );
+}
+
+function isAnimatedGifSrc(src: string): boolean {
+  const path = src.split("?")[0]?.split("#")[0] ?? src;
+  return path.toLowerCase().endsWith(".gif");
+}
+
+function MediaLayer({
+  imageSrc,
+  animated,
+  bg,
+  objectFit,
+  kenBurns,
+  mediaWidth,
+  mediaHeight,
+}: {
+  imageSrc?: string;
+  animated?: boolean;
+  bg: string;
+  objectFit: "cover" | "contain";
+  kenBurns: number;
+  /** Actual media band size — AnimatedImage fit must use this, not full 9:16. */
+  mediaWidth: number;
+  mediaHeight: number;
+}) {
+  if (imageSrc) {
+    // Prefer explicit board.animated — preview blob: URLs never end with .gif.
+    const animatedGif = Boolean(animated) || isAnimatedGifSrc(imageSrc);
+    // Keep GIFs at 1x — Ken Burns scaling fights AnimatedImage frame decode.
+    const scale = animatedGif ? 1 : kenBurns;
+    const fit = objectFit === "contain" ? "contain" : "cover";
+    return (
+      <div style={{ width: "100%", height: "100%", transform: `scale(${scale})`, overflow: "hidden" }}>
+        {animatedGif ? (
+          <AnimatedImage
+            src={imageSrc}
+            fit={fit}
+            width={Math.max(1, Math.round(mediaWidth))}
+            height={Math.max(1, Math.round(mediaHeight))}
+            loopBehavior="loop"
+            style={{
+              width: "100%",
+              height: "100%",
+            }}
+          />
+        ) : (
+          <Img
+            src={imageSrc}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit,
+              objectPosition: "center",
+            }}
+          />
+        )}
+      </div>
+    );
+  }
+  return (
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+        background: `radial-gradient(circle at 30% 20%, rgba(255,255,255,0.12), transparent 50%), ${bg}`,
+        transform: `scale(${kenBurns})`,
+      }}
+    />
   );
 }
 
@@ -447,12 +569,16 @@ function BoardScene({
   styleSubtitle,
   showCaption = true,
   style,
+  overlay,
+  suppressText = false,
 }: {
   board: BlogBoardProps;
   styleTitle?: string | null;
   styleSubtitle?: string | null;
   showCaption?: boolean;
   style: BlogShortsStyleProps;
+  overlay: ReturnType<typeof mergeOverlay>;
+  suppressText?: boolean;
 }) {
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
@@ -469,95 +595,101 @@ function BoardScene({
     fps,
     config: { damping: 16, stiffness: 120 },
   });
-  const captionY = interpolate(captionEnter, [0, 1], [48, 0]);
-  const captionOpacity = showCaption ? interpolate(captionEnter, [0, 1], [0, 1]) : 0;
+  const captionY = suppressText ? 0 : interpolate(captionEnter, [0, 1], [36, 0]);
+  const captionOpacity = showCaption && !suppressText ? interpolate(captionEnter, [0, 1], [0, 1]) : 0;
 
   const bg = board.backgroundColor ?? "#222222";
   const imageSrc = resolveBoardImageSrc(board.imageUrl);
-  const isCard = style.layout === "card";
-  const headerHeight = style.header === "card_white" || style.header === "info_navy" || style.header === "viral_black" ? 280 : 0;
+  const headerH = HEADER_BAND[style.header]?.height ?? 0;
+  const canvasBg = style.canvasBg || "#000000";
+
+  let mediaTop = 0;
+  let mediaHeight = BLOG_SHORTS_HEIGHT;
+  let mediaLeft = 0;
+  let mediaRight = 0;
+
+  if (style.layout === "letterbox") {
+    mediaTop = 500;
+    mediaHeight = 680;
+  } else if (style.layout === "header_stack") {
+    mediaTop = headerH;
+    mediaHeight = BLOG_SHORTS_HEIGHT - headerH;
+  } else if (style.layout === "card") {
+    mediaTop = headerH + 12;
+    mediaLeft = 28;
+    mediaRight = 28;
+    mediaHeight = 1020;
+  }
+
+  const mediaWidth = BLOG_SHORTS_WIDTH - mediaLeft - mediaRight;
 
   return (
-    <AbsoluteFill style={{ backgroundColor: isCard ? "#f3f4f6" : bg, overflow: "hidden" }}>
-      {isCard ? (
-        <div
+    <AbsoluteFill style={{ backgroundColor: canvasBg, overflow: "hidden" }}>
+      <div
+        style={{
+          position: "absolute",
+          top: mediaTop,
+          left: mediaLeft,
+          right: mediaRight,
+          height: mediaHeight,
+          overflow: "hidden",
+          borderRadius: style.layout === "card" ? 6 : 0,
+          backgroundColor: style.mediaFit === "contain" ? canvasBg : "#111",
+        }}
+      >
+        <MediaLayer
+          imageSrc={imageSrc}
+          animated={board.animated}
+          bg={bg}
+          objectFit={style.mediaFit}
+          kenBurns={kenBurns}
+          mediaWidth={mediaWidth}
+          mediaHeight={mediaHeight}
+        />
+      </div>
+
+      {style.layout === "fullscreen" ? (
+        <AbsoluteFill
           style={{
-            position: "absolute",
-            top: headerHeight + 24,
-            left: 40,
-            right: 40,
-            bottom: 280,
-            borderRadius: 28,
-            overflow: "hidden",
-            transform: `scale(${kenBurns})`,
-            boxShadow: "0 18px 48px rgba(0,0,0,0.22)",
-            backgroundColor: "#222",
+            background:
+              "linear-gradient(180deg, rgba(0,0,0,0.15) 0%, transparent 32%, transparent 58%, rgba(0,0,0,0.28) 100%)",
+            pointerEvents: "none",
           }}
-        >
-          {imageSrc ? (
-            <Img src={imageSrc} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-          ) : (
-            <div
-              style={{
-                width: "100%",
-                height: "100%",
-                background: `radial-gradient(circle at 30% 20%, rgba(255,255,255,0.12), transparent 50%), ${bg}`,
-              }}
-            />
-          )}
-        </div>
-      ) : (
+        />
+      ) : null}
+
+      <StyleHeaderBand header={style.header} />
+
+      {!suppressText ? (
         <>
-          {imageSrc ? (
-            <AbsoluteFill style={{ transform: `scale(${kenBurns})` }}>
-              <Img
-                src={imageSrc}
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  objectFit: "cover",
-                  imageRendering: "auto",
-                }}
-              />
-            </AbsoluteFill>
-          ) : (
-            <AbsoluteFill
-              style={{
-                background: `radial-gradient(circle at 30% 20%, rgba(255,255,255,0.12), transparent 50%), ${bg}`,
-                transform: `scale(${kenBurns})`,
-              }}
-            />
-          )}
-          {style.caption !== "dark_bar" ? (
-            <AbsoluteFill
-              style={{
-                background:
-                  "linear-gradient(180deg, rgba(0,0,0,0.35) 0%, transparent 28%, transparent 55%, rgba(0,0,0,0.72) 100%)",
-              }}
-            />
-          ) : null}
+          <TitleLayers
+            title={styleTitle}
+            subtitle={styleSubtitle}
+            accent={style.accent}
+            overlay={overlay}
+          />
+          <CaptionBlock
+            text={board.text}
+            caption={style.caption}
+            layer={overlay.caption}
+            captionFontId={overlay.captionFont}
+            captionY={captionY}
+            captionOpacity={captionOpacity}
+          />
         </>
-      )}
-
-      <StyleHeader
-        header={style.header}
-        title={styleTitle}
-        subtitle={styleSubtitle}
-        accent={style.accent}
-      />
-
-      <CaptionBlock
-        text={board.text}
-        caption={style.caption}
-        captionY={captionY}
-        captionOpacity={captionOpacity}
-      />
+      ) : null}
     </AbsoluteFill>
   );
 }
 
 export const BlogShorts: React.FC<BlogShortsProps> = (props) => {
+  useEffect(() => {
+    void ensureShortsFontsLoaded();
+  }, []);
+
   const style = resolveStyle(props);
+  const styleSlug = normalizeStyleSlug(props.visualStyle);
+  const overlay = mergeOverlay(styleSlug, props.overlay);
   const transitionType: TransitionType = props.transitionType ?? style.transitionType ?? "fade";
   const transitionSec =
     transitionType === "none" ? 0 : (props.transitionSec ?? style.transitionSec ?? 0.35);
@@ -609,6 +741,8 @@ export const BlogShorts: React.FC<BlogShortsProps> = (props) => {
             isFirst={index === 0}
             isLast={index === timeline.length - 1}
             style={style}
+            overlay={overlay}
+            suppressText={Boolean(props.suppressText)}
           />
         </Sequence>
       ))}
@@ -626,6 +760,8 @@ function FadingBoard({
   isFirst,
   isLast,
   style,
+  overlay,
+  suppressText,
 }: {
   board: BlogBoardProps;
   styleTitle?: string | null;
@@ -636,6 +772,8 @@ function FadingBoard({
   isFirst: boolean;
   isLast: boolean;
   style: BlogShortsStyleProps;
+  overlay: ReturnType<typeof mergeOverlay>;
+  suppressText: boolean;
 }) {
   const frame = useCurrentFrame();
   const { durationInFrames } = useVideoConfig();
@@ -693,6 +831,8 @@ function FadingBoard({
         styleSubtitle={styleSubtitle}
         showCaption={showCaption}
         style={style}
+        overlay={overlay}
+        suppressText={suppressText}
       />
     </AbsoluteFill>
   );

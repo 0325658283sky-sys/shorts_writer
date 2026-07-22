@@ -1,11 +1,20 @@
+from pathlib import Path
+
 import pytest
+from bs4 import BeautifulSoup
 from fastapi import HTTPException
 
 from app.services.blog_service import (
+    _extract_image_urls,
+    _narration_hook_guidance,
     _normalize_wizard_step,
+    _plan_board_texts_and_images,
+    _prefer_high_res_image_url,
+    _resolve_downloaded_image,
     _split_script_into_board_texts,
     _split_script_into_units,
     create_blog_clip_board,
+    download_blog_images,
     update_blog_clip_motion_settings,
     update_blog_clip_style_copy,
     update_blog_clip_visual_style,
@@ -35,6 +44,38 @@ def test_split_script_into_board_texts_fills_all_boards():
 
 def test_split_script_into_board_texts_empty_script():
     assert _split_script_into_board_texts("", 4) == ["", "", "", ""]
+
+
+def test_plan_boards_reuses_images_instead_of_cramming_text():
+    script = "첫 훅입니다. 두 번째 긴장감. 세 번째 반전. 네 번째 디테일. 다섯 번째 CTA."
+    images = ["/img/a.jpg", "/img/b.jpg", "/img/c.jpg"]
+    texts, assigned = _plan_board_texts_and_images(script, images, max_boards=12)
+    assert len(texts) == 5
+    assert len(assigned) == 5
+    assert assigned == [
+        "/img/a.jpg",
+        "/img/b.jpg",
+        "/img/c.jpg",
+        "/img/a.jpg",
+        "/img/b.jpg",
+    ]
+    # One short unit per board — not a long packed paragraph on board 0.
+    assert all("." not in text[:-1] for text in texts if text)
+    assert max(len(text) for text in texts) < len(script)
+
+
+def test_plan_boards_keeps_image_count_when_script_is_short():
+    texts, assigned = _plan_board_texts_and_images("한 문장뿐입니다.", ["/a.jpg", "/b.jpg", "/c.jpg"])
+    assert len(texts) == 3
+    assert len(assigned) == 3
+    assert assigned == ["/a.jpg", "/b.jpg", "/c.jpg"]
+
+
+def test_hook_guidance_asks_for_short_caption_sentences():
+    guidance = _narration_hook_guidance().lower()
+    assert "caption" in guidance or "subtitle" in guidance
+    assert "short" in guidance
+    assert "one idea" in guidance or "sequence" in guidance
 
 
 def test_update_wizard_step(conn, awaiting_boards_clip):
@@ -94,14 +135,129 @@ def test_update_visual_style_applies_pack(conn, awaiting_boards_clip, monkeypatc
         conn,
         1,
         awaiting_boards_clip,
-        "card_news",
+        "info_black",
         apply_pack=True,
     )
-    assert updated.visual_style == "card_news"
+    assert updated.visual_style == "info_black"
     assert updated.transition_type == "fade"
     assert updated.bgm_asset_id == 1
     assert updated.auto_bgm is True
     assert updated.default_voice == "nova"
+    assert updated.style_title
+    assert updated.style_overlay_json
+
+
+def test_prefer_high_res_does_not_mutate_gif_urls():
+    url = "https://blogfiles.naver.net/2024/foo/bar.gif"
+    assert _prefer_high_res_image_url(url) == url
+
+
+def test_prefer_high_res_strips_naver_gif_blur_type():
+    url = (
+        "https://postfiles.pstatic.net/MjAyNjA1MTFfMTk1/MDAx.GIF/22.gif?type=w80_blur"
+    )
+    assert _prefer_high_res_image_url(url) == (
+        "https://postfiles.pstatic.net/MjAyNjA1MTFfMTk1/MDAx.GIF/22.gif"
+    )
+
+
+def test_extract_image_urls_includes_gif_attachments():
+    html = """
+    <div class="se-main-container">
+      <img src="https://cdn.example.com/photo.jpg" />
+      <a href="https://cdn.example.com/motion.gif">첨부 GIF</a>
+      <video poster="https://cdn.example.com/poster.gif">
+        <source src="https://cdn.example.com/clip.mp4" type="video/mp4" />
+      </video>
+      <source src="https://cdn.example.com/extra.gif" />
+    </div>
+    """
+    container = BeautifulSoup(html, "html.parser").select_one(".se-main-container")
+    urls = _extract_image_urls(container, "https://blog.example.com/post")
+    assert "https://cdn.example.com/photo.jpg" in urls or any("photo.jpg" in u for u in urls)
+    assert any(u.endswith("motion.gif") for u in urls)
+    assert any(u.endswith("poster.gif") for u in urls)
+    assert any(u.endswith("extra.gif") for u in urls)
+    assert not any(u.endswith(".mp4") for u in urls)
+
+
+def test_extract_skips_naver_gif_mp4_proxy_and_dedupes_blur():
+    html = """
+    <div class="se-main-container">
+      <img src="https://postfiles.pstatic.net/x.GIF/a.gif?type=w80_blur" />
+      <img src="https://mblogvideo-phinf.pstatic.net/x.GIF/a.gif?type=mp4w800" />
+      <img src="https://postfiles.pstatic.net/x.GIF/a.gif" />
+      <img src="https://postfiles.pstatic.net/y.GIF/b.gif?type=w80_blur" />
+    </div>
+    """
+    container = BeautifulSoup(html, "html.parser").select_one(".se-main-container")
+    urls = _extract_image_urls(container, "https://blog.naver.com/post")
+    assert urls == [
+        "https://postfiles.pstatic.net/x.GIF/a.gif",
+        "https://postfiles.pstatic.net/y.GIF/b.gif",
+    ]
+
+
+def test_download_blog_images_keeps_gifs_beyond_selection_max(tmp_path: Path, monkeypatch):
+    from app.core import config
+
+    monkeypatch.setattr(config.settings, "blog_image_max_count", 8)
+    monkeypatch.setattr(config.settings, "blog_image_candidate_max_count", 12)
+
+    class FakeResponse:
+        def __init__(self, payload: bytes, content_type: str):
+            self.status_code = 200
+            self.headers = {"Content-Type": content_type}
+            self.content = payload
+
+    def fake_get(url, **kwargs):
+        if url.endswith(".gif"):
+            return FakeResponse(b"GIF89a" + (b"\x01" * 2_500), "image/gif")
+        return FakeResponse(b"\xff\xd8\xff" + (b"\x00" * 16_000), "image/jpeg")
+
+    monkeypatch.setattr("app.services.blog_service.requests.get", fake_get)
+    urls = [f"https://cdn.example.com/still-{i}.jpg" for i in range(10)]
+    urls.append("https://cdn.example.com/motion.gif")
+    saved = download_blog_images(urls, tmp_path)
+    assert len(saved) == 11
+    assert any(path.suffix == ".gif" for path, _ in saved)
+
+
+def test_resolve_downloaded_image_accepts_small_gif_octet_stream():
+    content = b"GIF89a" + (b"\x00" * 2_400)
+    resolved = _resolve_downloaded_image(content, "application/octet-stream")
+    assert resolved is not None
+    assert resolved[1] == "image/gif"
+
+
+def test_resolve_downloaded_image_rejects_tiny_gif():
+    content = b"GIF89a" + (b"\x00" * 100)
+    assert _resolve_downloaded_image(content, "image/gif") is None
+
+
+def test_resolve_downloaded_image_still_rejects_tiny_jpeg():
+    content = b"\xff\xd8\xff" + (b"\x00" * 100)
+    assert _resolve_downloaded_image(content, "image/jpeg") is None
+
+
+def test_download_blog_images_saves_gif_from_magic_bytes(tmp_path: Path, monkeypatch):
+    gif_bytes = b"GIF89a" + (b"\x01" * 2_500)
+
+    class FakeResponse:
+        status_code = 200
+        headers = {"Content-Type": "application/octet-stream"}
+        content = gif_bytes
+
+    monkeypatch.setattr(
+        "app.services.blog_service.requests.get",
+        lambda *args, **kwargs: FakeResponse(),
+    )
+    saved = download_blog_images(["https://cdn.example.com/clip.gif"], tmp_path)
+    assert len(saved) == 1
+    path, source = saved[0]
+    assert path.suffix == ".gif"
+    assert path.read_bytes().startswith(b"GIF89a")
+    assert source.endswith("clip.gif")
 
 
 def test_create_intro_board_at_front(conn, awaiting_boards_clip, tmp_board_image):

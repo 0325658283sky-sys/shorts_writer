@@ -54,8 +54,10 @@ export function ImageSelectStep({
       .then((loaded) => {
         if (cancelled) return;
         setCandidates(loaded);
-        const initial = loaded.filter((item) => item.selected).map((item) => item.id);
-        setSelectedIds(initial.length > 0 ? initial : loaded.map((item) => item.id));
+        const preselected = loaded.filter((item) => item.selected).map((item) => item.id);
+        const fallback = loaded.map((item) => item.id);
+        const initial = (preselected.length > 0 ? preselected : fallback).slice(0, BLOG_IMAGE_MAX_COUNT);
+        setSelectedIds(initial);
       })
       .catch((error) => {
         if (!cancelled) {

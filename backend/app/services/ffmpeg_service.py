@@ -140,6 +140,10 @@ def create_vertical_clip(source_path: str, output_path: str, start_time: float, 
         raise FFmpegClipError(error[-1000:])
 
 
+def _is_gif_path(path: Path) -> bool:
+    return path.suffix.lower() == ".gif"
+
+
 def _ken_burns_zoompan(index: int, frames: int) -> str:
     """Build a zoompan expression that pans/zooms for `frames` output frames."""
     denom = max(frames - 1, 1)
@@ -161,6 +165,16 @@ def _ken_burns_zoompan(index: int, frames: int) -> str:
         f"crop=2160:3840,"
         f"zoompan=z='{z}':x='{x}':y='{y}':d={frames}:s=1080x1920:fps=30,"
         f"setsar=1"
+    )
+
+
+def _gif_cover_filter(frames: int) -> str:
+    """Scale/crop animated GIF frames to 1080x1920 without Ken Burns freeze."""
+    trim_sec = frames / 30.0
+    return (
+        "scale=1080:1920:force_original_aspect_ratio=increase,"
+        f"crop=1080:1920,fps=30,setsar=1,trim=duration={trim_sec:.3f},"
+        "setpts=PTS-STARTPTS,format=yuv420p"
     )
 
 
@@ -186,17 +200,41 @@ def create_image_slideshow(
         per_image_seconds = max(0.5, audio_duration / len(image_paths))
         per_image_seconds_list = [per_image_seconds] * len(image_paths)
 
-    # Still images as looped inputs; Ken Burns zoompan emits a fixed frame count
-    # per board so each segment has an explicit duration (no -t on the image inputs).
+    # Bound each still with -t so later concat segments do not keep reading the
+    # first looped inputs (unbounded -loop 1 + zoompan often freezes after 1–2 slides).
+    # GIFs use stream_loop so animation plays (and repeats) for the board duration.
     command = ["ffmpeg", "-y"]
-    for image_path in image_paths:
-        command += ["-loop", "1", "-i", str(Path(image_path))]
+    gif_flags: list[bool] = []
+    for image_path, duration in zip(image_paths, per_image_seconds_list):
+        path = Path(image_path)
+        is_gif = _is_gif_path(path)
+        gif_flags.append(is_gif)
+        if is_gif:
+            command += [
+                "-ignore_loop",
+                "0",
+                "-stream_loop",
+                "-1",
+                "-t",
+                f"{float(duration):.3f}",
+                "-i",
+                str(path),
+            ]
+        else:
+            command += ["-loop", "1", "-t", f"{float(duration):.3f}", "-i", str(path)]
     command += ["-i", str(Path(audio_path))]
 
     filter_parts = []
     for index, duration in enumerate(per_image_seconds_list):
         frames = max(15, int(round(duration * 30)))
-        filter_parts.append(f"[{index}:v]{_ken_burns_zoompan(index, frames)}[v{index}]")
+        trim_sec = frames / 30.0
+        if gif_flags[index]:
+            filter_parts.append(f"[{index}:v]{_gif_cover_filter(frames)}[v{index}]")
+        else:
+            filter_parts.append(
+                f"[{index}:v]{_ken_burns_zoompan(index, frames)},"
+                f"trim=duration={trim_sec:.3f},setpts=PTS-STARTPTS,format=yuv420p[v{index}]"
+            )
     concat_inputs = "".join(f"[v{index}]" for index in range(len(image_paths)))
     filter_parts.append(f"{concat_inputs}concat=n={len(image_paths)}:v=1:a=0[vout]")
     filter_complex = ";".join(filter_parts)
@@ -357,6 +395,9 @@ def mix_narration_with_bed(
 
     duration = get_video_duration_seconds(str(narration))
     bgm_vol = max(0.0, min(1.0, float(bgm_volume)))
+    # Legacy/default 0.18 + ducking made soft system beds inaudible under TTS.
+    if duck_bgm and 0.0 < bgm_vol < 0.28:
+        bgm_vol = 0.36
     nar_vol = max(0.0, min(2.0, float(narration_volume)))
     events = list(sfx_events or [])
 
@@ -383,10 +424,10 @@ def mix_narration_with_bed(
         if duck_bgm:
             filter_parts.append("[nar0]asplit=2[nar_main][nar_sc]")
             # Voice sidechain: lower BGM while narration is present.
-            # Milder ducking so beds stay audible under TTS (was ratio=8 / threshold=0.04).
+            # Soft demo pads + continuous TTS need a gentle curve or BGM vanishes.
             filter_parts.append(
                 "[bgm_raw][nar_sc]sidechaincompress="
-                "threshold=0.08:ratio=3.5:attack=120:release=550:makeup=1.1:knee=3[bgm]"
+                "threshold=0.20:ratio=1.8:attack=220:release=900:makeup=1.45:knee=8[bgm]"
             )
             mix_labels.extend(["[nar_main]", "[bgm]"])
         else:

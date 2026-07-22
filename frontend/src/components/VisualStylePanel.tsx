@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import { authorizedRequest } from "../api/client";
-import type { TransitionType, VisualStyle, VisualStyleSlug } from "../types";
+import { FontRolePicker } from "./FontRolePicker";
+import { normalizeVisualStyleSlug } from "../lib/blogShortsProps";
+import { DEFAULT_SHORTS_FONT_ID, normalizeShortsFontId } from "../lib/shortsFonts";
+import type { BlogClip, TransitionType, VisualStyle, VisualStyleSlug } from "../types";
 
 const TRANSITION_OPTIONS: { value: TransitionType; label: string }[] = [
   { value: "fade", label: "페이드" },
@@ -10,22 +13,28 @@ const TRANSITION_OPTIONS: { value: TransitionType; label: string }[] = [
 
 /** Compact visual-style picker + editable top title/subtitle for BoardEditor. */
 export function VisualStylePanel({
+  blogClipId,
   appliedStyle,
   styleTitle,
   styleSubtitle,
+  styleOverlay,
   transitionSec,
   transitionType,
   onApply,
   onStyleCopyChange,
   onMotionChange,
+  onTitlesGenerated,
+  onOverlayUpdated,
   applying,
   savingCopy,
   savingMotion,
   onMessage,
 }: {
+  blogClipId: number;
   appliedStyle?: string | null;
   styleTitle?: string | null;
   styleSubtitle?: string | null;
+  styleOverlay?: BlogClip["style_overlay"];
   transitionSec?: number | null;
   transitionType?: string | null;
   onApply: (style: VisualStyleSlug | string) => Promise<void>;
@@ -34,6 +43,8 @@ export function VisualStylePanel({
     transition_sec?: number;
     transition_type?: TransitionType;
   }) => Promise<void>;
+  onTitlesGenerated?: (clip: BlogClip) => void;
+  onOverlayUpdated?: (clip: BlogClip) => void;
   applying: boolean;
   savingCopy: boolean;
   savingMotion: boolean;
@@ -47,11 +58,26 @@ export function VisualStylePanel({
   const [typeDraft, setTypeDraft] = useState<TransitionType>(
     (transitionType as TransitionType) || "fade",
   );
+  const [generatingTitles, setGeneratingTitles] = useState(false);
+  const [savingFonts, setSavingFonts] = useState(false);
+  const [titleFont, setTitleFont] = useState(
+    normalizeShortsFontId(styleOverlay?.titleFont ?? DEFAULT_SHORTS_FONT_ID),
+  );
+  const [captionFont, setCaptionFont] = useState(
+    normalizeShortsFontId(styleOverlay?.captionFont ?? DEFAULT_SHORTS_FONT_ID),
+  );
+
+  const activeSlug = normalizeVisualStyleSlug(appliedStyle);
 
   useEffect(() => {
     setTitleDraft(styleTitle ?? "");
     setSubtitleDraft(styleSubtitle ?? "");
   }, [styleTitle, styleSubtitle]);
+
+  useEffect(() => {
+    setTitleFont(normalizeShortsFontId(styleOverlay?.titleFont ?? DEFAULT_SHORTS_FONT_ID));
+    setCaptionFont(normalizeShortsFontId(styleOverlay?.captionFont ?? DEFAULT_SHORTS_FONT_ID));
+  }, [styleOverlay?.titleFont, styleOverlay?.captionFont]);
 
   useEffect(() => {
     setSecDraft(String(transitionSec ?? 0.35));
@@ -87,6 +113,45 @@ export function VisualStylePanel({
     }
   }
 
+  async function regenerateTitles() {
+    setGeneratingTitles(true);
+    try {
+      const updated = await authorizedRequest<BlogClip>(`/blog-clips/${blogClipId}/style-titles/generate`, {
+        method: "POST",
+      });
+      setTitleDraft(updated.style_title || "");
+      setSubtitleDraft(updated.style_subtitle || "");
+      onTitlesGenerated?.(updated);
+      onMessage("스타일에 맞는 훅 타이틀을 다시 만들었습니다.");
+    } catch (error) {
+      onMessage(error instanceof Error ? error.message : "타이틀 생성에 실패했습니다.");
+    } finally {
+      setGeneratingTitles(false);
+    }
+  }
+
+  async function saveFonts(next: { titleFont: string; captionFont: string }) {
+    setTitleFont(normalizeShortsFontId(next.titleFont));
+    setCaptionFont(normalizeShortsFontId(next.captionFont));
+    setSavingFonts(true);
+    try {
+      const updated = await authorizedRequest<BlogClip>(`/blog-clips/${blogClipId}/style-overlay`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          overlay: {
+            titleFont: next.titleFont,
+            captionFont: next.captionFont,
+          },
+        }),
+      });
+      onOverlayUpdated?.(updated);
+    } catch (error) {
+      onMessage(error instanceof Error ? error.message : "폰트 저장에 실패했습니다.");
+    } finally {
+      setSavingFonts(false);
+    }
+  }
+
   async function saveMotion(next?: { sec?: number; type?: TransitionType }) {
     const sec = next?.sec ?? Number(secDraft);
     const type = next?.type ?? typeDraft;
@@ -104,7 +169,7 @@ export function VisualStylePanel({
   return (
     <div className="media-tab-body">
       <p className="muted">
-        상단 타이틀·보조설명은 템플릿 헤더에 표시됩니다. 강조할 단어는 <code>*이렇게*</code> 감싸세요.
+        썸네일을 클릭하면 템플릿·훅 타이틀이 함께 적용됩니다. 강조 단어는 <code>*이렇게*</code> 감싸세요.
       </p>
 
       <label className="style-copy-field">
@@ -112,7 +177,7 @@ export function VisualStylePanel({
         <textarea
           rows={2}
           value={titleDraft}
-          disabled={savingCopy}
+          disabled={savingCopy || generatingTitles}
           onChange={(event) => setTitleDraft(event.target.value)}
           onBlur={() => void saveCopy()}
           placeholder="예: 밀양 *숨겨진* 숙소 추천"
@@ -123,12 +188,27 @@ export function VisualStylePanel({
         <input
           type="text"
           value={subtitleDraft}
-          disabled={savingCopy}
+          disabled={savingCopy || generatingTitles}
           onChange={(event) => setSubtitleDraft(event.target.value)}
           onBlur={() => void saveCopy()}
           placeholder="예: 깔끔한 정보 전달"
         />
       </label>
+      <button
+        type="button"
+        className="ghost-small"
+        disabled={generatingTitles || applying}
+        onClick={() => void regenerateTitles()}
+      >
+        {generatingTitles ? "타이틀 생성 중…" : "훅 타이틀 다시 만들기"}
+      </button>
+
+      <FontRolePicker
+        titleFont={titleFont}
+        captionFont={captionFont}
+        disabled={savingFonts || applying}
+        onChange={(next) => void saveFonts(next)}
+      />
 
       <div className="motion-settings">
         <p className="muted">보드 전환</p>
@@ -165,34 +245,35 @@ export function VisualStylePanel({
         </label>
       </div>
 
-      {loading ? <p className="muted">스타일 불러오는 중…</p> : null}
-      <div className="visual-style-list">
+      {loading ? <p className="muted">템플릿 불러오는 중…</p> : null}
+      <p className="style-gallery-label">템플릿</p>
+      <div className="style-gallery style-gallery-compact">
         {styles.map((style) => {
-          const active = (appliedStyle || "fullscreen") === style.slug;
+          const active = activeSlug === style.slug;
           return (
             <button
               key={style.slug}
               type="button"
-              className={`visual-style-row ${active ? "is-selected" : ""}`}
+              className={`style-card ${active ? "is-selected" : ""}`}
               disabled={applying || active}
               onClick={() => void onApply(style.slug)}
             >
-              <div className="visual-style-row-preview">
+              {style.badge ? <span className="style-card-badge">{style.badge}</span> : null}
+              {active ? (
+                <span className="style-card-check" aria-hidden="true">
+                  ✓
+                </span>
+              ) : null}
+              <div className="style-card-preview">
                 {style.previewImage ? <img src={style.previewImage} alt="" /> : null}
               </div>
-              <div className="visual-style-row-copy">
-                <strong>
-                  {style.label}
-                  {style.badge ? <span className="visual-style-row-badge">{style.badge}</span> : null}
-                </strong>
-                <span className="muted">{style.description}</span>
-                {style.packHint ? <span className="style-pack-hint">팩: {style.packHint}</span> : null}
-              </div>
-              <span className="muted">{active ? "적용됨" : applying ? "저장 중…" : "적용"}</span>
+              <strong>{style.label}</strong>
+              <span className="muted">{style.description}</span>
             </button>
           );
         })}
       </div>
+      {applying ? <p className="muted">스타일 적용 중…</p> : null}
     </div>
   );
 }

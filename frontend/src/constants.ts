@@ -98,4 +98,78 @@ export const BLOG_PROGRESS_STAGE_LABELS: Record<string, string> = {
   done: "완료",
 };
 
+/** User-facing 6-step progress (maps many backend stages into one vocabulary). */
+export const FRIENDLY_PROGRESS_STEPS = [
+  { id: "prepare", label: "준비" },
+  { id: "gather", label: "자료 수집" },
+  { id: "script", label: "대본·분석" },
+  { id: "edit", label: "편집" },
+  { id: "render", label: "렌더" },
+  { id: "done", label: "완료" },
+] as const;
+
+export type FriendlyProgressStepId = (typeof FRIENDLY_PROGRESS_STEPS)[number]["id"];
+
+const BLOG_STAGE_TO_FRIENDLY: Record<string, FriendlyProgressStepId> = {
+  queued: "prepare",
+  scraping: "gather",
+  downloading_images: "gather",
+  generating_script: "script",
+  awaiting_images: "script",
+  awaiting_script: "script",
+  awaiting_boards: "edit",
+  synthesizing_audio: "render",
+  rendering_video: "render",
+  burning_subtitles: "render",
+  done: "done",
+};
+
+const VIDEO_STATUS_TO_FRIENDLY: Record<VideoStatus, FriendlyProgressStepId> = {
+  uploaded: "prepare",
+  extracting_audio: "gather",
+  audio_extracted: "gather",
+  transcribing: "script",
+  transcribed: "script",
+  failed: "prepare",
+};
+
+export function friendlyProgressStepIndex(id: FriendlyProgressStepId): number {
+  return FRIENDLY_PROGRESS_STEPS.findIndex((step) => step.id === id);
+}
+
+export function friendlyProgressFromBlogStage(stage: string | null | undefined): {
+  id: FriendlyProgressStepId;
+  label: string;
+  index: number;
+} {
+  const id = (stage && BLOG_STAGE_TO_FRIENDLY[stage]) || "prepare";
+  const index = friendlyProgressStepIndex(id);
+  return { id, label: FRIENDLY_PROGRESS_STEPS[index]?.label ?? "준비", index: Math.max(index, 0) };
+}
+
+export function friendlyProgressFromVideoStatus(status: VideoStatus): {
+  id: FriendlyProgressStepId;
+  label: string;
+  index: number;
+} {
+  const id = VIDEO_STATUS_TO_FRIENDLY[status] ?? "prepare";
+  const index = friendlyProgressStepIndex(id);
+  return { id, label: FRIENDLY_PROGRESS_STEPS[index]?.label ?? "준비", index: Math.max(index, 0) };
+}
+
+/** Prefer friendly 6-step label; fall back to detailed blog stage copy. */
+export function userFacingProgressLabel(
+  stage: string | null | undefined,
+  options?: { detailed?: boolean },
+): string {
+  if (options?.detailed && stage && BLOG_PROGRESS_STAGE_LABELS[stage]) {
+    return BLOG_PROGRESS_STAGE_LABELS[stage];
+  }
+  if (stage && BLOG_PROGRESS_STAGE_LABELS[stage]) {
+    const friendly = friendlyProgressFromBlogStage(stage);
+    return `${friendly.label} · ${BLOG_PROGRESS_STAGE_LABELS[stage]}`;
+  }
+  return friendlyProgressFromBlogStage(stage).label;
+}
+
 export const BLOG_CLIP_POLL_INTERVAL_MS = 2000;

@@ -1336,7 +1336,7 @@ def update_blog_clip_visual_style(
     if slug not in ALLOWED_VISUAL_STYLES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="visual_style must be impact_full, info_black, info_navy, viral_cyan, or card_white.",
+            detail="visual_style must be impact_full, info_black, info_navy, viral_cyan, card_white, or yt_profile.",
         )
     slug = normalize_visual_style(slug)
     style = resolve_visual_style(slug)
@@ -1972,6 +1972,11 @@ def fetch_generic_blog_content(url: str) -> BlogContent:
 
 
 def fetch_blog_content(url: str) -> BlogContent:
+    from app.services.product_service import fetch_product, is_supported_product_url
+
+    if is_supported_product_url(url):
+        product = fetch_product(url)
+        return BlogContent(title=product.title, text=product.text, image_urls=product.image_urls)
     if _is_naver_blog_url(url):
         return fetch_naver_blog_content(url)
     return fetch_generic_blog_content(url)
@@ -3146,6 +3151,7 @@ def confirm_blog_clip_image_selection(
     user_id: int,
     blog_clip_id: int,
     image_ids: list[int],
+    visual_style: str | None = None,
 ) -> BlogClip:
     blog_clip = get_blog_clip_for_user(conn, user_id, blog_clip_id)
     if blog_clip is None:
@@ -3175,6 +3181,9 @@ def confirm_blog_clip_image_selection(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="image_ids must refer to candidates for this blog short.",
         )
+
+    if visual_style:
+        _apply_visual_style_early(conn, blog_clip, visual_style)
 
     selected_set = set(unique_ids)
     for candidate in candidates:
@@ -3233,6 +3242,79 @@ def confirm_blog_clip_image_selection(
     if refreshed is None:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Image selection failed.")
     return refreshed
+
+
+def _apply_visual_style_early(conn: sqlite3.Connection, blog_clip: BlogClip, visual_style: str) -> None:
+    """Set template on image-select step without requiring awaiting_boards / GPT hooks."""
+    from app.services.audio_service import get_system_audio_by_slug
+    from app.services.tts_service import is_known_voice
+    from app.services.visual_style_catalog import (
+        ALLOWED_VISUAL_STYLES,
+        default_style_overlay,
+        merge_style_overlay,
+        normalize_font_id,
+        normalize_visual_style,
+        resolve_visual_style,
+    )
+
+    slug = (visual_style or "").strip().lower()
+    if slug not in ALLOWED_VISUAL_STYLES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "visual_style must be impact_full, info_black, info_navy, "
+                "viral_cyan, card_white, or yt_profile."
+            ),
+        )
+    slug = normalize_visual_style(slug)
+    style = resolve_visual_style(slug)
+    previous_overlay = blog_clip_style_overlay(blog_clip) or {}
+    overlay = default_style_overlay(slug)
+    if previous_overlay.get("titleFont"):
+        overlay["titleFont"] = normalize_font_id(str(previous_overlay.get("titleFont")))
+    if previous_overlay.get("captionFont"):
+        overlay["captionFont"] = normalize_font_id(str(previous_overlay.get("captionFont")))
+    overlay = merge_style_overlay(slug, overlay)
+
+    set_parts = [
+        "visual_style = ?",
+        "transition_sec = ?",
+        "transition_type = ?",
+        "style_overlay_json = ?",
+    ]
+    params: list[Any] = [
+        slug,
+        float(style.get("transitionSec", 0.35)),
+        str(style.get("transitionType") or "fade"),
+        json.dumps(overlay, ensure_ascii=False),
+    ]
+    if not (blog_clip.style_title or "").strip():
+        set_parts.append("style_title = ?")
+        params.append((blog_clip.blog_title or "").strip() or None)
+
+    bgm_slug = style.get("recommendedBgmSlug")
+    if bgm_slug:
+        bgm = get_system_audio_by_slug(conn, str(bgm_slug))
+        if bgm is not None:
+            set_parts.append("bgm_asset_id = ?")
+            params.append(bgm.id)
+            set_parts.append("auto_bgm = 1")
+            set_parts.append("bgm_volume = ?")
+            params.append(max(float(blog_clip.bgm_volume or 0), DEFAULT_BGM_VOLUME))
+    if "recommendedAutoSfx" in style:
+        set_parts.append("auto_sfx = ?")
+        params.append(1 if style.get("recommendedAutoSfx") else 0)
+    voice_id = style.get("recommendedVoice")
+    if voice_id and is_known_voice(str(voice_id)):
+        set_parts.append("default_voice = ?")
+        params.append(str(voice_id))
+
+    set_parts.append("updated_at = CURRENT_TIMESTAMP")
+    params.append(blog_clip.id)
+    conn.execute(
+        f"UPDATE blog_clips SET {', '.join(set_parts)} WHERE id = ?",
+        params,
+    )
 
 
 def _list_saved_blog_images(user_id: int, blog_clip_id: int) -> list[Path]:
@@ -3406,7 +3488,7 @@ def run_blog_clip_pipeline(blog_clip_id: int, user_id: int, url: str, style: str
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
                     detail=(
-                        f"블로그에서 사용할 수 있는 이미지가 부족합니다 "
+                        f"사용할 수 있는 이미지가 부족합니다 "
                         f"({len(downloaded)}개, 최소 {settings.blog_image_min_count}개 필요)."
                     ),
                 )

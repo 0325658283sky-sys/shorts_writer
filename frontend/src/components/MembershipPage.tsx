@@ -12,8 +12,8 @@ export function MembershipPage({ usage }: { usage: Usage | null }) {
         <p className="membership-kicker">Membership</p>
         <h1 className="membership-title">요금제</h1>
         <p className="membership-lead">
-          최종 쇼츠 내보내기와 영상 Analyze에 월간 크레딧이 사용됩니다. 스크랩·보드 편집·프리뷰는 횟수에 포함되지
-          않습니다.
+          월간 한도는 <strong>영상 Analyze(오디오 추출) 성공</strong> 시에만 1회 차감됩니다. 블로그 쇼츠 렌더·보드
+          편집·프리뷰·이미 분석된 영상의 전사/하이라이트는 차감되지 않습니다. (서버 정책: Free 3 / Lite 30 / Pro 150)
         </p>
       </header>
 
@@ -98,16 +98,14 @@ export function MembershipPage({ usage }: { usage: Usage | null }) {
         <h3>크레딧이 차감되는 작업</h3>
         <ul>
           <li>
-            <strong>블로그 쇼츠 최종 렌더</strong> — 내보내기 성공 시 1회 (재렌더 포함)
-          </li>
-          <li>
-            <strong>영상 Analyze</strong> — 분석 성공 시 1회 (업로드·가져오기만으로는 차감되지 않음)
+            <strong>영상 Analyze</strong> — 분석(오디오 추출) 성공 시 1회. 업로드·유튜브 가져오기만으로는 차감되지
+            않습니다.
           </li>
         </ul>
         <h3>차감되지 않는 작업</h3>
         <ul>
-          <li>블로그 스크랩, 이미지 선택, 보드·대본 편집, 프리뷰</li>
-          <li>이미 분석된 영상의 재조회(트랜스크립트·하이라이트 등)</li>
+          <li>블로그 스크랩, 이미지·대본 선택, 보드 편집, 프리뷰, 최종 렌더</li>
+          <li>이미 분석된 영상의 전사·하이라이트·클립 자르기·자막</li>
         </ul>
         <p className="membership-footnote">
           표시 가격은 부가세 별도 안내 기준이며, 결제 연동 전까지 요금제 변경은 관리자(DB)에서 적용됩니다. 월간

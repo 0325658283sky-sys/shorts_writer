@@ -50,6 +50,16 @@ class YoutubeImportRequest(BaseModel):
     url: HttpUrl
 
 
+class YoutubePreviewResponse(BaseModel):
+    url: str
+    video_id: str | None = None
+    title: str
+    thumbnail_url: str | None = None
+    duration_seconds: int | None = None
+    channel: str | None = None
+    channel_avatar_url: str | None = None
+
+
 class VideoResponse(BaseModel):
     id: int
     original_filename: str
@@ -103,6 +113,7 @@ class HighlightResponse(BaseModel):
 
 class ClipCreateRequest(BaseModel):
     highlight_id: int
+    visual_style: str | None = None
 
 
 SubtitleStyle = Literal["basic", "bold", "shorts"]
@@ -117,6 +128,18 @@ class NarrationRequest(BaseModel):
     mode: TtsMode = "original_audio"
 
 
+class ClipTemplateRenderRequest(BaseModel):
+    visual_style: str | None = None
+    style_title: str | None = None
+    style_subtitle: str | None = None
+    channel_name: str | None = None
+    channel_avatar_url: str | None = None
+    video_title: str | None = None
+    # When true, burn ASS captions onto source before Remotion wrap (best effort).
+    burn_subtitles: bool = True
+    subtitle_style: SubtitleStyle = "bold"
+
+
 class ClipResponse(BaseModel):
     id: int
     video_id: int
@@ -129,6 +152,10 @@ class ClipResponse(BaseModel):
     narration_script: str | None = None
     narration_audio_path: str | None = None
     narrated_output_path: str | None = None
+    visual_style: str = "yt_profile"
+    style_title: str | None = None
+    style_subtitle: str | None = None
+    templated_output_path: str | None = None
     status: str
     error_message: str | None = None
     created_at: str
@@ -177,6 +204,8 @@ class BlogClipImageCandidateResponse(BaseModel):
 
 class BlogClipImageSelectionRequest(BaseModel):
     image_ids: list[int]
+    # Optional template chosen on the image-select step (applied before boards exist).
+    visual_style: str | None = None
 
 
 class BoardResponse(BaseModel):
@@ -291,6 +320,7 @@ VisualStyleSlug = Literal[
     "info_navy",
     "viral_cyan",
     "card_white",
+    "yt_profile",
     # legacy aliases (normalized server-side)
     "fullscreen",
     "card_news",

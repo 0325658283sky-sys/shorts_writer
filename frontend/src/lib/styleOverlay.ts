@@ -72,6 +72,13 @@ const DEFAULT_OVERLAYS: Record<string, StyleOverlay> = {
     subtitle: { x: 0.5, y: 0.113, fontSize: 110, color: "#151515", align: "center", maxWidth: 0.9, visible: false },
     caption: { x: 0.5, y: 0.72, fontSize: 44, color: "#151515", align: "center", maxWidth: 0.84, visible: true },
   },
+  yt_profile: {
+    titleFont: DEFAULT_SHORTS_FONT_ID,
+    captionFont: DEFAULT_SHORTS_FONT_ID,
+    title: { x: 0.5, y: 0.06, fontSize: 92, color: "#ffffff", align: "center", maxWidth: 0.9, visible: true },
+    subtitle: { x: 0.5, y: 0.125, fontSize: 92, color: "#FFE566", align: "center", maxWidth: 0.9, visible: true },
+    caption: { x: 0.5, y: 0.58, fontSize: 40, color: "#ffffff", align: "center", maxWidth: 0.86, visible: true },
+  },
 };
 
 function cloneOverlay(overlay: StyleOverlay): StyleOverlay {

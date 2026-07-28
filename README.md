@@ -17,6 +17,7 @@ pipelines:
 More documentation:
 
 ```text
+docs/USER_JOURNEYS.md   End-user journeys (for UX/process improvement discussions)
 docs/ARCHITECTURE.md    System design, data flow, database schema
 docs/API_SPEC.md        Full endpoint reference (request/response examples)
 docs/DEPLOYMENT.md      How this runs today and what real deployment needs

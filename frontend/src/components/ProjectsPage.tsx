@@ -1,31 +1,26 @@
 import { useEffect, useMemo, useState, type MouseEvent } from "react";
-import { BLOG_CLIP_STATUS_LABELS, SCRIPT_TONE_LABELS } from "../constants";
 import type {
   BlogClip,
   Clip,
   ClipMetadata,
   Highlight,
-  ScriptTone,
   SubtitleStyle,
   Transcript,
   TtsMode,
   Video,
 } from "../types";
+import {
+  PROJECT_SOURCE_LABELS,
+  buildProjectListItems,
+  type ProjectBucket,
+  type ProjectListItem,
+  type ProjectSource,
+} from "../lib/projectAdapters";
 import { BlogClipThumb } from "./BlogClipThumb";
 import { ClipsLibrary } from "./ClipsLibrary";
 import { VideoList } from "./VideoList";
 
-const WIZARD_STEP_LABELS = {
-  video_style: "스타일",
-  edit_mode: "편집",
-  quick: "퀵설정",
-  ready: "완료",
-  boards: "편집",
-  voice: "편집",
-  style: "편집",
-} as const;
-
-type ProjectTab = "shorts" | "videos" | "clips";
+type ProjectsView = ProjectBucket | "advanced";
 
 function formatDate(value: string) {
   const date = new Date(value);
@@ -41,8 +36,10 @@ function canDownloadBlogClip(blogClip: BlogClip): boolean {
   return Boolean(blogClip.subtitled_video_path || blogClip.video_path);
 }
 
-function canEditBlogClip(blogClip: BlogClip): boolean {
-  return blogClip.status === "awaiting_boards" || blogClip.status === "completed";
+function primaryActionLabel(item: ProjectListItem): string {
+  if (item.bucket === "done") return "결과 보기";
+  if (item.kind === "blog" && item.blogClip?.status === "awaiting_boards") return "편집 이어하기";
+  return "이어하기";
 }
 
 export function ProjectsPage({
@@ -64,9 +61,10 @@ export function ProjectsPage({
   analyzingId,
   transcribingId,
   highlightingId,
-  onOpenBlogClip,
+  onResumeBlogClip,
   onDownloadBlogClip,
-  onEditBlogClip,
+  onResumeVideo,
+  onResumeClip,
   onCreateNew,
   onAnalyze,
   onTranscript,
@@ -102,9 +100,10 @@ export function ProjectsPage({
   analyzingId: number | null;
   transcribingId: number | null;
   highlightingId: number | null;
-  onOpenBlogClip: (blogClip: BlogClip) => void;
+  onResumeBlogClip: (blogClip: BlogClip) => void;
   onDownloadBlogClip: (blogClip: BlogClip) => void;
-  onEditBlogClip: (blogClip: BlogClip) => void;
+  onResumeVideo: (video: Video) => void;
+  onResumeClip: (clip: Clip) => void;
   onCreateNew: () => void;
   onAnalyze: (videoId: number) => void;
   onTranscript: (videoId: number) => void;
@@ -118,37 +117,58 @@ export function ProjectsPage({
   onGenerateMetadata: (clip: Clip) => void;
   onStyleChange: (clipId: number, style: SubtitleStyle) => void;
   onTtsModeChange: (clipId: number, mode: TtsMode) => void;
-  projectsTabRequest?: ProjectTab | null;
+  projectsTabRequest?: ProjectsView | null;
   focusVideoId?: number | null;
   onProjectsTabRequestConsumed?: () => void;
 }) {
-  const [tab, setTab] = useState<ProjectTab>("shorts");
+  const [view, setView] = useState<ProjectsView>("in_progress");
+  const [sourceFilter, setSourceFilter] = useState<ProjectSource | "all">("all");
   const [query, setQuery] = useState("");
 
   useEffect(() => {
     if (!projectsTabRequest) return;
-    setTab(projectsTabRequest);
+    setView(projectsTabRequest);
     onProjectsTabRequestConsumed?.();
   }, [projectsTabRequest, onProjectsTabRequestConsumed]);
 
-  const filteredBlogClips = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return blogClips;
-    return blogClips.filter((clip) => {
-      const title = (clip.blog_title ?? "").toLowerCase();
-      const url = clip.source_url.toLowerCase();
-      return title.includes(q) || url.includes(q);
-    });
-  }, [blogClips, query]);
+  const allItems = useMemo(
+    () => buildProjectListItems({ blogClips, videos, clips }),
+    [blogClips, videos, clips],
+  );
 
-  const filteredVideos = useMemo(() => {
+  const inProgressCount = useMemo(
+    () => allItems.filter((item) => item.bucket === "in_progress").length,
+    [allItems],
+  );
+  const doneCount = useMemo(() => allItems.filter((item) => item.bucket === "done").length, [allItems]);
+
+  const filteredItems = useMemo(() => {
+    if (view === "advanced") return [];
     const q = query.trim().toLowerCase();
-    if (!q) return videos;
-    return videos.filter((video) => video.original_filename.toLowerCase().includes(q));
-  }, [videos, query]);
+    return allItems.filter((item) => {
+      if (item.bucket !== view) return false;
+      if (sourceFilter !== "all" && item.source !== sourceFilter) return false;
+      if (!q) return true;
+      return item.title.toLowerCase().includes(q) || item.meta.toLowerCase().includes(q);
+    });
+  }, [allItems, view, sourceFilter, query]);
 
   function stopRow(event: MouseEvent) {
     event.stopPropagation();
+  }
+
+  function resumeItem(item: ProjectListItem) {
+    if (item.kind === "blog" && item.blogClip) {
+      onResumeBlogClip(item.blogClip);
+      return;
+    }
+    if (item.kind === "video" && item.video) {
+      onResumeVideo(item.video);
+      return;
+    }
+    if (item.kind === "clip" && item.clip) {
+      onResumeClip(item.clip);
+    }
   }
 
   return (
@@ -157,7 +177,7 @@ export function ProjectsPage({
         <header className="projects-header">
           <div>
             <h1 className="projects-title">프로젝트</h1>
-            <p className="projects-lead">만든 쇼츠와 영상 프로젝트를 이어서 편집하세요.</p>
+            <p className="projects-lead">작업 중과 완료를 한곳에서 이어하세요. 소스만 다를 뿐 같은 목록입니다.</p>
           </div>
           <button className="btn-primary" type="button" onClick={onCreateNew}>
             새 프로젝트
@@ -165,144 +185,85 @@ export function ProjectsPage({
         </header>
 
         <div className="projects-toolbar">
-          <div className="projects-tabs" role="tablist" aria-label="프로젝트 종류">
+          <div className="projects-tabs" role="tablist" aria-label="프로젝트 상태">
             <button
               type="button"
               role="tab"
-              aria-selected={tab === "shorts"}
-              className={`projects-tab ${tab === "shorts" ? "is-active" : ""}`}
-              onClick={() => setTab("shorts")}
+              aria-selected={view === "in_progress"}
+              className={`projects-tab ${view === "in_progress" ? "is-active" : ""}`}
+              onClick={() => setView("in_progress")}
             >
-              블로그 쇼츠
-              <span className="projects-tab-count">{blogClips.length}</span>
+              작업 중
+              <span className="projects-tab-count">{inProgressCount}</span>
             </button>
             <button
               type="button"
               role="tab"
-              aria-selected={tab === "videos"}
-              className={`projects-tab ${tab === "videos" ? "is-active" : ""}`}
-              onClick={() => setTab("videos")}
+              aria-selected={view === "done"}
+              className={`projects-tab ${view === "done" ? "is-active" : ""}`}
+              onClick={() => setView("done")}
             >
-              영상
-              <span className="projects-tab-count">{videos.length}</span>
+              완료
+              <span className="projects-tab-count">{doneCount}</span>
             </button>
             <button
               type="button"
               role="tab"
-              aria-selected={tab === "clips"}
-              className={`projects-tab ${tab === "clips" ? "is-active" : ""}`}
-              onClick={() => setTab("clips")}
+              aria-selected={view === "advanced"}
+              className={`projects-tab ${view === "advanced" ? "is-active" : ""}`}
+              onClick={() => setView("advanced")}
             >
-              클립
+              고급
             </button>
           </div>
-          <label className="projects-search">
-            <span className="sr-only">프로젝트 검색</span>
-            <input
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="제목 또는 URL 검색"
-            />
-          </label>
+          {view !== "advanced" ? (
+            <label className="projects-search">
+              <span className="sr-only">프로젝트 검색</span>
+              <input
+                type="search"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="제목 또는 URL 검색"
+              />
+            </label>
+          ) : null}
         </div>
 
-        {tab === "shorts" ? (
-          filteredBlogClips.length === 0 ? (
-            <div className="projects-empty">
-              <p>{blogClips.length === 0 ? "아직 만든 프로젝트가 없습니다." : "검색 결과가 없습니다."}</p>
-              {blogClips.length === 0 ? (
-                <button className="btn-outline" type="button" onClick={onCreateNew}>
-                  새 프로젝트 만들기 →
-                </button>
-              ) : null}
-            </div>
-          ) : (
-            <ul className="projects-list">
-              {filteredBlogClips.map((blogClip) => {
-                const downloadable = canDownloadBlogClip(blogClip);
-                const editable = canEditBlogClip(blogClip);
-                const downloading = downloadingBlogClipId === blogClip.id;
-                return (
-                  <li key={blogClip.id}>
-                    <div
-                      className="projects-row"
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => onOpenBlogClip(blogClip)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter" || event.key === " ") {
-                          event.preventDefault();
-                          onOpenBlogClip(blogClip);
-                        }
-                      }}
-                    >
-                      <BlogClipThumb blogClipId={blogClip.id} title={blogClip.blog_title} />
-                      <div className="projects-row-main">
-                        <strong>{blogClip.blog_title ?? "제목 없는 쇼츠"}</strong>
-                        <span className="projects-row-meta">
-                          {formatDate(blogClip.updated_at || blogClip.created_at)}
-                          {blogClip.script_tone ? ` · ${SCRIPT_TONE_LABELS[blogClip.script_tone as ScriptTone]}` : ""}
-                          {blogClip.status === "awaiting_boards" && blogClip.wizard_step
-                            ? ` · ${WIZARD_STEP_LABELS[blogClip.wizard_step]}`
-                            : ""}
-                        </span>
-                        <span className={`status-badge status-${blogClip.status}`}>
-                          {BLOG_CLIP_STATUS_LABELS[blogClip.status]}
-                        </span>
-                      </div>
-                      <div className="projects-row-actions" onClick={stopRow}>
-                        <button
-                          className="small-button ghost-small"
-                          type="button"
-                          disabled={!downloadable || downloading}
-                          onClick={() => onDownloadBlogClip(blogClip)}
-                        >
-                          {downloading ? "다운로드 중" : "다운로드"}
-                        </button>
-                        <button
-                          className="small-button ghost-small"
-                          type="button"
-                          disabled={!editable}
-                          onClick={() => onEditBlogClip(blogClip)}
-                        >
-                          편집
-                        </button>
-                        <button
-                          className="small-button"
-                          type="button"
-                          onClick={() => onOpenBlogClip(blogClip)}
-                        >
-                          열기
-                        </button>
-                      </div>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )
+        {view !== "advanced" ? (
+          <div className="projects-source-filters" role="group" aria-label="소스 필터">
+            <button
+              type="button"
+              className={`projects-chip ${sourceFilter === "all" ? "is-active" : ""}`}
+              onClick={() => setSourceFilter("all")}
+            >
+              전체
+            </button>
+            {(Object.keys(PROJECT_SOURCE_LABELS) as ProjectSource[]).map((source) => (
+              <button
+                key={source}
+                type="button"
+                className={`projects-chip ${sourceFilter === source ? "is-active" : ""}`}
+                onClick={() => setSourceFilter(source)}
+              >
+                {PROJECT_SOURCE_LABELS[source]}
+              </button>
+            ))}
+          </div>
         ) : null}
 
-        {tab === "videos" ? (
-          filteredVideos.length === 0 ? (
-            <div className="projects-empty">
-              <p>{videos.length === 0 ? "아직 가져온 영상이 없습니다." : "검색 결과가 없습니다."}</p>
-              {videos.length === 0 ? (
-                <button className="btn-outline" type="button" onClick={onCreateNew}>
-                  새 프로젝트 만들기 →
-                </button>
-              ) : null}
-            </div>
-          ) : (
+        {view === "advanced" ? (
+          <div className="projects-advanced">
+            <p className="create-note">
+              고전 VideoList·클립 라이브러리입니다. 새 작업은 위 <strong>작업 중 / 완료</strong>에서 이어하세요.
+            </p>
+            {focusVideoId ? (
+              <p className="create-note">
+                방금 가져온 영상 #{focusVideoId} — 가이드 흐름이 아니라 여기서 단계별로 진행할 수 있습니다.
+              </p>
+            ) : null}
             <div className="projects-video-wrap">
-              {focusVideoId ? (
-                <p className="create-note">
-                  방금 가져온 영상 #{focusVideoId} — 아래에서 <strong>분석하기</strong>로 다음 단계를 진행하세요.
-                </p>
-              ) : null}
               <VideoList
-                videos={filteredVideos}
+                videos={videos}
                 transcripts={transcripts}
                 highlights={highlights}
                 clips={clips}
@@ -333,12 +294,93 @@ export function ProjectsPage({
                 onTtsModeChange={onTtsModeChange}
               />
             </div>
-          )
-        ) : null}
-
-        {tab === "clips" ? (
-          <ClipsLibrary onDownload={onDownloadClip} downloadingClipId={downloadingClipId} />
-        ) : null}
+            <h2 className="projects-advanced-title">클립 라이브러리</h2>
+            <ClipsLibrary onDownload={onDownloadClip} downloadingClipId={downloadingClipId} />
+          </div>
+        ) : filteredItems.length === 0 ? (
+          <div className="projects-empty">
+            <p>
+              {allItems.length === 0
+                ? "아직 만든 프로젝트가 없습니다."
+                : view === "in_progress"
+                  ? "진행 중인 작업이 없습니다."
+                  : "완료된 결과가 없습니다."}
+            </p>
+            {allItems.length === 0 ? (
+              <button className="btn-outline" type="button" onClick={onCreateNew}>
+                새 프로젝트 만들기 →
+              </button>
+            ) : null}
+          </div>
+        ) : (
+          <ul className="projects-list">
+            {filteredItems.map((item) => {
+              const blogClip = item.blogClip;
+              const downloadableBlog = blogClip ? canDownloadBlogClip(blogClip) : false;
+              const downloadingBlog = blogClip != null && downloadingBlogClipId === blogClip.id;
+              const downloadingClip = item.clip != null && downloadingClipId === item.clip.id;
+              return (
+                <li key={item.key}>
+                  <div
+                    className="projects-row"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => resumeItem(item)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        resumeItem(item);
+                      }
+                    }}
+                  >
+                    {item.kind === "blog" && blogClip ? (
+                      <BlogClipThumb blogClipId={blogClip.id} title={blogClip.blog_title} />
+                    ) : (
+                      <div className="projects-thumb projects-thumb-fallback" aria-hidden>
+                        {PROJECT_SOURCE_LABELS[item.source].slice(0, 1)}
+                      </div>
+                    )}
+                    <div className="projects-row-main">
+                      <strong>{item.title}</strong>
+                      <span className="projects-row-meta">
+                        {PROJECT_SOURCE_LABELS[item.source]} · {formatDate(item.updatedAt)}
+                        {item.progressLabel ? ` · ${item.progressLabel}` : ""}
+                      </span>
+                      <span className={`status-badge status-${item.blogClip?.status ?? item.clip?.status ?? "uploaded"}`}>
+                        {item.statusLabel}
+                      </span>
+                    </div>
+                    <div className="projects-row-actions" onClick={stopRow}>
+                      {item.kind === "blog" && blogClip && downloadableBlog ? (
+                        <button
+                          className="small-button ghost-small"
+                          type="button"
+                          disabled={downloadingBlog}
+                          onClick={() => onDownloadBlogClip(blogClip)}
+                        >
+                          {downloadingBlog ? "다운로드 중" : "다운로드"}
+                        </button>
+                      ) : null}
+                      {item.kind === "clip" && item.clip ? (
+                        <button
+                          className="small-button ghost-small"
+                          type="button"
+                          disabled={downloadingClip}
+                          onClick={() => onDownloadClip(item.clip!)}
+                        >
+                          {downloadingClip ? "다운로드 중" : "다운로드"}
+                        </button>
+                      ) : null}
+                      <button className="small-button" type="button" onClick={() => resumeItem(item)}>
+                        {primaryActionLabel(item)}
+                      </button>
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </div>
     </section>
   );

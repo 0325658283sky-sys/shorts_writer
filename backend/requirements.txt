@@ -8,4 +8,5 @@ openai==2.14.0
 yt-dlp==2026.6.9
 requests==2.32.3
 beautifulsoup4==4.12.3
+playwright==1.61.0
 pytest==8.3.5

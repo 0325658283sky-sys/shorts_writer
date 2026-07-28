@@ -9,6 +9,7 @@ import {
   SCRIPT_TONES,
   SUBTITLE_STYLE_LABELS,
   TOKEN_KEY,
+  userFacingProgressLabel,
 } from "../constants";
 import type { BlogClip, BlogClipVersion, ScriptTone, SubtitleStyle } from "../types";
 import { AliveProgressBar } from "./AliveProgressBar";
@@ -23,6 +24,7 @@ export function BlogClipCard({
   generatingBlogMetadataId,
   selectingBlogScriptId,
   blogBoardCounts,
+  hidePrimaryActions = false,
   onCopyText,
   onDownloadBlogClip,
   onGenerateMetadata,
@@ -37,6 +39,7 @@ export function BlogClipCard({
   generatingBlogMetadataId: number | null;
   selectingBlogScriptId: number | null;
   blogBoardCounts: Record<number, number>;
+  hidePrimaryActions?: boolean;
   onCopyText: (key: string, text: string) => void;
   onDownloadBlogClip: (blogClip: BlogClip) => void;
   onGenerateMetadata: (blogClip: BlogClip) => void;
@@ -60,7 +63,7 @@ export function BlogClipCard({
   const isAwaitingBoards = blogClip.status === "awaiting_boards";
   const isCompleted = blogClip.status === "completed";
   const boardCount = blogBoardCounts[blogClip.id];
-  const stageLabel = BLOG_PROGRESS_STAGE_LABELS[blogClip.progress_stage] ?? blogClip.progress_stage;
+  const stageLabel = userFacingProgressLabel(blogClip.progress_stage);
   const availableTones = SCRIPT_TONES.filter((tone) => Boolean(blogClip.script_candidates[tone]));
 
   useEffect(() => {
@@ -252,7 +255,7 @@ export function BlogClipCard({
           />
         </div>
       ) : null}
-      {canDownload ? (
+      {canDownload && !hidePrimaryActions ? (
         <div className="subtitle-controls">
           <button
             className="small-button ghost-small"
@@ -273,7 +276,7 @@ export function BlogClipCard({
         </div>
       ) : null}
       {blogClip.metadata_error ? <p className="error-text">{blogClip.metadata_error}</p> : null}
-      {hasMetadata ? (
+      {hasMetadata && !hidePrimaryActions ? (
         <MetadataBox
           copiedKey={copiedKey}
           idPrefix={`blog-${blogClip.id}`}

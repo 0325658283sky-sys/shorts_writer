@@ -67,6 +67,10 @@ class Clip:
     narration_script: str | None
     narration_audio_path: str | None
     narrated_output_path: str | None
+    visual_style: str
+    style_title: str | None
+    style_subtitle: str | None
+    templated_output_path: str | None
     status: str
     error_message: str | None
     created_at: str

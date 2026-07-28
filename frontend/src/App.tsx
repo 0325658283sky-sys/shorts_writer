@@ -4,6 +4,9 @@ import { AuthPanel } from "./components/AuthPanel";
 import { BlogClipFlow } from "./components/BlogClipFlow";
 import { BoardEditor } from "./components/board/BoardEditor";
 import { Dashboard } from "./components/Dashboard";
+import { type YoutubePreview } from "./components/YoutubeConfirmStep";
+import { YoutubeClipFlow } from "./components/YoutubeClipFlow";
+import { YoutubeWorkspaceEditor } from "./components/YoutubeWorkspaceEditor";
 import {
   BLOG_CLIP_POLL_INTERVAL_MS,
   CLIP_STATUS_LABELS,
@@ -35,8 +38,24 @@ import type {
   Video,
   VideoStatusResponse,
   View,
+  VisualStyleSlug,
   WizardBoardsStep,
 } from "./types";
+
+function subtitleStyleFromVisual(style: string): SubtitleStyle {
+  const slug = style.toLowerCase();
+  if (slug.includes("card_white") || slug.includes("fullscreen")) return "basic";
+  if (slug.includes("info_") || slug.includes("card_news") || slug.includes("yt_profile")) return "bold";
+  return "shorts";
+}
+
+type YoutubeProjectMeta = {
+  title: string;
+  channel: string | null;
+  thumbnail_url: string | null;
+  channel_avatar_url: string | null;
+  visualStyle: string;
+};
 
 export function App() {
   const [view, setView] = useState<View>("login");
@@ -54,6 +73,12 @@ export function App() {
   const [ttsModes, setTtsModes] = useState<Record<number, TtsMode>>({});
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [youtubeUrl, setYoutubeUrl] = useState("");
+  const [youtubePreview, setYoutubePreview] = useState<YoutubePreview | null>(null);
+  const [isPreviewingYoutube, setIsPreviewingYoutube] = useState(false);
+  const [preferredYoutubeVisualStyle, setPreferredYoutubeVisualStyle] = useState<string | null>(null);
+  const [youtubeProjectMetaByVideoId, setYoutubeProjectMetaByVideoId] = useState<
+    Record<number, YoutubeProjectMeta>
+  >({});
   const [blogUrl, setBlogUrl] = useState("");
   const [blogSubtitleStyle, setBlogSubtitleStyle] = useState<SubtitleStyle>("shorts");
   const [blogTargetLength, setBlogTargetLength] = useState<TargetLength>("short");
@@ -70,8 +95,10 @@ export function App() {
   const [editingBlogClipId, setEditingBlogClipId] = useState<number | null>(null);
   const [focusBlogClipId, setFocusBlogClipId] = useState<number | null>(null);
   const [studioNav, setStudioNav] = useState<StudioTab>("create");
-  const [projectsTabRequest, setProjectsTabRequest] = useState<"shorts" | "videos" | "clips" | null>(null);
+  const [projectsTabRequest, setProjectsTabRequest] = useState<"in_progress" | "done" | "advanced" | null>(null);
   const [focusVideoId, setFocusVideoId] = useState<number | null>(null);
+  const [focusYoutubeVideoId, setFocusYoutubeVideoId] = useState<number | null>(null);
+  const [editingYoutubeClipId, setEditingYoutubeClipId] = useState<number | null>(null);
   const [blogBoardCounts, setBlogBoardCounts] = useState<Record<number, number>>({});
   const [generatingBlogMetadataId, setGeneratingBlogMetadataId] = useState<number | null>(null);
   const [downloadingBlogClipId, setDownloadingBlogClipId] = useState<number | null>(null);
@@ -92,12 +119,70 @@ export function App() {
 
   const editingBlogClip = blogClips.find((clip) => clip.id === editingBlogClipId) ?? null;
   const focusBlogClip = blogClips.find((clip) => clip.id === focusBlogClipId) ?? null;
+  const focusYoutubeVideo = videos.find((item) => item.id === focusYoutubeVideoId) ?? null;
+  const editingYoutubeClip =
+    editingYoutubeClipId == null
+      ? null
+      : Object.values(clips).find((item) => item.id === editingYoutubeClipId) ?? null;
+  const editingYoutubeVideo =
+    editingYoutubeClip == null ? null : videos.find((item) => item.id === editingYoutubeClip.video_id) ?? null;
+  const editingYoutubeMeta =
+    editingYoutubeClip == null ? null : youtubeProjectMetaByVideoId[editingYoutubeClip.video_id] ?? null;
+  const editingWorkspaceClips =
+    editingYoutubeClip == null
+      ? []
+      : Object.values(clips)
+          .filter((item) => item.video_id === editingYoutubeClip.video_id)
+          .sort((a, b) => {
+            const ha = (highlights[a.video_id] ?? []).find((h) => h.id === a.highlight_id);
+            const hb = (highlights[b.video_id] ?? []).find((h) => h.id === b.highlight_id);
+            return (ha?.start_time ?? 0) - (hb?.start_time ?? 0) || a.id - b.id;
+          });
+  const editingYoutubeHighlight =
+    editingYoutubeClip == null
+      ? null
+      : (highlights[editingYoutubeClip.video_id] ?? []).find((item) => item.id === editingYoutubeClip.highlight_id) ?? null;
+  const focusYoutubeMeta =
+    focusYoutubeVideoId == null ? null : youtubeProjectMetaByVideoId[focusYoutubeVideoId] ?? null;
   const skipHashSyncRef = useRef(false);
   const [routeReady, setRouteReady] = useState(false);
 
-  function applyAppRoute(route: AppRoute, clips: BlogClip[]) {
+  async function applyAppRoute(route: AppRoute, blogList: BlogClip[]) {
+    if (route.kind === "videoFlow") {
+      setEditingBlogClipId(null);
+      setFocusBlogClipId(null);
+      setEditingYoutubeClipId(null);
+      setFocusYoutubeVideoId(route.videoId);
+      return;
+    }
+
+    if (route.kind === "clipEdit") {
+      setEditingBlogClipId(null);
+      setFocusBlogClipId(null);
+      let clip = Object.values(clips).find((item) => item.id === route.clipId) ?? null;
+      if (!clip) {
+        try {
+          clip = await authorizedRequest<Clip>(`/clips/${route.clipId}`);
+          setClips((current) => ({ ...current, [clip!.highlight_id]: clip! }));
+        } catch {
+          writeAppRoute({ kind: "studio", tab: "create" }, "replace");
+          setEditingYoutubeClipId(null);
+          setFocusYoutubeVideoId(null);
+          setStudioNav("create");
+          return;
+        }
+      }
+      setFocusYoutubeVideoId(clip.video_id);
+      setEditingYoutubeClipId(clip.id);
+      return;
+    }
+
+    // Blog routes clear YouTube focus so overlays don't fight.
+    setFocusYoutubeVideoId(null);
+    setEditingYoutubeClipId(null);
+
     if (route.kind === "edit") {
-      const clip = clips.find((item) => item.id === route.clipId);
+      const clip = blogList.find((item) => item.id === route.clipId);
       if (clip && clip.status === "awaiting_boards") {
         setFocusBlogClipId(clip.id);
         setEditingBlogClipId(clip.id);
@@ -111,7 +196,7 @@ export function App() {
       }
     }
     if (route.kind === "flow") {
-      const clip = clips.find((item) => item.id === route.clipId);
+      const clip = blogList.find((item) => item.id === route.clipId);
       if (clip) {
         setEditingBlogClipId(null);
         setFocusBlogClipId(clip.id);
@@ -128,8 +213,18 @@ export function App() {
   }
 
   function handleStudioNavChange(tab: StudioTab) {
-    if (tab === studioNav && focusBlogClipId == null && editingBlogClipId == null) return;
+    if (
+      tab === studioNav &&
+      focusBlogClipId == null &&
+      editingBlogClipId == null &&
+      focusYoutubeVideoId == null &&
+      editingYoutubeClipId == null
+    ) {
+      return;
+    }
     setFocusBlogClipId(null);
+    setFocusYoutubeVideoId(null);
+    setEditingYoutubeClipId(null);
     setEditingBlogClipId(null);
     setStudioNav(tab);
     skipHashSyncRef.current = true;
@@ -142,21 +237,39 @@ export function App() {
     loadCurrentUser(token);
   }, []);
 
-  // Keep URL hash in sync so refresh/back restore Shorts screens and studio tabs.
+  // Keep URL hash in sync so refresh/back restore Shorts / video flows and studio tabs.
   useEffect(() => {
     if (view !== "dashboard" || !user || !routeReady) return;
     if (skipHashSyncRef.current) {
       skipHashSyncRef.current = false;
       return;
     }
-    writeAppRoute(routeFromScreenState(editingBlogClipId, focusBlogClipId, studioNav), "replace");
-  }, [view, user, routeReady, editingBlogClipId, focusBlogClipId, studioNav]);
+    writeAppRoute(
+      routeFromScreenState({
+        editingYoutubeClipId,
+        editingBlogClipId,
+        focusYoutubeVideoId,
+        focusBlogClipId,
+        studioTab: studioNav,
+      }),
+      "replace",
+    );
+  }, [
+    view,
+    user,
+    routeReady,
+    editingYoutubeClipId,
+    editingBlogClipId,
+    focusYoutubeVideoId,
+    focusBlogClipId,
+    studioNav,
+  ]);
 
   useEffect(() => {
     if (view !== "dashboard" || !user || !routeReady) return;
     function onHashChange() {
       skipHashSyncRef.current = true;
-      applyAppRoute(parseAppRoute(window.location.hash), blogClips);
+      void applyAppRoute(parseAppRoute(window.location.hash), blogClips);
     }
     window.addEventListener("hashchange", onHashChange);
     window.addEventListener("popstate", onHashChange);
@@ -164,10 +277,15 @@ export function App() {
       window.removeEventListener("hashchange", onHashChange);
       window.removeEventListener("popstate", onHashChange);
     };
-  }, [view, user, routeReady, blogClips]);
+  }, [view, user, routeReady, blogClips, clips]);
 
   async function loadVideos() {
     setVideos(await authorizedRequest<Video[]>("/videos"));
+  }
+
+  async function loadClips() {
+    const loaded = await authorizedRequest<Clip[]>("/clips");
+    setClips(Object.fromEntries(loaded.map((clip) => [clip.highlight_id, clip])));
   }
 
   async function loadUsage() {
@@ -249,9 +367,15 @@ export function App() {
     }
 
     try {
-      const [, , , clips] = await Promise.all([loadVideos(), loadUsage(), loadPlans(), loadBlogClips()]);
+      const [, , , , loadedBlogClips] = await Promise.all([
+        loadVideos(),
+        loadClips(),
+        loadUsage(),
+        loadPlans(),
+        loadBlogClips(),
+      ]);
       skipHashSyncRef.current = true;
-      applyAppRoute(parseAppRoute(window.location.hash), clips);
+      await applyAppRoute(parseAppRoute(window.location.hash), loadedBlogClips);
     } catch (error) {
       setUploadMessage(error instanceof Error ? error.message : "대시보드 데이터를 불러오지 못했습니다. 새로고침을 눌러보세요.");
     } finally {
@@ -309,11 +433,13 @@ export function App() {
       const video = await uploadRequest<Video>("/videos/upload", formData);
       setSelectedFile(null);
       setYoutubeUrl("");
-      setUploadMessage("업로드가 완료되었습니다. 다음 단계: 분석하기를 눌러주세요.");
+      setUploadMessage("업로드가 완료되었습니다. 음성·하이라이트를 자동으로 추출합니다.");
+      setVideos((current) => (current.some((item) => item.id === video.id) ? current : [video, ...current]));
       await Promise.all([loadVideos(), loadUsage(), loadPlans()]);
       setFocusVideoId(video.id);
-      setProjectsTabRequest("videos");
-      handleStudioNavChange("projects");
+      setFocusBlogClipId(null);
+      setEditingYoutubeClipId(null);
+      setFocusYoutubeVideoId(video.id);
     } catch (error) {
       setUploadMessage(error instanceof Error ? error.message : "업로드에 실패했습니다.");
     } finally {
@@ -321,25 +447,68 @@ export function App() {
     }
   }
 
-  async function handleImportYoutube(event: FormEvent<HTMLFormElement>) {
+
+  async function handlePreviewYoutube(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!youtubeUrl.trim()) {
       setUploadMessage("먼저 유튜브 URL을 입력해주세요.");
       return;
     }
-    setIsImportingYoutube(true);
+    setIsPreviewingYoutube(true);
     setUploadMessage("");
     try {
-      const video = await authorizedRequest<Video>("/videos/import-youtube", {
+      const preview = await authorizedRequest<YoutubePreview>("/videos/youtube-preview", {
         method: "POST",
         body: JSON.stringify({ url: youtubeUrl.trim() }),
       });
+      setYoutubePreview(preview);
+      setUploadMessage("영상을 확인한 뒤 템플릿을 고르고 생성하기를 눌러주세요.");
+    } catch (error) {
+      setYoutubePreview(null);
+      setUploadMessage(error instanceof Error ? error.message : "유튜브 미리보기에 실패했습니다.");
+    } finally {
+      setIsPreviewingYoutube(false);
+    }
+  }
+
+  function handleCancelYoutubePreview() {
+    setYoutubePreview(null);
+    setUploadMessage("");
+  }
+
+  async function handleConfirmYoutubeImport(visualStyle: VisualStyleSlug | string) {
+    if (!youtubePreview?.url) {
+      setUploadMessage("먼저 유튜브 영상을 확인해 주세요.");
+      return;
+    }
+    setIsImportingYoutube(true);
+    setUploadMessage("");
+    const styleSlug = String(visualStyle);
+    setPreferredYoutubeVisualStyle(styleSlug);
+    const previewSnapshot = youtubePreview;
+    try {
+      const video = await authorizedRequest<Video>("/videos/import-youtube", {
+        method: "POST",
+        body: JSON.stringify({ url: previewSnapshot.url }),
+      });
+      setYoutubeProjectMetaByVideoId((current) => ({
+        ...current,
+        [video.id]: {
+          title: previewSnapshot.title || video.original_filename,
+          channel: previewSnapshot.channel,
+          thumbnail_url: previewSnapshot.thumbnail_url,
+          channel_avatar_url: previewSnapshot.channel_avatar_url ?? null,
+          visualStyle: styleSlug,
+        },
+      }));
       setYoutubeUrl("");
-      setUploadMessage("유튜브 영상을 가져왔습니다. 다음 단계: 분석하기를 눌러주세요.");
+      setYoutubePreview(null);
+      setUploadMessage("유튜브 영상을 가져왔습니다. AI가 편집점을 잡아 쇼츠를 생성합니다.");
+      setVideos((current) => (current.some((item) => item.id === video.id) ? current : [video, ...current]));
       await Promise.all([loadVideos(), loadUsage(), loadPlans()]);
       setFocusVideoId(video.id);
-      setProjectsTabRequest("videos");
-      handleStudioNavChange("projects");
+      setFocusBlogClipId(null);
+      setFocusYoutubeVideoId(video.id);
     } catch (error) {
       setUploadMessage(error instanceof Error ? error.message : "유튜브 영상 가져오기에 실패했습니다.");
     } finally {
@@ -350,7 +519,7 @@ export function App() {
   async function handleCreateBlogShort(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!blogUrl.trim()) {
-      setUploadMessage("먼저 블로그 글 URL을 입력해주세요.");
+      setUploadMessage("먼저 URL을 입력해주세요.");
       return;
     }
     setIsCreatingBlogShort(true);
@@ -377,18 +546,33 @@ export function App() {
     }
   }
 
-  async function handleConfirmBlogImages(blogClip: BlogClip, imageIds: number[]) {
+  async function handleConfirmBlogImages(
+    blogClip: BlogClip,
+    imageIds: number[],
+    visualStyle?: VisualStyleSlug | string,
+  ) {
     setConfirmingImageSelectionId(blogClip.id);
     setUploadMessage("");
     try {
       const updated = await authorizedRequest<BlogClip>(`/blog-clips/${blogClip.id}/images/selection`, {
         method: "PUT",
-        body: JSON.stringify({ image_ids: imageIds }),
+        body: JSON.stringify({
+          image_ids: imageIds,
+          ...(visualStyle ? { visual_style: String(visualStyle) } : {}),
+        }),
       });
       setBlogClips((current) => current.map((item) => (item.id === updated.id ? updated : item)));
       setFocusBlogClipId(updated.id);
     } catch (error) {
-      setUploadMessage(error instanceof Error ? error.message : "이미지 선택에 실패했습니다.");
+      const message = error instanceof Error ? error.message : "이미지 선택에 실패했습니다.";
+      setUploadMessage(message);
+      // Server may already have moved past awaiting_images; refresh clip so UI can recover.
+      try {
+        const refreshed = await authorizedRequest<BlogClip>(`/blog-clips/${blogClip.id}`);
+        setBlogClips((current) => current.map((item) => (item.id === refreshed.id ? refreshed : item)));
+      } catch {
+        /* ignore refresh errors */
+      }
     } finally {
       setConfirmingImageSelectionId(null);
     }
@@ -520,33 +704,53 @@ export function App() {
 
   function handleOpenBoardEditor(blogClip: BlogClip) {
     if (blogClip.status !== "awaiting_boards") return;
+    setFocusYoutubeVideoId(null);
+    setEditingYoutubeClipId(null);
     setFocusBlogClipId(blogClip.id);
     setEditingBlogClipId(blogClip.id);
   }
 
   /** Projects list “편집”: board editor when awaiting boards, else open Flow result. */
-  function handleEditBlogClip(blogClip: BlogClip) {
+  function handleResumeBlogClip(blogClip: BlogClip) {
     setUploadMessage("");
+    setFocusYoutubeVideoId(null);
+    setEditingYoutubeClipId(null);
     if (blogClip.status === "awaiting_boards") {
       handleOpenBoardEditor(blogClip);
       return;
     }
-    if (blogClip.status === "completed") {
-      setEditingBlogClipId(null);
-      setFocusBlogClipId(blogClip.id);
-    }
-  }
-
-  function handleOpenBlogClip(blogClip: BlogClip) {
+    setEditingBlogClipId(null);
     setFocusBlogClipId(blogClip.id);
-    setUploadMessage("");
     if (blogClip.status === "pending" || blogClip.status === "processing") {
       pollBlogClip(blogClip.id);
     }
   }
 
+  function handleResumeVideo(video: Video) {
+    setUploadMessage("");
+    setFocusBlogClipId(null);
+    setEditingBlogClipId(null);
+    setEditingYoutubeClipId(null);
+    setFocusYoutubeVideoId(video.id);
+  }
+
+  function handleResumeClip(clip: Clip) {
+    setUploadMessage("");
+    setFocusBlogClipId(null);
+    setEditingBlogClipId(null);
+    setFocusYoutubeVideoId(clip.video_id);
+    setEditingYoutubeClipId(clip.id);
+    setClips((current) => (current[clip.highlight_id] ? current : { ...current, [clip.highlight_id]: clip }));
+  }
+
+  function handleOpenBlogClip(blogClip: BlogClip) {
+    handleResumeBlogClip(blogClip);
+  }
+
   function handleBackToStudio() {
     setFocusBlogClipId(null);
+    setFocusYoutubeVideoId(null);
+    setEditingYoutubeClipId(null);
     setUploadMessage("");
   }
 
@@ -660,23 +864,63 @@ export function App() {
 
   async function handleHighlights(videoId: number) {
     setHighlightingId(videoId);
+    setUploadMessage("");
     try {
+      let video = videos.find((item) => item.id === videoId) ?? null;
+      const needsAudio =
+        !video ||
+        !video.audio_path ||
+        video.status === "uploaded" ||
+        video.status === "extracting_audio" ||
+        video.status === "failed";
+      if (needsAudio) {
+        setUploadMessage("오디오 추출 중…");
+        const analyzed = await authorizedRequest<VideoStatusResponse>(`/videos/${videoId}/analyze`, { method: "POST" });
+        mergeVideoStatus(analyzed);
+        video = video ? { ...video, ...analyzed } : null;
+      }
+
+      const hasTranscript =
+        (transcripts[videoId]?.status === "transcribed" && Boolean(transcripts[videoId]?.text)) ||
+        video?.status === "transcribed";
+      if (!hasTranscript || !transcripts[videoId]?.text) {
+        setUploadMessage("음성 인식 중… (하이라이트 전에 필요)");
+        setTranscribingId(videoId);
+        try {
+          const transcript = await authorizedRequest<Transcript>(`/videos/${videoId}/transcript`);
+          setTranscripts((current) => ({ ...current, [videoId]: transcript }));
+          await Promise.all([loadVideos(), loadUsage(), loadPlans()]);
+        } finally {
+          setTranscribingId(null);
+        }
+      }
+
+      setUploadMessage("하이라이트 추천 중…");
       const candidates = await authorizedRequest<Highlight[]>(`/videos/${videoId}/highlights`);
       setHighlights((current) => ({ ...current, [videoId]: candidates }));
+      setUploadMessage(candidates.length ? `하이라이트 ${candidates.length}개를 추천했습니다.` : "추천된 하이라이트가 없습니다.");
     } catch (error) {
+      await Promise.all([loadVideos(), loadUsage(), loadPlans()]);
       setUploadMessage(error instanceof Error ? error.message : "하이라이트 추천에 실패했습니다.");
     } finally {
       setHighlightingId(null);
     }
   }
 
-  async function handleCreateClip(highlightId: number) {
+  async function handleCreateClip(highlightId: number): Promise<Clip | null> {
     setCreatingClipId(highlightId);
     setUploadMessage("");
     try {
+      const highlight =
+        Object.values(highlights)
+          .flat()
+          .find((item) => item.id === highlightId) ?? null;
+      const meta = highlight ? youtubeProjectMetaByVideoId[highlight.video_id] : undefined;
+      const visualStyle =
+        meta?.visualStyle || preferredYoutubeVisualStyle || "yt_profile";
       const clip = await authorizedRequest<Clip>("/clips/create", {
         method: "POST",
-        body: JSON.stringify({ highlight_id: highlightId }),
+        body: JSON.stringify({ highlight_id: highlightId, visual_style: visualStyle }),
       });
       setClips((current) => ({ ...current, [highlightId]: clip }));
       setClipMetadata((current) => {
@@ -684,29 +928,45 @@ export function App() {
         delete next[clip.id];
         return next;
       });
-      setSubtitleStyles((current) => ({ ...current, [clip.id]: "basic" }));
+      setSubtitleStyles((current) => ({ ...current, [clip.id]: "shorts" }));
       setTtsModes((current) => ({ ...current, [clip.id]: "original_audio" }));
       setUploadMessage(clip.status === "completed" ? "클립이 생성되었습니다." : `클립 상태: ${CLIP_STATUS_LABELS[clip.status]}`);
+      return clip;
     } catch (error) {
       setUploadMessage(error instanceof Error ? error.message : "클립 생성에 실패했습니다.");
+      return null;
     } finally {
       setCreatingClipId(null);
     }
   }
 
-  async function handleBurnSubtitles(clip: Clip) {
-    const style = subtitleStyles[clip.id] ?? "basic";
+  async function handleBurnSubtitles(clip: Clip, styleOverride?: SubtitleStyle): Promise<Clip | null> {
+    const style = styleOverride ?? subtitleStyles[clip.id] ?? "bold";
+    const meta = youtubeProjectMetaByVideoId[clip.video_id];
+    const visualStyle =
+      meta?.visualStyle || preferredYoutubeVisualStyle || clip.visual_style || "yt_profile";
     setSubtitlingClipId(clip.id);
     setUploadMessage("");
     try {
-      const updated = await authorizedRequest<Clip>(`/clips/${clip.id}/subtitles`, {
+      // Remotion template wrap (includes best-effort ASS burn + chrome).
+      const updated = await authorizedRequest<Clip>(`/clips/${clip.id}/render-template`, {
         method: "POST",
-        body: JSON.stringify({ style }),
+        body: JSON.stringify({
+          visual_style: visualStyle,
+          channel_name: meta?.channel ?? null,
+          channel_avatar_url: meta?.channel_avatar_url ?? null,
+          video_title: meta?.title ?? null,
+          burn_subtitles: true,
+          subtitle_style: style,
+        }),
       });
       setClips((current) => ({ ...current, [updated.highlight_id]: updated }));
-      setUploadMessage("자막이 삽입된 클립이 생성되었습니다.");
+      setSubtitleStyles((current) => ({ ...current, [updated.id]: style }));
+      setUploadMessage("템플릿이 적용된 쇼츠가 준비되었습니다.");
+      return updated;
     } catch (error) {
-      setUploadMessage(error instanceof Error ? error.message : "자막 삽입에 실패했습니다.");
+      setUploadMessage(error instanceof Error ? error.message : "템플릿 렌더에 실패했습니다.");
+      return null;
     } finally {
       setSubtitlingClipId(null);
     }
@@ -807,12 +1067,16 @@ export function App() {
     setTtsModes({});
     setSelectedFile(null);
     setYoutubeUrl("");
+    setYoutubePreview(null);
+    setPreferredYoutubeVisualStyle(null);
     setBlogUrl("");
     setBlogClips([]);
     setBlogBoardCounts({});
     setSelectingBlogScriptId(null);
     setEditingBlogClipId(null);
     setFocusBlogClipId(null);
+    setFocusYoutubeVideoId(null);
+    setEditingYoutubeClipId(null);
     setRouteReady(false);
     setView("login");
     setMessage("");
@@ -820,6 +1084,48 @@ export function App() {
     setStudioNav("create");
     writeAppRoute({ kind: "studio", tab: "create" }, "replace");
   }
+
+  if (view === "dashboard" && user && editingYoutubeClip) {
+    const workspaceTitle =
+      editingYoutubeMeta?.title ||
+      editingYoutubeVideo?.original_filename ||
+      `영상 #${editingYoutubeClip.video_id}`;
+    const workspaceStyle = editingYoutubeMeta?.visualStyle || preferredYoutubeVisualStyle || "yt_profile";
+    return (
+      <main className="app-root">
+        <YoutubeWorkspaceEditor
+          clips={editingWorkspaceClips.length > 0 ? editingWorkspaceClips : [editingYoutubeClip]}
+          highlights={highlights[editingYoutubeClip.video_id] ?? []}
+          selectedClipId={editingYoutubeClip.id}
+          videoTitle={workspaceTitle}
+          channel={editingYoutubeMeta?.channel ?? null}
+          channelAvatarUrl={editingYoutubeMeta?.channel_avatar_url ?? null}
+          visualStyleSlug={workspaceStyle}
+          metadata={clipMetadata[editingYoutubeClip.id]}
+          copiedKey={copiedKey}
+          selectedStyle={subtitleStyles[editingYoutubeClip.id] ?? "shorts"}
+          selectedTtsMode={
+            ttsModes[editingYoutubeClip.id] ?? (editingYoutubeClip.tts_mode as TtsMode) ?? "original_audio"
+          }
+          downloadingClipId={downloadingClipId}
+          generatingMetadataId={generatingMetadataId}
+          narratingClipId={narratingClipId}
+          subtitlingClipId={subtitlingClipId}
+          onSelectClip={(clipId) => setEditingYoutubeClipId(clipId)}
+          onClose={() => setEditingYoutubeClipId(null)}
+          onBurnSubtitles={handleBurnSubtitles}
+          onApplyNarration={handleApplyNarration}
+          onGenerateMetadata={handleGenerateMetadata}
+          onDownloadClip={handleDownloadClip}
+          onCopyText={handleCopyText}
+          onStyleChange={(clipId, style) => setSubtitleStyles((current) => ({ ...current, [clipId]: style }))}
+          onTtsModeChange={(clipId, mode) => setTtsModes((current) => ({ ...current, [clipId]: mode }))}
+          onMessage={setUploadMessage}
+        />
+      </main>
+    );
+  }
+
 
   if (editingBlogClip && editingBlogClip.status === "awaiting_boards") {
     return (
@@ -832,6 +1138,38 @@ export function App() {
         }}
         onMessage={setUploadMessage}
       />
+    );
+  }
+
+  if (view === "dashboard" && user && focusYoutubeVideo) {
+    return (
+      <main className="app-root">
+        <YoutubeClipFlow
+          video={focusYoutubeVideo}
+          highlights={highlights[focusYoutubeVideo.id] ?? []}
+          clips={clips}
+          projectTitle={focusYoutubeMeta?.title}
+          projectChannel={focusYoutubeMeta?.channel}
+          projectThumbnailUrl={focusYoutubeMeta?.thumbnail_url}
+          downloadingClipId={downloadingClipId}
+          initialSubtitleStyle={subtitleStyleFromVisual(
+            focusYoutubeMeta?.visualStyle || preferredYoutubeVisualStyle || "yt_profile",
+          )}
+          onBackToStudio={handleBackToStudio}
+          onVideoUpdated={mergeVideoStatus}
+          onHighlightsReady={(videoId, items) => {
+            setHighlights((current) => ({ ...current, [videoId]: items }));
+          }}
+          onTranscriptReady={(videoId, transcript) => {
+            setTranscripts((current) => ({ ...current, [videoId]: transcript }));
+          }}
+          onCreateClip={handleCreateClip}
+          onBurnSubtitles={handleBurnSubtitles}
+          onStyleChange={(clipId, style) => setSubtitleStyles((current) => ({ ...current, [clipId]: style }))}
+          onOpenDetailedEditor={(clip) => setEditingYoutubeClipId(clip.id)}
+          onMessage={setUploadMessage}
+        />
+      </main>
     );
   }
 
@@ -866,6 +1204,7 @@ export function App() {
             setBlogClips((current) => current.map((item) => (item.id === updated.id ? updated : item)));
           }}
           onMessage={setUploadMessage}
+          flowMessage={uploadMessage}
         />
       </main>
     );
@@ -883,6 +1222,8 @@ export function App() {
           isUploading={isUploading}
           youtubeUrl={youtubeUrl}
           isImportingYoutube={isImportingYoutube}
+          isPreviewingYoutube={isPreviewingYoutube}
+          youtubePreview={youtubePreview}
           blogUrl={blogUrl}
           blogSubtitleStyle={blogSubtitleStyle}
           blogTargetLength={blogTargetLength}
@@ -909,8 +1250,11 @@ export function App() {
           onLogout={handleLogout}
           onUpload={handleUpload}
           onSelectedFileChange={setSelectedFile}
-          onImportYoutube={handleImportYoutube}
+          onPreviewYoutube={handlePreviewYoutube}
+          onConfirmYoutubeImport={handleConfirmYoutubeImport}
+          onCancelYoutubePreview={handleCancelYoutubePreview}
           onYoutubeUrlChange={setYoutubeUrl}
+          onToastMessage={setUploadMessage}
           onCreateBlogShort={handleCreateBlogShort}
           onBlogUrlChange={setBlogUrl}
           onBlogSubtitleStyleChange={setBlogSubtitleStyle}
@@ -920,7 +1264,8 @@ export function App() {
           onCopyText={handleCopyText}
           onOpenBlogClip={handleOpenBlogClip}
           onDownloadBlogClip={handleDownloadBlogClip}
-          onEditBlogClip={handleEditBlogClip}
+          onResumeVideo={handleResumeVideo}
+          onResumeClip={handleResumeClip}
           downloadingBlogClipId={downloadingBlogClipId}
           onAnalyze={handleAnalyze}
           onTranscript={handleTranscript}

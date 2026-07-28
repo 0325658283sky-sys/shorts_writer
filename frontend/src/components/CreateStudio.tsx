@@ -12,10 +12,11 @@ import {
 import type { NarrationLanguage, ScriptModel, SubtitleStyle, TargetLength } from "../types";
 import { formatBytes } from "../utils/format";
 
-export type CreateSource = "blog" | "youtube" | "mp4";
+export type CreateSource = "blog" | "product" | "youtube" | "mp4";
 
 const SOURCES: Array<{ id: CreateSource; label: string; hint: string }> = [
   { id: "blog", label: "블로그 URL", hint: "글 → 쇼츠 자동 제작" },
+  { id: "product", label: "상품 URL", hint: "아마존·스마트스토어 → 쇼츠" },
   { id: "youtube", label: "유튜브 URL", hint: "영상 가져와 클립" },
   { id: "mp4", label: "MP4 업로드", hint: "로컬 파일로 시작" },
 ];
@@ -40,9 +41,10 @@ export function CreateStudio({
   onBlogScriptModelChange,
   onCreateBlogShort,
   onYoutubeUrlChange,
-  onImportYoutube,
+  onPreviewYoutube,
   onSelectedFileChange,
   onUpload,
+  isPreviewingYoutube = false,
 }: {
   source: CreateSource;
   onSourceChange: (source: CreateSource) => void;
@@ -54,6 +56,7 @@ export function CreateStudio({
   isCreatingBlogShort: boolean;
   youtubeUrl: string;
   isImportingYoutube: boolean;
+  isPreviewingYoutube?: boolean;
   selectedFile: File | null;
   isUploading: boolean;
   onBlogUrlChange: (value: string) => void;
@@ -63,18 +66,19 @@ export function CreateStudio({
   onBlogScriptModelChange: (value: ScriptModel) => void;
   onCreateBlogShort: (event: FormEvent<HTMLFormElement>) => void;
   onYoutubeUrlChange: (value: string) => void;
-  onImportYoutube: (event: FormEvent<HTMLFormElement>) => void;
+  onPreviewYoutube: (event: FormEvent<HTMLFormElement>) => void;
   onSelectedFileChange: (file: File | null) => void;
   onUpload: (event: FormEvent<HTMLFormElement>) => void;
 }) {
-  const busy = isCreatingBlogShort || isImportingYoutube || isUploading;
+  const busy = isCreatingBlogShort || isImportingYoutube || isUploading || isPreviewingYoutube;
+  const isProduct = source === "product";
 
   return (
     <section className="create-studio" aria-label="쇼츠 만들기">
       <div className="create-studio-copy">
         <p className="create-kicker">새 프로젝트</p>
         <h2>어떤 소스로 시작할까요?</h2>
-        <p className="create-lead">블로그·유튜브·MP4 중 하나를 고르면, 바로 아래에서 입력하고 생성합니다.</p>
+        <p className="create-lead">블로그·상품·유튜브·MP4 중 하나를 고르면, 바로 아래에서 입력하고 생성합니다.</p>
       </div>
 
       <div className="source-tabs" role="tablist" aria-label="소스 선택">
@@ -94,16 +98,20 @@ export function CreateStudio({
       </div>
 
       <div className="create-panel" role="tabpanel">
-        {source === "blog" ? (
+        {source === "blog" || source === "product" ? (
           <form className="create-form" onSubmit={onCreateBlogShort}>
             <label className="create-field">
-              <span>블로그 / 글 URL</span>
+              <span>{isProduct ? "상품 URL" : "블로그 / 글 URL"}</span>
               <div className="url-row">
                 <input
                   type="url"
                   value={blogUrl}
                   onChange={(event) => onBlogUrlChange(event.target.value)}
-                  placeholder="https://blog.naver.com/... 또는 티스토리, 브런치"
+                  placeholder={
+                    isProduct
+                      ? "https://smartstore.naver.com/.../products/... 또는 amazon.com/dp/..."
+                      : "https://blog.naver.com/... 또는 티스토리, 브런치"
+                  }
                   required
                 />
                 <button className="cta-button" type="submit" disabled={busy}>
@@ -168,15 +176,20 @@ export function CreateStudio({
             </div>
 
             <ol className="create-steps">
-              <li>글 읽고 대본 3종 생성</li>
+              <li>{isProduct ? "상품 정보·이미지 수집" : "글 읽고 대본 3종 생성"}</li>
               <li>톤 선택 → 보드 편집</li>
               <li>렌더 · 다운로드 · 버전</li>
             </ol>
+            {isProduct ? (
+              <p className="create-note">
+                Amazon(/dp/ASIN)과 네이버 스마트스토어·브랜드스토어(/products/상품번호) 링크를 지원합니다.
+              </p>
+            ) : null}
           </form>
         ) : null}
 
         {source === "youtube" ? (
-          <form className="create-form" onSubmit={onImportYoutube}>
+          <form className="create-form" onSubmit={onPreviewYoutube}>
             <label className="create-field">
               <span>유튜브 URL</span>
               <div className="url-row">
@@ -188,11 +201,16 @@ export function CreateStudio({
                   required
                 />
                 <button className="cta-button" type="submit" disabled={busy}>
-                  {isImportingYoutube ? "가져오는 중…" : "가져오기"}
+                  {isPreviewingYoutube ? "확인 중…" : isImportingYoutube ? "가져오는 중…" : "확인"}
                 </button>
               </div>
             </label>
-            <p className="create-note">본인이 소유했거나 처리 권한이 있는 영상만 사용하세요. 가져온 뒤 하이라이트·클립 단계로 이어집니다.</p>
+            <ol className="create-steps">
+              <li>영상 확인 후 템플릿 선택</li>
+              <li>음성·하이라이트 자동 추출</li>
+              <li>퀵 / 세부 편집 → 렌더</li>
+            </ol>
+            <p className="create-note">본인이 소유했거나 처리 권한이 있는 영상만 사용하세요.</p>
           </form>
         ) : null}
 
@@ -210,8 +228,14 @@ export function CreateStudio({
               )}
             </label>
             <button className="cta-button" type="submit" disabled={busy || !selectedFile}>
-              {isUploading ? "업로드 중…" : "업로드하고 시작"}
+              {isUploading ? "업로드 중…" : "클립 만들기"}
             </button>
+            <ol className="create-steps">
+              <li>음성·하이라이트 자동 추출</li>
+              <li>하이라이트 썸네일 선택</li>
+              <li>퀵 / 세부 편집 → 렌더</li>
+            </ol>
+            <p className="create-note">유튜브와 같은 가이드 흐름으로 이어집니다. Projects → 영상에서도 고전 방식으로 다시 작업할 수 있습니다.</p>
           </form>
         ) : null}
       </div>

@@ -81,7 +81,13 @@ export function VideoList({
                 {formatBytes(video.file_size)} · {video.created_at}
               </p>
               {focusVideoId === video.id ? (
-                <p className="create-note">다음: 분석 → 음성 인식 → 하이라이트 → 클립 만들기</p>
+                <p className="create-note">
+                  {video.status === "transcribed" || transcripts[video.id]?.status === "transcribed"
+                    ? "다음: 하이라이트 추천 → 클립 만들기"
+                    : video.audio_path || video.status === "audio_extracted"
+                      ? "다음: 음성 인식 → 하이라이트 (하이라이트 버튼이 인식까지 자동 진행)"
+                      : "다음: 분석 → 음성 인식 → 하이라이트 (하이라이트 버튼이 앞 단계까지 자동 진행)"}
+                </p>
               ) : null}
               {video.audio_path ? <p>오디오 추출 완료</p> : null}
               {video.error_message ? <p className="error-text">{video.error_message}</p> : null}
@@ -128,8 +134,24 @@ export function VideoList({
               >
                 {transcribingId === video.id ? "인식 중" : "음성 인식"}
               </button>
-              <button className="small-button" type="button" onClick={() => onHighlights(video.id)} disabled={highlightingId === video.id}>
-                {highlightingId === video.id ? "추천 중" : "하이라이트 추천"}
+              <button
+                className="small-button"
+                type="button"
+                onClick={() => onHighlights(video.id)}
+                disabled={
+                  highlightingId === video.id ||
+                  analyzingId === video.id ||
+                  transcribingId === video.id ||
+                  video.status === "extracting_audio" ||
+                  video.status === "transcribing"
+                }
+                title="전사 전이면 분석·음성 인식을 먼저 자동 실행합니다"
+              >
+                {highlightingId === video.id
+                  ? transcribingId === video.id
+                    ? "인식 후 추천 중"
+                    : "추천 중"
+                  : "하이라이트 추천"}
               </button>
               <button className="small-button ghost-small" type="button" onClick={() => onRefreshStatus(video.id)}>
                 새로고침

@@ -209,6 +209,14 @@ def _create_clips_table(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE clips ADD COLUMN narration_audio_path TEXT")
     if "narrated_output_path" not in columns:
         conn.execute("ALTER TABLE clips ADD COLUMN narrated_output_path TEXT")
+    if "visual_style" not in columns:
+        conn.execute("ALTER TABLE clips ADD COLUMN visual_style TEXT NOT NULL DEFAULT 'yt_profile'")
+    if "style_title" not in columns:
+        conn.execute("ALTER TABLE clips ADD COLUMN style_title TEXT")
+    if "style_subtitle" not in columns:
+        conn.execute("ALTER TABLE clips ADD COLUMN style_subtitle TEXT")
+    if "templated_output_path" not in columns:
+        conn.execute("ALTER TABLE clips ADD COLUMN templated_output_path TEXT")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_clips_user_id ON clips (user_id)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_clips_highlight_id ON clips (highlight_id)")
 

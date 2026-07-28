@@ -78,6 +78,18 @@ const STYLE_BY_VISUAL: Record<string, BlogShortsStyleProps> = {
     transitionType: "fade",
     kenBurns: true,
   },
+  yt_profile: {
+    layout: "letterbox",
+    mediaFit: "contain",
+    canvasBg: "#1B2838",
+    caption: "black_box",
+    header: "yt_profile",
+    titleColor: "#ffffff",
+    accent: "#FFE566",
+    transitionSec: 0.35,
+    transitionType: "fade",
+    kenBurns: false,
+  },
 };
 
 export function normalizeVisualStyleSlug(slug?: string | null): string {

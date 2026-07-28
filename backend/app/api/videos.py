@@ -1,6 +1,7 @@
-﻿import sqlite3
+import sqlite3
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi.responses import FileResponse
 
 from app.api.users import get_current_user
 from app.db.database import get_connection
@@ -12,10 +13,18 @@ from app.db.schemas import (
     VideoResponse,
     VideoStatusResponse,
     YoutubeImportRequest,
+    YoutubePreviewResponse,
 )
-from app.services.highlight_service import get_or_create_highlights
+from app.services.highlight_service import ensure_highlight_thumbnail, get_or_create_highlights
 from app.services.transcription_service import transcript_segments, transcribe_video
-from app.services.video_service import analyze_video_audio, create_video, get_video_for_user, import_youtube_video, list_videos_for_user
+from app.services.video_service import (
+    analyze_video_audio,
+    create_video,
+    get_video_for_user,
+    import_youtube_video,
+    list_videos_for_user,
+    preview_youtube_video,
+)
 
 router = APIRouter(prefix="/videos", tags=["videos"])
 
@@ -71,6 +80,16 @@ def _to_highlight_response(highlight) -> HighlightResponse:
         score=highlight.score,
         created_at=highlight.created_at,
     )
+
+
+@router.post("/youtube-preview", response_model=YoutubePreviewResponse)
+def youtube_preview(
+    request: YoutubeImportRequest,
+    current_user: User = Depends(get_current_user),
+) -> YoutubePreviewResponse:
+    _ = current_user
+    preview = preview_youtube_video(str(request.url))
+    return YoutubePreviewResponse(**preview)
 
 
 @router.post("/upload", response_model=VideoResponse, status_code=201)
@@ -153,3 +172,14 @@ def read_video_highlights(
 ) -> list[HighlightResponse]:
     highlights = get_or_create_highlights(conn, current_user.id, video_id)
     return [_to_highlight_response(highlight) for highlight in highlights]
+
+
+@router.get("/{video_id}/highlights/{highlight_id}/thumbnail")
+def read_highlight_thumbnail(
+    video_id: int,
+    highlight_id: int,
+    current_user: User = Depends(get_current_user),
+    conn: sqlite3.Connection = Depends(get_connection),
+) -> FileResponse:
+    path = ensure_highlight_thumbnail(conn, current_user.id, video_id, highlight_id)
+    return FileResponse(path=path, media_type="image/jpeg", filename=path.name)

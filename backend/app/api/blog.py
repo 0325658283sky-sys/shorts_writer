@@ -236,6 +236,7 @@ def confirm_blog_clip_images_endpoint(
         current_user.id,
         blog_clip_id,
         request.image_ids,
+        visual_style=request.visual_style,
     )
     return _to_blog_clip_response(blog_clip)
 

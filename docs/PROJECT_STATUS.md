@@ -4,6 +4,9 @@ Last updated: 2026-07-20
 Project root: `C:\Users\stkim\Documents\Codex\new_cut` (branch `sky_cut` — see
 "Branching" below)
 
+**User-facing process map (for UX/process improvement):** see
+[`USER_JOURNEYS.md`](USER_JOURNEYS.md).
+
 ## Current Stage
 
 **Blog shorts product polish — in progress.**

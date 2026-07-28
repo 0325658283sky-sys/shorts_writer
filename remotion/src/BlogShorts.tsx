@@ -4,9 +4,9 @@ import {
   AnimatedImage,
   Audio,
   Img,
+  OffthreadVideo,
   Sequence,
   interpolate,
-  spring,
   staticFile,
   useCurrentFrame,
   useVideoConfig,
@@ -59,6 +59,11 @@ const DEFAULT_OVERLAYS: Record<string, Record<"title" | "subtitle" | "caption", 
     title: { x: 0.5, y: 0.05, fontSize: 110, color: "#151515", align: "center", maxWidth: 0.9, visible: true },
     subtitle: { x: 0.5, y: 0.113, fontSize: 110, color: "#151515", align: "center", maxWidth: 0.9, visible: false },
     caption: { x: 0.5, y: 0.72, fontSize: 44, color: "#151515", align: "center", maxWidth: 0.84, visible: true },
+  },
+  yt_profile: {
+    title: { x: 0.5, y: 0.06, fontSize: 92, color: "#ffffff", align: "center", maxWidth: 0.9, visible: true },
+    subtitle: { x: 0.5, y: 0.125, fontSize: 92, color: "#FFE566", align: "center", maxWidth: 0.9, visible: true },
+    caption: { x: 0.5, y: 0.58, fontSize: 40, color: "#ffffff", align: "center", maxWidth: 0.86, visible: true },
   },
 };
 
@@ -123,6 +128,18 @@ const STYLE_BY_VISUAL: Record<string, BlogShortsStyleProps> = {
     transitionType: "fade",
     kenBurns: true,
   },
+  yt_profile: {
+    layout: "letterbox",
+    mediaFit: "contain",
+    canvasBg: "#1B2838",
+    caption: "black_box",
+    header: "yt_profile",
+    titleColor: "#ffffff",
+    accent: "#FFE566",
+    transitionSec: 0.35,
+    transitionType: "fade",
+    kenBurns: false,
+  },
 };
 
 const HEADER_BAND: Record<BlogShortsStyleProps["header"], { height: number; bg: string }> = {
@@ -132,6 +149,7 @@ const HEADER_BAND: Record<BlogShortsStyleProps["header"], { height: number; bg: 
   info_navy: { height: 520, bg: "#0B1F3A" },
   viral_cyan: { height: 540, bg: "#000000" },
   card_white: { height: 520, bg: "#ffffff" },
+  yt_profile: { height: 520, bg: "#1B2838" },
 };
 
 /** Parse `*accent*` markers in title text into colored spans. */
@@ -501,6 +519,8 @@ function isAnimatedGifSrc(src: string): boolean {
 
 function MediaLayer({
   imageSrc,
+  videoSrc,
+  muteVideo,
   animated,
   bg,
   objectFit,
@@ -509,6 +529,8 @@ function MediaLayer({
   mediaHeight,
 }: {
   imageSrc?: string;
+  videoSrc?: string;
+  muteVideo?: boolean;
   animated?: boolean;
   bg: string;
   objectFit: "cover" | "contain";
@@ -517,6 +539,22 @@ function MediaLayer({
   mediaWidth: number;
   mediaHeight: number;
 }) {
+  if (videoSrc) {
+    return (
+      <div style={{ width: "100%", height: "100%", overflow: "hidden", backgroundColor: "#000" }}>
+        <OffthreadVideo
+          src={videoSrc}
+          muted={Boolean(muteVideo)}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit,
+            objectPosition: "center",
+          }}
+        />
+      </div>
+    );
+  }
   if (imageSrc) {
     // Prefer explicit board.animated — preview blob: URLs never end with .gif.
     const animatedGif = Boolean(animated) || isAnimatedGifSrc(imageSrc);
@@ -563,46 +601,91 @@ function MediaLayer({
   );
 }
 
-function BoardScene({
-  board,
-  styleTitle,
-  styleSubtitle,
-  showCaption = true,
-  style,
-  overlay,
-  suppressText = false,
+function ProfileFooter({
+  channelName,
+  channelAvatarUrl,
+  videoTitle,
 }: {
-  board: BlogBoardProps;
-  styleTitle?: string | null;
-  styleSubtitle?: string | null;
-  showCaption?: boolean;
-  style: BlogShortsStyleProps;
-  overlay: ReturnType<typeof mergeOverlay>;
-  suppressText?: boolean;
+  channelName?: string | null;
+  channelAvatarUrl?: string | null;
+  videoTitle?: string | null;
 }) {
-  const frame = useCurrentFrame();
-  const { fps, durationInFrames } = useVideoConfig();
+  if (!channelName && !videoTitle) return null;
+  const avatarSrc = resolveBoardImageSrc(channelAvatarUrl);
+  return (
+    <div
+      style={{
+        position: "absolute",
+        left: 48,
+        right: 48,
+        bottom: 72,
+        display: "flex",
+        alignItems: "center",
+        gap: 18,
+        zIndex: 5,
+      }}
+    >
+      <div
+        style={{
+          width: 72,
+          height: 72,
+          borderRadius: "50%",
+          overflow: "hidden",
+          backgroundColor: "#3a4554",
+          flexShrink: 0,
+          border: "2px solid rgba(255,255,255,0.35)",
+        }}
+      >
+        {avatarSrc ? (
+          <Img src={avatarSrc} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        ) : null}
+      </div>
+      <div style={{ minWidth: 0, display: "grid", gap: 4 }}>
+        {channelName ? (
+          <div
+            style={{
+              color: "#fff",
+              fontSize: 28,
+              fontWeight: 700,
+              lineHeight: 1.2,
+              textShadow: "0 2px 8px rgba(0,0,0,0.55)",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {channelName}
+          </div>
+        ) : null}
+        {videoTitle ? (
+          <div
+            style={{
+              color: "rgba(255,255,255,0.82)",
+              fontSize: 22,
+              fontWeight: 500,
+              lineHeight: 1.25,
+              textShadow: "0 2px 8px rgba(0,0,0,0.45)",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {videoTitle}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
 
-  const kenBurns = style.kenBurns
-    ? interpolate(frame, [0, durationInFrames], [1, 1.05], {
-        extrapolateLeft: "clamp",
-        extrapolateRight: "clamp",
-      })
-    : 1;
-
-  const captionEnter = spring({
-    frame,
-    fps,
-    config: { damping: 16, stiffness: 120 },
-  });
-  const captionY = suppressText ? 0 : interpolate(captionEnter, [0, 1], [36, 0]);
-  const captionOpacity = showCaption && !suppressText ? interpolate(captionEnter, [0, 1], [0, 1]) : 0;
-
-  const bg = board.backgroundColor ?? "#222222";
-  const imageSrc = resolveBoardImageSrc(board.imageUrl);
+function mediaBandRect(style: BlogShortsStyleProps): {
+  mediaTop: number;
+  mediaHeight: number;
+  mediaLeft: number;
+  mediaRight: number;
+  mediaWidth: number;
+} {
   const headerH = HEADER_BAND[style.header]?.height ?? 0;
-  const canvasBg = style.canvasBg || "#000000";
-
   let mediaTop = 0;
   let mediaHeight = BLOG_SHORTS_HEIGHT;
   let mediaLeft = 0;
@@ -621,10 +704,47 @@ function BoardScene({
     mediaHeight = 1020;
   }
 
-  const mediaWidth = BLOG_SHORTS_WIDTH - mediaLeft - mediaRight;
+  return {
+    mediaTop,
+    mediaHeight,
+    mediaLeft,
+    mediaRight,
+    mediaWidth: BLOG_SHORTS_WIDTH - mediaLeft - mediaRight,
+  };
+}
+
+/** Media slide only — fade/slide transitions apply here, never to titles/captions. */
+function MediaSlide({
+  board,
+  style,
+  muteVideo = false,
+  opacity = 1,
+  transform,
+}: {
+  board: BlogBoardProps;
+  style: BlogShortsStyleProps;
+  muteVideo?: boolean;
+  opacity?: number;
+  transform?: string;
+}) {
+  const frame = useCurrentFrame();
+  const { durationInFrames } = useVideoConfig();
+  const videoSrc = resolveBoardImageSrc(board.videoUrl);
+  const hasVideo = Boolean(videoSrc);
+  const kenBurns =
+    !hasVideo && style.kenBurns
+      ? interpolate(frame, [0, durationInFrames], [1, 1.05], {
+          extrapolateLeft: "clamp",
+          extrapolateRight: "clamp",
+        })
+      : 1;
+  const bg = board.backgroundColor ?? "#222222";
+  const imageSrc = resolveBoardImageSrc(board.imageUrl);
+  const canvasBg = style.canvasBg || "#000000";
+  const { mediaTop, mediaHeight, mediaLeft, mediaRight, mediaWidth } = mediaBandRect(style);
 
   return (
-    <AbsoluteFill style={{ backgroundColor: canvasBg, overflow: "hidden" }}>
+    <AbsoluteFill style={{ opacity, transform, pointerEvents: "none" }}>
       <div
         style={{
           position: "absolute",
@@ -639,6 +759,8 @@ function BoardScene({
       >
         <MediaLayer
           imageSrc={imageSrc}
+          videoSrc={videoSrc}
+          muteVideo={muteVideo}
           animated={board.animated}
           bg={bg}
           objectFit={style.mediaFit}
@@ -647,7 +769,6 @@ function BoardScene({
           mediaHeight={mediaHeight}
         />
       </div>
-
       {style.layout === "fullscreen" ? (
         <AbsoluteFill
           style={{
@@ -657,28 +778,78 @@ function BoardScene({
           }}
         />
       ) : null}
+    </AbsoluteFill>
+  );
+}
 
+function StableChrome({
+  styleTitle,
+  styleSubtitle,
+  style,
+  overlay,
+  suppressText = false,
+  channelName,
+  channelAvatarUrl,
+  videoTitle,
+}: {
+  styleTitle?: string | null;
+  styleSubtitle?: string | null;
+  style: BlogShortsStyleProps;
+  overlay: ReturnType<typeof mergeOverlay>;
+  suppressText?: boolean;
+  channelName?: string | null;
+  channelAvatarUrl?: string | null;
+  videoTitle?: string | null;
+}) {
+  const showProfile =
+    style.header === "yt_profile" || Boolean(channelName) || Boolean(videoTitle);
+
+  // Transparent shell so media slides underneath remain visible.
+  return (
+    <AbsoluteFill style={{ overflow: "hidden", pointerEvents: "none" }}>
       <StyleHeaderBand header={style.header} />
-
       {!suppressText ? (
-        <>
-          <TitleLayers
-            title={styleTitle}
-            subtitle={styleSubtitle}
-            accent={style.accent}
-            overlay={overlay}
-          />
-          <CaptionBlock
-            text={board.text}
-            caption={style.caption}
-            layer={overlay.caption}
-            captionFontId={overlay.captionFont}
-            captionY={captionY}
-            captionOpacity={captionOpacity}
-          />
-        </>
+        <TitleLayers
+          title={styleTitle}
+          subtitle={styleSubtitle}
+          accent={style.accent}
+          overlay={overlay}
+        />
+      ) : null}
+      {showProfile && !suppressText ? (
+        <ProfileFooter
+          channelName={channelName}
+          channelAvatarUrl={channelAvatarUrl}
+          videoTitle={videoTitle}
+        />
       ) : null}
     </AbsoluteFill>
+  );
+}
+
+function BoardCaption({
+  board,
+  style,
+  overlay,
+  suppressText = false,
+}: {
+  board: BlogBoardProps;
+  style: BlogShortsStyleProps;
+  overlay: ReturnType<typeof mergeOverlay>;
+  suppressText?: boolean;
+}) {
+  if (suppressText || !(board.text || "").trim()) return null;
+
+  // Hard-cut captions — never share fade/slide with media transitions.
+  return (
+    <CaptionBlock
+      text={board.text}
+      caption={style.caption}
+      layer={overlay.caption}
+      captionFontId={overlay.captionFont}
+      captionY={0}
+      captionOpacity={1}
+    />
   );
 }
 
@@ -725,24 +896,50 @@ export const BlogShorts: React.FC<BlogShortsProps> = (props) => {
   }, [boards, transitionFrames, transitionType]);
 
   const narrationSrc = resolveBoardImageSrc(props.narrationUrl);
+  const muteVideo = Boolean(narrationSrc);
+  const suppressText = Boolean(props.suppressText);
+
+  const canvasBg = style.canvasBg || "#000000";
 
   return (
-    <AbsoluteFill style={{ backgroundColor: "#000" }}>
+    <AbsoluteFill style={{ backgroundColor: canvasBg }}>
       {narrationSrc ? <Audio src={narrationSrc} /> : null}
-      {timeline.map(({ board, from, duration, spoken, index }) => (
-        <Sequence key={index} from={from} durationInFrames={duration} name={`board-${index}`}>
-          <FadingBoard
+
+      {/* Media slides only — crossfade / slide happens here. */}
+      {timeline.map(({ board, from, duration, index }) => (
+        <Sequence key={`media-${index}`} from={from} durationInFrames={duration} name={`media-${index}`}>
+          <FadingMediaSlide
             board={board}
-            styleTitle={styleTitle}
-            styleSubtitle={styleSubtitle}
             transitionFrames={transitionFrames}
             transitionType={transitionType}
-            spokenFrames={spoken}
             isFirst={index === 0}
             isLast={index === timeline.length - 1}
             style={style}
+            muteVideo={muteVideo}
+          />
+        </Sequence>
+      ))}
+
+      {/* Stable chrome above media: titles / header / profile never transition. */}
+      <StableChrome
+        styleTitle={styleTitle}
+        styleSubtitle={styleSubtitle}
+        style={style}
+        overlay={overlay}
+        suppressText={suppressText}
+        channelName={props.channelName}
+        channelAvatarUrl={props.channelAvatarUrl}
+        videoTitle={props.videoTitle}
+      />
+
+      {/* Captions hard-cut on spoken window (no transition overlap → no double text). */}
+      {timeline.map(({ board, from, spoken, index }) => (
+        <Sequence key={`caption-${index}`} from={from} durationInFrames={spoken} name={`caption-${index}`}>
+          <BoardCaption
+            board={board}
+            style={style}
             overlay={overlay}
-            suppressText={Boolean(props.suppressText)}
+            suppressText={suppressText}
           />
         </Sequence>
       ))}
@@ -750,30 +947,22 @@ export const BlogShorts: React.FC<BlogShortsProps> = (props) => {
   );
 };
 
-function FadingBoard({
+function FadingMediaSlide({
   board,
-  styleTitle,
-  styleSubtitle,
   transitionFrames,
   transitionType,
-  spokenFrames,
   isFirst,
   isLast,
   style,
-  overlay,
-  suppressText,
+  muteVideo,
 }: {
   board: BlogBoardProps;
-  styleTitle?: string | null;
-  styleSubtitle?: string | null;
   transitionFrames: number;
   transitionType: TransitionType;
-  spokenFrames: number;
   isFirst: boolean;
   isLast: boolean;
   style: BlogShortsStyleProps;
-  overlay: ReturnType<typeof mergeOverlay>;
-  suppressText: boolean;
+  muteVideo: boolean;
 }) {
   const frame = useCurrentFrame();
   const { durationInFrames } = useVideoConfig();
@@ -818,22 +1007,17 @@ function FadingBoard({
           },
         );
 
-  const showCaption = frame < spokenFrames;
   const opacity = transitionType === "none" ? 1 : Math.min(fadeIn, fadeOut);
   const transform =
     transitionType === "slide" ? `translateX(${slideIn + slideOut}px)` : undefined;
 
   return (
-    <AbsoluteFill style={{ opacity, transform }}>
-      <BoardScene
-        board={board}
-        styleTitle={styleTitle}
-        styleSubtitle={styleSubtitle}
-        showCaption={showCaption}
-        style={style}
-        overlay={overlay}
-        suppressText={suppressText}
-      />
-    </AbsoluteFill>
+    <MediaSlide
+      board={board}
+      style={style}
+      muteVideo={muteVideo}
+      opacity={opacity}
+      transform={transform}
+    />
   );
 }

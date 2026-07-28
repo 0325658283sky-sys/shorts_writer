@@ -15,10 +15,12 @@ import type {
   Usage,
   User,
   Video,
+  VisualStyleSlug,
 } from "../types";
 import { CreateStudio, type CreateSource } from "./CreateStudio";
 import { MembershipPage } from "./MembershipPage";
 import { ProjectsPage } from "./ProjectsPage";
+import { YoutubeConfirmStep, type YoutubePreview } from "./YoutubeConfirmStep";
 
 export function Dashboard({
   user,
@@ -55,8 +57,13 @@ export function Dashboard({
   onLogout,
   onUpload,
   onSelectedFileChange,
-  onImportYoutube,
+  onPreviewYoutube,
+  onConfirmYoutubeImport,
+  onCancelYoutubePreview,
   onYoutubeUrlChange,
+  onToastMessage,
+  youtubePreview,
+  isPreviewingYoutube,
   onCreateBlogShort,
   onBlogUrlChange,
   onBlogSubtitleStyleChange,
@@ -66,7 +73,8 @@ export function Dashboard({
   onCopyText,
   onOpenBlogClip,
   onDownloadBlogClip,
-  onEditBlogClip,
+  onResumeVideo,
+  onResumeClip,
   downloadingBlogClipId,
   onAnalyze,
   onTranscript,
@@ -93,6 +101,8 @@ export function Dashboard({
   isUploading: boolean;
   youtubeUrl: string;
   isImportingYoutube: boolean;
+  isPreviewingYoutube: boolean;
+  youtubePreview: YoutubePreview | null;
   blogUrl: string;
   blogSubtitleStyle: SubtitleStyle;
   blogTargetLength: TargetLength;
@@ -119,8 +129,11 @@ export function Dashboard({
   onLogout: () => void;
   onUpload: (event: FormEvent<HTMLFormElement>) => void;
   onSelectedFileChange: (file: File | null) => void;
-  onImportYoutube: (event: FormEvent<HTMLFormElement>) => void;
+  onPreviewYoutube: (event: FormEvent<HTMLFormElement>) => void;
+  onConfirmYoutubeImport: (visualStyle: VisualStyleSlug | string) => void;
+  onCancelYoutubePreview: () => void;
   onYoutubeUrlChange: (value: string) => void;
+  onToastMessage: (message: string) => void;
   onCreateBlogShort: (event: FormEvent<HTMLFormElement>) => void;
   onBlogUrlChange: (value: string) => void;
   onBlogSubtitleStyleChange: (value: SubtitleStyle) => void;
@@ -130,7 +143,8 @@ export function Dashboard({
   onCopyText: (key: string, text: string) => void;
   onOpenBlogClip: (blogClip: BlogClip) => void;
   onDownloadBlogClip: (blogClip: BlogClip) => void;
-  onEditBlogClip: (blogClip: BlogClip) => void;
+  onResumeVideo: (video: Video) => void;
+  onResumeClip: (clip: Clip) => void;
   downloadingBlogClipId: number | null;
   onAnalyze: (videoId: number) => void;
   onTranscript: (videoId: number) => void;
@@ -145,7 +159,7 @@ export function Dashboard({
   onTtsModeChange: (clipId: number, mode: TtsMode) => void;
   studioNav: StudioTab;
   onStudioNavChange: (tab: StudioTab) => void;
-  projectsTabRequest?: "shorts" | "videos" | "clips" | null;
+  projectsTabRequest?: "in_progress" | "done" | "advanced" | null;
   focusVideoId?: number | null;
   onProjectsTabRequestConsumed?: () => void;
 }) {
@@ -209,30 +223,41 @@ export function Dashboard({
       <main className="studio-main">
         {studioNav === "create" ? (
           <>
-            <CreateStudio
-              source={source}
-              onSourceChange={setSource}
-              blogUrl={blogUrl}
-              blogSubtitleStyle={blogSubtitleStyle}
-              blogTargetLength={blogTargetLength}
-              blogNarrationLanguage={blogNarrationLanguage}
-              blogScriptModel={blogScriptModel}
-              isCreatingBlogShort={isCreatingBlogShort}
-              youtubeUrl={youtubeUrl}
-              isImportingYoutube={isImportingYoutube}
-              selectedFile={selectedFile}
-              isUploading={isUploading}
-              onBlogUrlChange={onBlogUrlChange}
-              onBlogSubtitleStyleChange={onBlogSubtitleStyleChange}
-              onBlogTargetLengthChange={onBlogTargetLengthChange}
-              onBlogNarrationLanguageChange={onBlogNarrationLanguageChange}
-              onBlogScriptModelChange={onBlogScriptModelChange}
-              onCreateBlogShort={onCreateBlogShort}
-              onYoutubeUrlChange={onYoutubeUrlChange}
-              onImportYoutube={onImportYoutube}
-              onSelectedFileChange={onSelectedFileChange}
-              onUpload={onUpload}
-            />
+            {youtubePreview ? (
+              <YoutubeConfirmStep
+                preview={youtubePreview}
+                importing={isImportingYoutube}
+                onCancel={onCancelYoutubePreview}
+                onConfirm={onConfirmYoutubeImport}
+                onMessage={onToastMessage}
+              />
+            ) : (
+              <CreateStudio
+                source={source}
+                onSourceChange={setSource}
+                blogUrl={blogUrl}
+                blogSubtitleStyle={blogSubtitleStyle}
+                blogTargetLength={blogTargetLength}
+                blogNarrationLanguage={blogNarrationLanguage}
+                blogScriptModel={blogScriptModel}
+                isCreatingBlogShort={isCreatingBlogShort}
+                youtubeUrl={youtubeUrl}
+                isImportingYoutube={isImportingYoutube}
+                isPreviewingYoutube={isPreviewingYoutube}
+                selectedFile={selectedFile}
+                isUploading={isUploading}
+                onBlogUrlChange={onBlogUrlChange}
+                onBlogSubtitleStyleChange={onBlogSubtitleStyleChange}
+                onBlogTargetLengthChange={onBlogTargetLengthChange}
+                onBlogNarrationLanguageChange={onBlogNarrationLanguageChange}
+                onBlogScriptModelChange={onBlogScriptModelChange}
+                onCreateBlogShort={onCreateBlogShort}
+                onYoutubeUrlChange={onYoutubeUrlChange}
+                onPreviewYoutube={onPreviewYoutube}
+                onSelectedFileChange={onSelectedFileChange}
+                onUpload={onUpload}
+              />
+            )}
             {uploadMessage ? (
               <p className="studio-toast" role="status">
                 {uploadMessage}
@@ -266,9 +291,10 @@ export function Dashboard({
               analyzingId={analyzingId}
               transcribingId={transcribingId}
               highlightingId={highlightingId}
-              onOpenBlogClip={onOpenBlogClip}
+              onResumeBlogClip={onOpenBlogClip}
               onDownloadBlogClip={onDownloadBlogClip}
-              onEditBlogClip={onEditBlogClip}
+              onResumeVideo={onResumeVideo}
+              onResumeClip={onResumeClip}
               onCreateNew={() => onStudioNavChange("create")}
               onAnalyze={onAnalyze}
               onTranscript={onTranscript}

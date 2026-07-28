@@ -7,6 +7,8 @@ export type BlogBoardProps = {
   boardId?: number | null;
   /** http(s) URL, or path under remotion/public for staticFile() */
   imageUrl?: string | null;
+  /** Optional MP4 (YouTube clip burn-in). Prefer staticFile-relative under remotion/public. */
+  videoUrl?: string | null;
   /**
    * True when the board media is an animated GIF.
    * Required for blob:/API URLs that do not end in `.gif` — otherwise Remotion `<Img>`
@@ -26,6 +28,7 @@ export type VisualStyleSlug =
   | "info_navy"
   | "viral_cyan"
   | "card_white"
+  | "yt_profile"
   /** @deprecated legacy aliases */
   | "fullscreen"
   | "card_news"
@@ -66,7 +69,7 @@ export type BlogShortsStyleProps = {
   mediaFit: "cover" | "contain";
   canvasBg: string;
   caption: "center_stroke" | "bottom_outline" | "black_box" | "white_pill";
-  header: "none" | "info_black" | "info_navy" | "viral_cyan" | "card_white";
+  header: "none" | "info_black" | "info_navy" | "viral_cyan" | "card_white" | "yt_profile";
   titleColor: string;
   accent: string;
   transitionSec: number;
@@ -84,7 +87,7 @@ export type BlogShortsProps = {
   /** Fade/slide overlap between boards in seconds */
   transitionSec?: number;
   transitionType?: TransitionType;
-  source?: "dummy" | "blog_clip";
+  source?: "dummy" | "blog_clip" | "youtube_clip";
   /** staticFile-relative or absolute URL for full narration (TTS/BGM mix) */
   narrationUrl?: string | null;
   visualStyle?: VisualStyleSlug | string | null;
@@ -92,6 +95,10 @@ export type BlogShortsProps = {
   overlay?: StyleOverlayProps | null;
   /** Hide text layers (preview HTML editor draws them instead). */
   suppressText?: boolean;
+  /** YouTube / channel branding footer (yt_profile). */
+  channelName?: string | null;
+  channelAvatarUrl?: string | null;
+  videoTitle?: string | null;
   boards: BlogBoardProps[];
 };
 

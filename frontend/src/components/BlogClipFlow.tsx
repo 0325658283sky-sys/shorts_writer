@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import {
   BLOG_CLIP_STATUS_LABELS,
-  BLOG_PROGRESS_STAGE_LABELS,
   SCRIPT_TONE_HINTS,
   SCRIPT_TONE_LABELS,
   SCRIPT_TONES,
   SUBTITLE_STYLE_LABELS,
+  userFacingProgressLabel,
 } from "../constants";
 import type { BlogClip, ScriptTone, SubtitleStyle, VisualStyleSlug, WizardBoardsStep } from "../types";
 import { parseWizardBoardsStep } from "../types";
@@ -13,6 +13,8 @@ import { AliveProgressBar } from "./AliveProgressBar";
 import { BlogClipCard } from "./BlogClipCard";
 import { ImageSelectStep } from "./ImageSelectStep";
 import { QuickSettingsStep } from "./QuickSettingsStep";
+import { ResultActionsCard } from "./ResultActionsCard";
+import { MetadataBox } from "./MetadataBox";
 import { VideoStyleStep } from "./VideoStyleStep";
 
 const FLOW_STEPS = [
@@ -67,6 +69,7 @@ export function BlogClipFlow({
   onOpenBoardEditor,
   onBlogClipUpdated,
   onMessage,
+  flowMessage,
 }: {
   blogClip: BlogClip;
   boardCount?: number;
@@ -84,7 +87,7 @@ export function BlogClipFlow({
   onDownloadBlogClip: (blogClip: BlogClip) => void;
   onGenerateMetadata: (blogClip: BlogClip) => void;
   onSelectScript: (blogClip: BlogClip, tone: ScriptTone) => void;
-  onConfirmImages: (blogClip: BlogClip, imageIds: number[]) => void;
+  onConfirmImages: (blogClip: BlogClip, imageIds: number[], visualStyle: VisualStyleSlug | string) => void;
   onSaveDefaultVoice: (blogClip: BlogClip, voiceId: string, ttsSpeed: number) => Promise<void>;
   onApplyVisualStyle: (
     blogClip: BlogClip,
@@ -100,6 +103,7 @@ export function BlogClipFlow({
   onOpenBoardEditor: (blogClip: BlogClip) => void;
   onBlogClipUpdated: (blogClip: BlogClip) => void;
   onMessage: (message: string) => void;
+  flowMessage?: string;
 }) {
   const [boardsStep, setBoardsStep] = useState<WizardBoardsStep>(() => parseWizardBoardsStep(blogClip.wizard_step));
 
@@ -116,7 +120,7 @@ export function BlogClipFlow({
   const isAwaitingBoards = blogClip.status === "awaiting_boards";
   const isCompleted = blogClip.status === "completed";
   const isFailed = blogClip.status === "failed";
-  const stageLabel = BLOG_PROGRESS_STAGE_LABELS[blogClip.progress_stage] ?? blogClip.progress_stage;
+  const stageLabel = userFacingProgressLabel(blogClip.progress_stage);
   const availableTones = SCRIPT_TONES.filter((tone) => Boolean(blogClip.script_candidates[tone]));
 
   const stepIndex = isFinalRender
@@ -210,6 +214,8 @@ export function BlogClipFlow({
         </aside>
 
         <main className="flow-main">
+          {flowMessage ? <p className="error-text flow-inline-error">{flowMessage}</p> : null}
+
           {isProgress ? (
             <section className="flow-card flow-progress-card" aria-live="polite">
               <p className="create-kicker">{isFinalRender ? "렌더 중" : "준비 중"}</p>
@@ -235,7 +241,7 @@ export function BlogClipFlow({
             <ImageSelectStep
               blogClip={blogClip}
               confirming={confirmingImageSelection}
-              onConfirm={(imageIds) => onConfirmImages(blogClip, imageIds)}
+              onConfirm={(imageIds, visualStyle) => onConfirmImages(blogClip, imageIds, visualStyle)}
               onMessage={onMessage}
             />
           ) : null}
@@ -359,22 +365,70 @@ export function BlogClipFlow({
                 <p className="create-kicker">결과 보기</p>
                 <h1>{blogClip.blog_title ?? "쇼츠가 완성되었습니다"}</h1>
                 <p className="flow-lead">아래에서 바로 재생한 뒤 다운로드하거나, 메타·다른 톤 버전을 이어서 만들 수 있어요.</p>
+                {blogClip.render_spec?.fallback_used || blogClip.render_spec?.engine === "ffmpeg" ? (
+                  <p className="error-text flow-inline-error">
+                    템플릿이 적용되지 않은 FFmpeg 결과입니다
+                    {blogClip.render_spec?.fallback_used
+                      ? " (Remotion 서버 연결 실패 → 폴백)."
+                      : "."}{" "}
+                    Remotion(3100)을 켠 뒤 보드 편집에서 다시 렌더하세요.
+                    {blogClip.render_spec?.fallback_reason
+                      ? ` 사유: ${blogClip.render_spec.fallback_reason}`
+                      : ""}
+                  </p>
+                ) : null}
               </div>
-              <BlogClipCard
-                blogClip={blogClip}
-                copiedKey={copiedKey}
-                downloadingBlogClipId={downloadingBlogClipId}
-                generatingBlogMetadataId={generatingBlogMetadataId}
-                selectingBlogScriptId={selectingBlogScriptId}
-                blogBoardCounts={boardCount != null ? { [blogClip.id]: boardCount } : {}}
-                onCopyText={onCopyText}
-                onDownloadBlogClip={onDownloadBlogClip}
-                onGenerateMetadata={onGenerateMetadata}
-                onSelectScript={onSelectScript}
-                onOpenBoardEditor={onOpenBoardEditor}
-                onBlogClipUpdated={onBlogClipUpdated}
-                onMessage={onMessage}
+              <ResultActionsCard
+                title="다운로드 · 메타 · 이어서 작업"
+                lead="결과 액션은 여기에서 한 번에 처리합니다."
+                canDownload={Boolean(blogClip.subtitled_video_path || blogClip.video_path)}
+                downloading={downloadingBlogClipId === blogClip.id}
+                onDownload={() => onDownloadBlogClip(blogClip)}
+                hasMetadata={Boolean(
+                  (blogClip.title_candidates?.length ?? 0) > 0 || blogClip.description || (blogClip.hashtags?.length ?? 0) > 0,
+                )}
+                generatingMetadata={generatingBlogMetadataId === blogClip.id}
+                onGenerateMetadata={() => onGenerateMetadata(blogClip)}
+                metadataSlot={
+                  (blogClip.title_candidates?.length ?? 0) > 0 || blogClip.description || (blogClip.hashtags?.length ?? 0) > 0 ? (
+                    <MetadataBox
+                      copiedKey={copiedKey}
+                      idPrefix={`blog-flow-${blogClip.id}`}
+                      titleCandidates={blogClip.title_candidates}
+                      description={blogClip.description ?? ""}
+                      hashtags={blogClip.hashtags}
+                      onCopyText={onCopyText}
+                    />
+                  ) : null
+                }
+                reEditLabel="미리보기·버전 보기"
+                onReEdit={() => {
+                  document.getElementById(`blog-result-${blogClip.id}`)?.scrollIntoView({ behavior: "smooth" });
+                }}
+                secondary={
+                  <button className="ghost-button" type="button" onClick={onBackToStudio}>
+                    작업실로
+                  </button>
+                }
               />
+              <div id={`blog-result-${blogClip.id}`}>
+                <BlogClipCard
+                  blogClip={blogClip}
+                  copiedKey={copiedKey}
+                  downloadingBlogClipId={downloadingBlogClipId}
+                  generatingBlogMetadataId={generatingBlogMetadataId}
+                  selectingBlogScriptId={selectingBlogScriptId}
+                  blogBoardCounts={boardCount != null ? { [blogClip.id]: boardCount } : {}}
+                  hidePrimaryActions
+                  onCopyText={onCopyText}
+                  onDownloadBlogClip={onDownloadBlogClip}
+                  onGenerateMetadata={onGenerateMetadata}
+                  onSelectScript={onSelectScript}
+                  onOpenBoardEditor={onOpenBoardEditor}
+                  onBlogClipUpdated={onBlogClipUpdated}
+                  onMessage={onMessage}
+                />
+              </div>
               <button className="ghost-button flow-back-bottom" type="button" onClick={onBackToStudio}>
                 작업실로 돌아가기
               </button>

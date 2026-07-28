@@ -15,6 +15,7 @@ export type VisualStyleSlug =
   | "info_navy"
   | "viral_cyan"
   | "card_white"
+  | "yt_profile"
   | "fullscreen"
   | "card_news"
   | "info_dark"
@@ -133,6 +134,10 @@ export type Clip = {
   narration_script: string | null;
   narration_audio_path: string | null;
   narrated_output_path: string | null;
+  visual_style?: string | null;
+  style_title?: string | null;
+  style_subtitle?: string | null;
+  templated_output_path?: string | null;
   status: ClipStatus;
   error_message: string | null;
   created_at: string;

@@ -6,7 +6,14 @@ from fastapi.responses import FileResponse
 from app.api.users import get_current_user
 from app.db.database import get_connection
 from app.db.models import User
-from app.db.schemas import ClipCreateRequest, ClipMetadataResponse, ClipResponse, NarrationRequest, SubtitleCreateRequest
+from app.db.schemas import (
+    ClipCreateRequest,
+    ClipMetadataResponse,
+    ClipResponse,
+    ClipTemplateRenderRequest,
+    NarrationRequest,
+    SubtitleCreateRequest,
+)
 from app.services.clip_service import (
     apply_clip_narration,
     clip_download_path,
@@ -14,6 +21,7 @@ from app.services.clip_service import (
     create_subtitled_clip,
     get_clip_for_user,
     list_clips_for_user,
+    render_clip_with_template,
 )
 from app.services.metadata_service import get_metadata_for_clip, get_or_create_clip_metadata, metadata_hashtags, metadata_title_candidates
 
@@ -33,6 +41,10 @@ def _to_clip_response(clip) -> ClipResponse:
         narration_script=clip.narration_script,
         narration_audio_path=clip.narration_audio_path,
         narrated_output_path=clip.narrated_output_path,
+        visual_style=clip.visual_style,
+        style_title=clip.style_title,
+        style_subtitle=clip.style_subtitle,
+        templated_output_path=clip.templated_output_path,
         status=clip.status,
         error_message=clip.error_message,
         created_at=clip.created_at,
@@ -67,7 +79,12 @@ def create_clip(
     current_user: User = Depends(get_current_user),
     conn: sqlite3.Connection = Depends(get_connection),
 ) -> ClipResponse:
-    clip = create_clip_from_highlight(conn, current_user.id, request.highlight_id)
+    clip = create_clip_from_highlight(
+        conn,
+        current_user.id,
+        request.highlight_id,
+        visual_style=request.visual_style,
+    )
     return _to_clip_response(clip)
 
 
@@ -79,6 +96,29 @@ def burn_clip_subtitles(
     conn: sqlite3.Connection = Depends(get_connection),
 ) -> ClipResponse:
     clip = create_subtitled_clip(conn, current_user.id, clip_id, request.style)
+    return _to_clip_response(clip)
+
+
+@router.post("/{clip_id}/render-template", response_model=ClipResponse)
+def render_clip_template(
+    clip_id: int,
+    request: ClipTemplateRenderRequest,
+    current_user: User = Depends(get_current_user),
+    conn: sqlite3.Connection = Depends(get_connection),
+) -> ClipResponse:
+    clip = render_clip_with_template(
+        conn,
+        current_user.id,
+        clip_id,
+        visual_style=request.visual_style,
+        style_title=request.style_title,
+        style_subtitle=request.style_subtitle,
+        channel_name=request.channel_name,
+        channel_avatar_url=request.channel_avatar_url,
+        video_title=request.video_title,
+        burn_subtitles=request.burn_subtitles,
+        subtitle_style=request.subtitle_style,
+    )
     return _to_clip_response(clip)
 
 
@@ -128,7 +168,14 @@ def download_clip(
     if clip is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Clip not found.")
     path = clip_download_path(clip)
-    suffix = "narrated" if clip.narrated_output_path else "subtitled" if clip.subtitled_output_path else "clip"
+    if clip.templated_output_path:
+        suffix = "templated"
+    elif clip.narrated_output_path:
+        suffix = "narrated"
+    elif clip.subtitled_output_path:
+        suffix = "subtitled"
+    else:
+        suffix = "clip"
     return FileResponse(path=path, media_type="video/mp4", filename=f"new-cut-{suffix}-{clip.id}.mp4")
 
 

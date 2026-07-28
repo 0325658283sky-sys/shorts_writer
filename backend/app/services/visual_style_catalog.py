@@ -70,6 +70,14 @@ DEFAULT_OVERLAYS: dict[str, dict[str, Any]] = {
             "caption": {"x": 0.5, "y": 0.72, "fontSize": 44, "color": "#151515", "align": "center", "maxWidth": 0.84, "visible": True},
         }
     ),
+    # AlphaCut-style: white/yellow header + letterbox video + channel profile footer.
+    "yt_profile": _overlay_with_fonts(
+        {
+            "title": {"x": 0.5, "y": 0.06, "fontSize": 92, "color": "#ffffff", "align": "center", "maxWidth": 0.9, "visible": True},
+            "subtitle": {"x": 0.5, "y": 0.125, "fontSize": 92, "color": "#FFE566", "align": "center", "maxWidth": 0.9, "visible": True},
+            "caption": {"x": 0.5, "y": 0.58, "fontSize": 40, "color": "#ffffff", "align": "center", "maxWidth": 0.86, "visible": True},
+        }
+    ),
 }
 
 # Prompt hints for LLM hook-title generation per style (Korean Shorts / Super-Shorts style).
@@ -95,6 +103,11 @@ TITLE_STYLE_HINTS: dict[str, str] = {
     "card_white": (
         "Card headline: style_title may use a newline for 2 black lines (total ~28–40 chars). "
         "style_subtitle usually empty. News-card look but still hooky, not bland summary."
+    ),
+    "yt_profile": (
+        "Two-line Shorts header: style_title = white hook (tension/FOMO), "
+        "style_subtitle = yellow payoff. Each line ~10–18 Korean chars; "
+        "must feel like AlphaCut info Shorts title stack."
     ),
 }
 
@@ -204,6 +217,27 @@ VISUAL_STYLES: dict[str, dict[str, Any]] = {
         "recommendedBgmSlug": "light_warm",
         "recommendedAutoSfx": False,
     },
+    "yt_profile": {
+        "slug": "yt_profile",
+        "label": "유튜브 · 프로필",
+        "description": "상단 투톤 타이틀 + 가로형 영상 + 채널 프로필·제목 하단.",
+        "badge": "NEW",
+        "previewImage": None,
+        "layout": "letterbox",
+        "mediaFit": "contain",
+        "canvasBg": "#1B2838",
+        "caption": "black_box",
+        "header": "yt_profile",
+        "titleColor": "#ffffff",
+        "accent": "#FFE566",
+        "transitionSec": 0.35,
+        "transitionType": "fade",
+        "kenBurns": False,
+        "packHint": "정보형 쇼츠 · 채널 프로필",
+        "recommendedVoice": "onyx",
+        "recommendedBgmSlug": "calm_drone",
+        "recommendedAutoSfx": False,
+    },
 }
 
 ALLOWED_VISUAL_STYLES = set(VISUAL_STYLES.keys()) | set(_LEGACY_SLUG_MAP.keys())
@@ -219,7 +253,9 @@ ALLOWED_ALIGN = frozenset({"left", "center", "right"})
 
 
 def list_visual_styles() -> list[dict[str, Any]]:
-    return [dict(item) for item in VISUAL_STYLES.values()]
+    items = [dict(item) for item in VISUAL_STYLES.values()]
+    items.sort(key=lambda item: 0 if item.get("slug") == "yt_profile" else 1)
+    return items
 
 
 def normalize_visual_style(slug: str | None) -> str:

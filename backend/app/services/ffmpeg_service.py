@@ -643,6 +643,33 @@ def concat_audio_files(audio_paths: list[str], output_path: str) -> None:
         list_path.unlink(missing_ok=True)
 
 
+def extract_video_frame_jpeg(source_path: str, output_path: str, *, at_seconds: float) -> None:
+    """Grab a single JPEG frame near `at_seconds` for highlight thumbnails."""
+    ensure_ffmpeg_available()
+    source = Path(source_path)
+    destination = Path(output_path)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    seek = max(0.0, float(at_seconds))
+    command = [
+        "ffmpeg",
+        "-y",
+        "-ss",
+        f"{seek:.3f}",
+        "-i",
+        str(source),
+        "-frames:v",
+        "1",
+        "-q:v",
+        "3",
+        str(destination),
+    ]
+    result = subprocess.run(command, capture_output=True, text=True, timeout=60)
+    if result.returncode != 0 or not destination.exists():
+        destination.unlink(missing_ok=True)
+        error = (result.stderr or result.stdout or "FFmpeg frame extract failed.").strip()
+        raise FFmpegExtractionError(error[-1000:])
+
+
 def replace_video_audio_with_narration(source_path: str, narration_path: str, output_path: str) -> None:
     ensure_ffmpeg_available()
     source = Path(source_path)

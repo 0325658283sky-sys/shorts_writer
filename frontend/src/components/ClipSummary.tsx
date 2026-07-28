@@ -44,12 +44,10 @@ export function ClipSummary({
       <span>{CLIP_STATUS_LABELS[clip.status]}</span>
       {clip.subtitle_style ? <span>자막: {SUBTITLE_STYLE_LABELS[clip.subtitle_style as SubtitleStyle] ?? clip.subtitle_style}</span> : null}
       {clip.tts_mode ? <span>음성: {TTS_MODE_LABELS[clip.tts_mode as TtsMode] ?? clip.tts_mode}</span> : null}
-      {clip.narrated_output_path ? (
-        <span>{clip.narrated_output_path}</span>
-      ) : clip.subtitled_output_path ? (
-        <span>{clip.subtitled_output_path}</span>
-      ) : clip.output_path ? (
-        <span>{clip.output_path}</span>
+      {clip.narrated_output_path || clip.subtitled_output_path || clip.output_path ? (
+        <span>
+          {clip.narrated_output_path ? "나레이션 적용본" : clip.subtitled_output_path ? "자막 적용본" : "원본 클립"}
+        </span>
       ) : null}
       {clip.error_message ? <span className="error-text">{clip.error_message}</span> : null}
       {canUseClip ? (

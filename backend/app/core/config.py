@@ -37,6 +37,16 @@ class Settings(BaseSettings):
     # (same image reused with different captions) up to this cap.
     blog_board_max_count: int = 12
     blog_fetch_timeout_seconds: int = 20
+    # Smart Store: retry plain HTTP on 429, then optional Playwright HTML fallback.
+    smartstore_http_retries: int = 2
+    smartstore_use_playwright: bool = True
+    # Amazon Product Advertising API 5.0 (optional). Without keys, HTML/og fallback is used.
+    amazon_paapi_access_key: str | None = None
+    amazon_paapi_secret_key: str | None = None
+    amazon_paapi_partner_tag: str | None = None
+    amazon_paapi_host: str = "webservices.amazon.com"
+    amazon_paapi_region: str = "us-east-1"
+    amazon_paapi_marketplace: str = "www.amazon.com"
     # Pexels stock photos for board image search (Stage 20). Empty = search disabled (400).
     pexels_api_key: str | None = None
     stock_search_timeout_seconds: int = 15

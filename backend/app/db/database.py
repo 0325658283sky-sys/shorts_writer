@@ -59,10 +59,16 @@ def _migrate_users_table(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE users ADD COLUMN usage_limit INTEGER NOT NULL DEFAULT 3")
     if "usage_month" not in columns:
         conn.execute("ALTER TABLE users ADD COLUMN usage_month TEXT")
+    if "ditodio_user_id" not in columns:
+        conn.execute("ALTER TABLE users ADD COLUMN ditodio_user_id TEXT")
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS users_ditodio_user_id_uq ON users(ditodio_user_id) "
+        "WHERE ditodio_user_id IS NOT NULL AND ditodio_user_id != ''"
+    )
     conn.execute("UPDATE users SET plan = LOWER(COALESCE(NULLIF(plan, ''), 'free'))")
     conn.execute("UPDATE users SET usage_limit = 3 WHERE LOWER(plan) = 'free'")
-    conn.execute("UPDATE users SET usage_limit = 30 WHERE LOWER(plan) = 'lite'")
-    conn.execute("UPDATE users SET usage_limit = 150 WHERE LOWER(plan) = 'pro'")
+    conn.execute("UPDATE users SET usage_limit = 20 WHERE LOWER(plan) = 'lite'")
+    conn.execute("UPDATE users SET usage_limit = 80 WHERE LOWER(plan) = 'pro'")
     conn.execute("UPDATE users SET plan = 'free', usage_limit = 3 WHERE LOWER(plan) NOT IN ('free', 'lite', 'pro')")
     conn.execute("UPDATE users SET usage_month = ? WHERE usage_month IS NULL OR usage_month = ''", (_current_usage_month(),))
 

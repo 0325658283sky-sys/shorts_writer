@@ -1,4 +1,5 @@
-﻿import sqlite3
+﻿import secrets
+import sqlite3
 
 from fastapi import HTTPException, status
 
@@ -62,3 +63,72 @@ def authenticate_user(conn: sqlite3.Connection, email: str, password: str) -> Us
     if row is None or not verify_password(password, row["password_hash"]):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password.")
     return _row_to_user(row)
+
+
+def get_ditodio_user_id(conn: sqlite3.Connection, user_id: int) -> str | None:
+    row = conn.execute("SELECT ditodio_user_id FROM users WHERE id = ?", (user_id,)).fetchone()
+    if row is None:
+        return None
+    value = row["ditodio_user_id"] if "ditodio_user_id" in row.keys() else None
+    return str(value).strip() if value else None
+
+
+def upsert_user_from_ditodio(
+    conn: sqlite3.Connection,
+    *,
+    ditodio_user_id: str,
+    email: str,
+    plan: str,
+) -> User:
+    """Link or create a local user for a Ditodio hub identity."""
+    normalized_email = email.lower().strip()
+    plan_id = plan_policy(plan)["id"]
+    limit = plan_policy(plan)["monthly_video_limit"]
+
+    by_ditodio = conn.execute(
+        "SELECT id FROM users WHERE ditodio_user_id = ?",
+        (ditodio_user_id,),
+    ).fetchone()
+    if by_ditodio is not None:
+        conn.execute(
+            "UPDATE users SET email = ?, plan = ?, usage_limit = ? WHERE id = ?",
+            (normalized_email, plan_id, limit, int(by_ditodio["id"])),
+        )
+        conn.commit()
+        user = get_user_by_id(conn, int(by_ditodio["id"]))
+        if user is None:
+            raise HTTPException(status_code=500, detail="Ditodio user sync failed.")
+        return user
+
+    existing = get_user_by_email(conn, normalized_email)
+    if existing is not None:
+        conn.execute(
+            "UPDATE users SET ditodio_user_id = ?, plan = ?, usage_limit = ? WHERE id = ?",
+            (ditodio_user_id, plan_id, limit, existing.id),
+        )
+        conn.commit()
+        user = get_user_by_id(conn, existing.id)
+        if user is None:
+            raise HTTPException(status_code=500, detail="Ditodio user link failed.")
+        return user
+
+    password = secrets.token_urlsafe(24)
+    cursor = conn.execute(
+        """
+        INSERT INTO users (email, password_hash, plan, monthly_usage, usage_limit, usage_month, ditodio_user_id)
+        VALUES (?, ?, ?, 0, ?, ?, ?)
+        """,
+        (
+            normalized_email,
+            hash_password(password),
+            plan_id,
+            limit,
+            current_usage_month(),
+            ditodio_user_id,
+        ),
+    )
+    conn.commit()
+    user = get_user_by_id(conn, int(cursor.lastrowid))
+    if user is None:
+        raise HTTPException(status_code=500, detail="Ditodio user create failed.")
+    return user

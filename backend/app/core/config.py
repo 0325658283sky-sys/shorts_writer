@@ -74,6 +74,11 @@ class Settings(BaseSettings):
         "http://127.0.0.1:5175",
         "http://localhost:5175",
     ]
+    # Ditodio control plane (blog_writer hub) — shared account / shorts meter
+    ditodio_hub_url: str = "http://127.0.0.1:3000"
+    platform_handoff_secret: str | None = None
+    platform_service_token: str | None = None
+    ditodio_entitlements_enabled: bool = True
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

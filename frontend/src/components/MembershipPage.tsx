@@ -12,8 +12,9 @@ export function MembershipPage({ usage }: { usage: Usage | null }) {
         <p className="membership-kicker">Membership</p>
         <h1 className="membership-title">요금제</h1>
         <p className="membership-lead">
-          월간 한도는 <strong>영상 Analyze(오디오 추출) 성공</strong> 시에만 1회 차감됩니다. 블로그 쇼츠 렌더·보드
-          편집·프리뷰·이미 분석된 영상의 전사/하이라이트는 차감되지 않습니다. (서버 정책: Free 3 / Lite 30 / Pro 150)
+          Ditodio 통합 요금제입니다. <strong>쇼츠 렌더 완료</strong> 시 월 쇼츠 한도가 차감되며, 블로그 포스트 한도는
+          같은 계정으로 앱(허브)에서 공유됩니다.
+          {usage?.ditodio_linked ? " · Ditodio 계정 연동됨" : null}
         </p>
       </header>
 
@@ -24,20 +25,24 @@ export function MembershipPage({ usage }: { usage: Usage | null }) {
             <strong>{usage.plan_name}</strong>
           </div>
           <div>
-            <span>이번 달 사용</span>
+            <span>쇼츠 (이번 달)</span>
             <strong>
-              {usage.monthly_usage}/{usage.usage_limit}
+              {usage.shorts_used ?? usage.monthly_usage}/{usage.shorts_limit ?? usage.usage_limit}
             </strong>
           </div>
           <div>
-            <span>남은 횟수</span>
+            <span>남은 쇼츠</span>
             <strong className={low ? "usage-remaining-low" : undefined}>
-              {remaining != null ? `${remaining}회` : "-"}
+              {remaining != null ? `${remaining}개` : "-"}
             </strong>
           </div>
           <div>
-            <span>최대 영상 길이</span>
-            <strong>{usage.max_video_minutes}분</strong>
+            <span>포스트 한도</span>
+            <strong>
+              {usage.posts_limit != null
+                ? `${usage.posts_used ?? 0}/${usage.posts_limit}`
+                : `${usage.max_video_minutes}분 소스`}
+            </strong>
           </div>
         </div>
       ) : null}

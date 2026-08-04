@@ -19,6 +19,7 @@ import {
   type AppRoute,
   type StudioTab,
 } from "./lib/appRoute";
+import { clearHandoffFromUrl, readInboundDeeplink } from "./lib/inboundDeeplink";
 import type {
   BlogClip,
   Board,
@@ -232,9 +233,73 @@ export function App() {
   }
 
   useEffect(() => {
+    const inbound = readInboundDeeplink();
+    if (inbound.handoff) {
+      void (async () => {
+        setIsLoading(true);
+        setMessage("");
+        try {
+          const data = await request<{ access_token: string }>("/auth/ditodio-handoff", {
+            method: "POST",
+            body: JSON.stringify({ handoff: inbound.handoff }),
+          });
+          localStorage.setItem(TOKEN_KEY, data.access_token);
+          clearHandoffFromUrl();
+          if (inbound.url) setBlogUrl(inbound.url);
+          if (
+            inbound.from === "ditodio" ||
+            inbound.from === "blog_writer" ||
+            inbound.source === "blog" ||
+            inbound.url
+          ) {
+            setStudioNav("create");
+            if (!window.location.hash || window.location.hash === "#" || window.location.hash === "#/") {
+              writeAppRoute({ kind: "studio", tab: "create" }, "replace");
+            }
+          }
+          await loadCurrentUser(data.access_token);
+        } catch (error) {
+          clearHandoffFromUrl();
+          setMessage(error instanceof Error ? error.message : "Ditodio 로그인 연동에 실패했습니다.");
+          const existing = localStorage.getItem(TOKEN_KEY);
+          if (existing) await loadCurrentUser(existing);
+        } finally {
+          setIsLoading(false);
+        }
+      })();
+      return;
+    }
+
     const token = localStorage.getItem(TOKEN_KEY);
     if (!token) return;
     loadCurrentUser(token);
+  }, []);
+
+  // Ditodio / blog_writer: ?from=&url=&brandId=&postId=#/studio/create
+  useEffect(() => {
+    const inbound = readInboundDeeplink();
+    if (inbound.handoff) return;
+    if (!inbound.from && !inbound.url && !inbound.source) return;
+    if (inbound.url) setBlogUrl(inbound.url);
+    if (
+      inbound.from === "ditodio" ||
+      inbound.from === "blog_writer" ||
+      inbound.source === "blog" ||
+      inbound.url
+    ) {
+      setStudioNav("create");
+      if (!window.location.hash || window.location.hash === "#" || window.location.hash === "#/") {
+        writeAppRoute({ kind: "studio", tab: "create" }, "replace");
+      }
+    }
+    if (inbound.from) {
+      console.info("[inbound]", {
+        from: inbound.from,
+        brandId: inbound.brandId,
+        postId: inbound.postId,
+        hasUrl: Boolean(inbound.url),
+      });
+    }
   }, []);
 
   // Keep URL hash in sync so refresh/back restore Shorts / video flows and studio tabs.

@@ -3,27 +3,29 @@ from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
 
+# Aligned with Ditodio unified catalog (shorts/month as primary short export quota).
+# Analyze credits reuse the same monthly_video_limit as a soft local fallback.
 PLAN_POLICIES = {
     "free": {
         "id": "free",
         "name": "Free",
         "monthly_video_limit": 3,
         "max_video_minutes": 10,
-        "description": "For local MVP testing and light personal use.",
+        "description": "Ditodio 통합 — 쇼츠 3/월 · 포스트 한도는 허브에서 관리",
     },
     "lite": {
         "id": "lite",
         "name": "Lite",
-        "monthly_video_limit": 30,
+        "monthly_video_limit": 20,
         "max_video_minutes": 30,
-        "description": "For regular creators processing short and medium videos.",
+        "description": "Ditodio 통합 — 쇼츠 20/월",
     },
     "pro": {
         "id": "pro",
         "name": "Pro",
-        "monthly_video_limit": 150,
+        "monthly_video_limit": 80,
         "max_video_minutes": 120,
-        "description": "For heavy creator workflows with long source videos.",
+        "description": "Ditodio 통합 — 쇼츠 80/월",
     },
 }
 

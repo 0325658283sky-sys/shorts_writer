@@ -87,6 +87,12 @@ export type Usage = {
   remaining: number;
   usage_month: string;
   max_video_minutes: number;
+  shorts_used?: number | null;
+  shorts_limit?: number | null;
+  shorts_remaining?: number | null;
+  posts_used?: number | null;
+  posts_limit?: number | null;
+  ditodio_linked?: boolean;
 };
 
 export type Plan = {

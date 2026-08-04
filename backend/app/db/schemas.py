@@ -13,6 +13,10 @@ class LoginRequest(BaseModel):
     password: str = Field(min_length=1, max_length=128)
 
 
+class DitodioHandoffRequest(BaseModel):
+    handoff: str = Field(min_length=10, max_length=4000)
+
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
@@ -36,6 +40,12 @@ class UsageResponse(BaseModel):
     remaining: int
     usage_month: str
     max_video_minutes: int
+    shorts_used: int | None = None
+    shorts_limit: int | None = None
+    shorts_remaining: int | None = None
+    posts_used: int | None = None
+    posts_limit: int | None = None
+    ditodio_linked: bool = False
 
 
 class PlanResponse(BaseModel):

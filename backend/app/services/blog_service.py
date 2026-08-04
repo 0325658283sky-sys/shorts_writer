@@ -1642,6 +1642,18 @@ def start_blog_clip_render(conn: sqlite3.Connection, user_id: int, blog_clip_id:
             detail="Blog short is not waiting for board confirmation.",
         )
 
+    try:
+        from app.services.ditodio_client import assert_can_create_short
+        from app.services.user_service import get_ditodio_user_id
+
+        ditodio_id = get_ditodio_user_id(conn, user_id)
+        if ditodio_id:
+            assert_can_create_short(ditodio_id)
+    except HTTPException:
+        raise
+    except Exception:
+        pass
+
     blog_clip = _apply_auto_audio_for_render(conn, user_id, blog_clip)
 
     boards = list_blog_clip_boards(conn, user_id, blog_clip_id)
@@ -3812,6 +3824,15 @@ def run_blog_clip_render_pipeline(blog_clip_id: int, user_id: int) -> None:
             subtitled_video_path,
             render_spec=render_spec,
         )
+        try:
+            from app.services.ditodio_client import post_shorts_usage
+            from app.services.user_service import get_ditodio_user_id
+
+            ditodio_id = get_ditodio_user_id(conn, user_id)
+            if ditodio_id:
+                post_shorts_usage(ditodio_id, delta=1, commit=True)
+        except Exception:
+            pass
     finally:
         next(connection_generator, None)
 

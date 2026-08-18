@@ -126,3 +126,68 @@ def test_smartstore_product_from_html_og_fallback():
     assert any("og.jpg" in url or "extra.jpg" in url for url in product.image_urls)
     soup = BeautifulSoup(html, "html.parser")
     assert soup.select_one('meta[property="og:title"]') is not None
+
+
+def test_smartstore_classify_falls_back_when_vision_errors(monkeypatch):
+    from app.services.product_service import classify_product_images
+    import app.services.product_image_filter as image_filter
+
+    monkeypatch.setattr(image_filter.settings, "openai_api_key", "sk-test")
+
+    def _boom(**_kwargs):
+        raise RuntimeError("429 rate limit")
+
+    monkeypatch.setattr(image_filter, "OpenAI", _boom)
+    urls = [
+        "https://shop-phinf.pstatic.net/20240101_1/banner.jpg",
+        "https://shop-phinf.pstatic.net/20240101_2/product.jpg",
+    ]
+    assert classify_product_images(urls, "세라디오 테스트 굿즈") == []
+
+
+def test_smartstore_vision_failure_keeps_scrape_order(monkeypatch):
+    from pathlib import Path
+
+    from app.services.product_image_filter import reorder_downloaded_product_images
+
+    scraped = [
+        (Path("a.jpg"), "https://shop-phinf.pstatic.net/20240101_1/banner.jpg"),
+        (Path("b.jpg"), "https://shop-phinf.pstatic.net/20240101_2/size.jpg"),
+        (Path("c.jpg"), "https://shop-phinf.pstatic.net/20240101_3/product.jpg"),
+    ]
+
+    def _fail(_urls, _title):
+        raise RuntimeError("vision unavailable")
+
+    monkeypatch.setattr(
+        "app.services.product_image_filter.classify_product_images",
+        _fail,
+    )
+    ranked = reorder_downloaded_product_images(scraped, "세라디오 테스트 굿즈")
+    assert ranked == scraped
+
+
+def test_smartstore_pipeline_ranking_never_raises(monkeypatch):
+    from pathlib import Path
+
+    from app.services.blog_service import _maybe_rank_product_images
+
+    downloaded = [(Path("1.jpg"), "https://shop-phinf.pstatic.net/20240101_1/a.jpg")]
+
+    def _fail(_downloaded, _title):
+        raise RuntimeError("vision ranking exploded")
+
+    monkeypatch.setattr(
+        "app.services.product_image_filter.reorder_downloaded_product_images",
+        _fail,
+    )
+    out = _maybe_rank_product_images(
+        "https://smartstore.naver.com/seragio/products/294040523",
+        "세라디오 테스트 굿즈",
+        downloaded,
+    )
+    assert out == downloaded
+
+
+def test_smartstore_blog_url_is_not_classified_as_product():
+    assert not is_supported_product_url("https://blog.naver.com/foo/123")

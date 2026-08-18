@@ -14,7 +14,7 @@ export const TOKEN_KEY = "new_cut_access_token";
 export const SUBTITLE_STYLES: SubtitleStyle[] = ["basic", "bold", "shorts"];
 export const TARGET_LENGTHS: TargetLength[] = ["short", "long"];
 export const NARRATION_LANGUAGES: NarrationLanguage[] = ["original", "ko", "en", "ja"];
-export const SCRIPT_MODELS: ScriptModel[] = ["gpt-4o-mini", "gpt-4o"];
+export const SCRIPT_MODELS: ScriptModel[] = ["gpt-4o", "gpt-4o-mini"];
 export const TTS_MODES: TtsMode[] = ["original_audio", "ai_narration"];
 
 export const VIDEO_STATUS_LABELS: Record<VideoStatus, string> = {
@@ -75,8 +75,8 @@ export const NARRATION_LANGUAGE_LABELS: Record<NarrationLanguage, string> = {
 };
 
 export const SCRIPT_MODEL_LABELS: Record<ScriptModel, string> = {
-  "gpt-4o-mini": "gpt-4o-mini (기본)",
-  "gpt-4o": "gpt-4o (고품질)",
+  "gpt-4o": "gpt-4o (훅 기본)",
+  "gpt-4o-mini": "gpt-4o-mini (절약)",
 };
 
 export const TTS_MODE_LABELS: Record<TtsMode, string> = {

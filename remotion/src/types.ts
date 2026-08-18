@@ -3,6 +3,12 @@
  * - remotion/schemas/blog-shorts-props.schema.json
  * - backend BlogShortsPropsResponse / remotion_props_service.py
  */
+export type CaptionWordTiming = {
+  text: string;
+  startSec: number;
+  endSec: number;
+};
+
 export type BlogBoardProps = {
   boardId?: number | null;
   /** http(s) URL, or path under remotion/public for staticFile() */
@@ -18,6 +24,8 @@ export type BlogBoardProps = {
   text: string;
   /** Seconds this board is on screen */
   durationSec: number;
+  /** Estimated or precise per-word timings for kinetic captions. */
+  words?: CaptionWordTiming[];
   backgroundColor?: string | null;
   speaker?: string | null;
 };
@@ -56,9 +64,12 @@ export type ShortsFontId =
   | "suit"
   | "jalnan";
 
+export type CaptionAnimation = "none" | "highlight";
+
 export type StyleOverlayProps = {
   titleFont?: ShortsFontId | string | null;
   captionFont?: ShortsFontId | string | null;
+  captionAnimation?: CaptionAnimation | null;
   title?: Partial<StyleOverlayLayer> | null;
   subtitle?: Partial<StyleOverlayLayer> | null;
   caption?: Partial<StyleOverlayLayer> | null;
@@ -75,6 +86,7 @@ export type BlogShortsStyleProps = {
   transitionSec: number;
   transitionType: TransitionType;
   kenBurns: boolean;
+  captionAnimation?: CaptionAnimation;
 };
 
 export type BlogShortsProps = {

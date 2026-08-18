@@ -9,7 +9,7 @@ export function VideoStyleStep({
   blogClip,
   saving,
   onSelect,
-  onBack,
+  onOpenBoardEditor,
   onMessage,
   onClipUpdated,
 }: {
@@ -19,7 +19,7 @@ export function VideoStyleStep({
     style: VisualStyleSlug | string,
     copy: { style_title: string; style_subtitle: string },
   ) => Promise<void>;
-  onBack?: () => void;
+  onOpenBoardEditor?: () => void;
   onMessage: (message: string) => void;
   onClipUpdated?: (clip: BlogClip) => void;
 }) {
@@ -96,7 +96,7 @@ export function VideoStyleStep({
 
   return (
     <section className="flow-card">
-      <p className="create-kicker">퀵 모드 · 영상 스타일</p>
+      <p className="create-kicker">스타일</p>
       <h1>영상 스타일을 선택해 주세요</h1>
       <p className="flow-lead">
         템플릿 썸네일을 고르면 타이틀·자막·미디어 비율이 맞춰집니다. 추천 보이스·BGM도 함께 적용됩니다.
@@ -163,13 +163,13 @@ export function VideoStyleStep({
       </div>
 
       <div className="flow-step-actions">
-        {onBack ? (
-          <button className="ghost-button" type="button" disabled={saving} onClick={onBack}>
-            ← 편집 모드
+        {onOpenBoardEditor ? (
+          <button className="ghost-button" type="button" disabled={saving} onClick={onOpenBoardEditor}>
+            보드 직접 편집
           </button>
         ) : null}
         <button className="cta-button flow-primary-cta" type="button" disabled={saving || loading} onClick={() => void handleContinue()}>
-          {saving ? "저장 중…" : "다음 · 보이스/오디오"}
+          {saving ? "저장 중…" : "다음 · 오디오"}
         </button>
       </div>
     </section>

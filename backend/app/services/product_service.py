@@ -588,6 +588,17 @@ def is_supported_product_url(url: str) -> bool:
     return is_amazon_product_url(url) or is_smartstore_product_url(url)
 
 
+def classify_product_images(image_urls: list[str], product_title: str) -> list[dict]:
+    """Vision ranking wrapper — never raises; empty list means keep scrape order."""
+    from app.services.product_image_filter import classify_product_images as _classify
+
+    try:
+        return _classify(image_urls, product_title)
+    except Exception:
+        logger.warning("classify_product_images failed; returning empty ranking.", exc_info=True)
+        return []
+
+
 def fetch_product(url: str) -> ProductContent:
     if is_amazon_product_url(url):
         return fetch_amazon_product(url)

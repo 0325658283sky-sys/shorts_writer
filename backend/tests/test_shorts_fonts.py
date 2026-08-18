@@ -11,6 +11,7 @@ def test_default_overlay_uses_gmarket_sans():
     overlay = default_style_overlay("impact_full")
     assert overlay["titleFont"] == "gmarket_sans"
     assert overlay["captionFont"] == "gmarket_sans"
+    assert overlay["captionAnimation"] == "highlight"
     assert DEFAULT_FONT_ID == "gmarket_sans"
 
 
@@ -34,6 +35,11 @@ def test_sanitize_keeps_fonts_and_drops_unknown():
     assert cleaned["captionFont"] == "gmarket_sans"
     assert cleaned["title"]["fontSize"] == 80
     assert "extra" not in cleaned
+
+
+def test_sanitize_keeps_caption_animation_override():
+    cleaned = sanitize_style_overlay({"captionAnimation": "none"})
+    assert cleaned["captionAnimation"] == "none"
 
 
 def test_merge_preserves_user_fonts_over_template_defaults():

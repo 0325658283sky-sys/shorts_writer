@@ -71,6 +71,8 @@ ALLOWED_SCRIPT_TONES = ("summary", "hook", "detailed")
 ALLOWED_TARGET_LENGTHS = {"short", "long"}
 ALLOWED_NARRATION_LANGUAGES = {"original", "ko", "en", "ja"}
 ALLOWED_SCRIPT_MODELS = {"gpt-4o-mini", "gpt-4o"}
+DRAFT_SCRIPT_MODEL = "gpt-4o-mini"
+DEFAULT_HOOK_SCRIPT_MODEL = "gpt-4o"
 ALLOWED_WIZARD_STEPS = {"video_style", "edit_mode", "quick", "ready", "boards", "voice", "style"}
 LEGACY_WIZARD_STEPS = {"boards", "voice", "style"}
 
@@ -1249,6 +1251,7 @@ def _apply_auto_audio_for_render(
             blog_clip.script_tone,
             blog_clip.target_length,
             blog_clip.visual_style,
+            seed=blog_clip.id,
         )
         if bgm is not None:
             conn.execute(
@@ -1359,6 +1362,8 @@ def update_blog_clip_visual_style(
         overlay["titleFont"] = normalize_font_id(str(previous_overlay.get("titleFont")))
     if previous_overlay.get("captionFont"):
         overlay["captionFont"] = normalize_font_id(str(previous_overlay.get("captionFont")))
+    if previous_overlay.get("captionAnimation"):
+        overlay["captionAnimation"] = previous_overlay["captionAnimation"]
     overlay = merge_style_overlay(slug, overlay)
     overlay_json = json.dumps(overlay, ensure_ascii=False)
 
@@ -1501,6 +1506,8 @@ def update_blog_clip_style_overlay(
     for font_key in ("titleFont", "captionFont"):
         if font_key in patch:
             combined[font_key] = patch[font_key]
+    if "captionAnimation" in patch:
+        combined["captionAnimation"] = patch["captionAnimation"]
     for layer_key in ("title", "subtitle", "caption"):
         if layer_key not in patch:
             continue
@@ -2050,6 +2057,24 @@ def download_blog_images(image_urls: list[str], dest_dir: Path) -> list[tuple[Pa
     return saved
 
 
+def _maybe_rank_product_images(
+    source_url: str,
+    product_title: str,
+    downloaded: list[tuple[Path, str]],
+) -> list[tuple[Path, str]]:
+    """Product URLs only: reorder downloads by vision score. Never raises."""
+    try:
+        from app.services.product_service import is_supported_product_url
+        from app.services.product_image_filter import reorder_downloaded_product_images
+
+        if not is_supported_product_url(source_url):
+            return downloaded
+        return reorder_downloaded_product_images(downloaded, product_title)
+    except Exception:
+        logger.exception("Product image vision ranking failed; keeping scrape order.")
+        return downloaded
+
+
 def upgrade_blog_clip_images_to_high_res(conn: sqlite3.Connection, user_id: int, blog_clip_id: int) -> int:
     """Re-download candidate images at Naver w966 when a larger file is available.
 
@@ -2159,8 +2184,11 @@ Extra rules ONLY for the "hook" key (promotional Shorts voiceover + on-screen ca
     (punch, curiosity, concrete payoff)—not a dry lecture or long explanation dump.
   · Prefer one idea per sentence; end sentences with . ! ? so boards can split 1:1.
   · Avoid long compound sentences that pack many facts into one board.
+- Required hook angles (same as on-screen titles — pick one, grounded in THIS post):
+  curiosity gap, time/change FOMO, twist/contrast, concrete number/scene, result-first.
+- FORBIDDEN openings: topic labels ("○의 미래", "○의 매력", "알아보자", "총정리"),
+  "오늘은", "이번 글에서는", "안녕하세요", or reading the title.
 - Voice: punchy, spoken, confident, slightly salesy but not spammy. Short sentences.
-- Avoid weak openings like "오늘은", "이번 글에서는", "안녕하세요", or reading the title.
 - Do NOT invent stats, reviews, rankings, "No.1", guarantees, or prices missing from the blog.
 - Grounded tension from the post is OK (change, scarcity of a view/scene); fake hype is not.
 - If the post is educational, still frame the hook as a problem → solution promo for that tip.
@@ -2185,6 +2213,30 @@ Tone rules:
 """.strip()
 
 
+def _draft_length_guidance(target_length: str) -> str:
+    if target_length == "long":
+        return """
+Length target: longer short-form (~30-45 seconds overall).
+Tone rules:
+- "summary": calm factual overview. About 25-35 seconds when read aloud.
+- "detailed": richer explanation with 1-2 concrete details from the post. About 35-45 seconds.
+- "hook": promotional fallback only if the dedicated hook call fails. About 30-40 seconds.
+""".strip()
+    return """
+Length target: short short-form (~10-20 seconds overall). Keep every tone concise.
+Tone rules:
+- "summary": calm factual overview. About 10-15 seconds when read aloud.
+- "detailed": one concrete detail from the post, still brief. About 15-20 seconds.
+- "hook": promotional fallback only if the dedicated hook call fails. About 12-18 seconds.
+""".strip()
+
+
+def _hook_length_guidance(target_length: str) -> str:
+    if target_length == "long":
+        return "Length: promotional Shorts voiceover about 30-40 seconds when read aloud."
+    return "Length: promotional Shorts voiceover about 12-18 seconds when read aloud. Keep it concise."
+
+
 def _narration_language_guidance(narration_language: str) -> str:
     if narration_language == "ko":
         return "Write every script in Korean."
@@ -2196,7 +2248,7 @@ def _narration_language_guidance(narration_language: str) -> str:
 
 
 def _resolve_script_model(model: str | None) -> str:
-    resolved = (model or settings.openai_metadata_model or "gpt-4o-mini").strip()
+    resolved = (model or settings.openai_metadata_model or DRAFT_SCRIPT_MODEL).strip()
     if resolved not in ALLOWED_SCRIPT_MODELS:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -2205,63 +2257,33 @@ def _resolve_script_model(model: str | None) -> str:
     return resolved
 
 
-def generate_blog_narration_script_candidates(
-    blog_title: str,
-    blog_text: str,
+def _resolve_hook_script_model(model: str | None) -> str:
+    """Hook model: gpt-4o by default; an explicit script_model overrides hook only."""
+    if model is None or not str(model).strip():
+        preferred = (getattr(settings, "openai_title_model", None) or DEFAULT_HOOK_SCRIPT_MODEL).strip()
+        if preferred in ALLOWED_SCRIPT_MODELS:
+            return preferred
+        return DEFAULT_HOOK_SCRIPT_MODEL
+    return _resolve_script_model(model)
+
+
+def _clean_script_tone(payload: dict[str, Any], tone: str) -> str:
+    return clean_subtitle_text(str(payload.get(tone, "")))[:900]
+
+
+def _openai_json_completion(
+    client: OpenAI,
     *,
-    target_length: str = "short",
-    narration_language: str = "original",
-    model: str | None = None,
-) -> dict[str, str]:
-    """Generate three tone variants (summary / hook / detailed) in one GPT call."""
-    if not settings.openai_api_key:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="OPENAI_API_KEY is not configured.")
-    if target_length not in ALLOWED_TARGET_LENGTHS:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="target_length must be short or long.")
-    if narration_language not in ALLOWED_NARRATION_LANGUAGES:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="narration_language must be original, ko, en, or ja.",
-        )
-    script_model = _resolve_script_model(model)
-
-    client = OpenAI(api_key=settings.openai_api_key)
-    prompt = f"""
-Create three short AI narration scripts for a vertical shorts video based on one blog post.
-Return ONLY valid JSON with exactly these keys: "summary", "hook", "detailed".
-
-{_narration_length_guidance(target_length)}
-
-{_narration_hook_guidance()}
-
-Shared rules for every tone:
-- {_narration_language_guidance(narration_language)}
-- Use only facts present in the blog text. Do not invent claims.
-- Keep it natural when read aloud as a short-form voiceover.
-- Do not include stage directions, timestamps, markdown, hashtags, or the title text itself.
-- Avoid exaggerated or misleading claims.
-- Each value must be a plain string (the full narration script for that tone).
-
-Blog title: {blog_title}
-
-Blog text:
-{blog_text}
-""".strip()
-
+    model: str,
+    system: str,
+    user: str,
+) -> dict[str, Any]:
     try:
         response = client.chat.completions.create(
-            model=script_model,
+            model=model,
             messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You write voiceover narration for vertical Shorts/Reels. "
-                        "For the hook tone, write like a polished product or local-service promo short "
-                        "made of short punchy caption sentences (one idea each) that also work on-screen. "
-                        "Respond with JSON only."
-                    ),
-                },
-                {"role": "user", "content": prompt},
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
             ],
             response_format={"type": "json_object"},
         )
@@ -2275,17 +2297,128 @@ Blog text:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Narration script generation failed: {exc}") from exc
 
     raw = response.choices[0].message.content if response.choices else None
-    payload = _extract_json_object(raw or "")
-    candidates: dict[str, str] = {}
-    for tone in ALLOWED_SCRIPT_TONES:
-        script = clean_subtitle_text(str(payload.get(tone, "")))
+    return _extract_json_object(raw or "")
+
+
+def generate_blog_narration_script_candidates(
+    blog_title: str,
+    blog_text: str,
+    *,
+    target_length: str = "short",
+    narration_language: str = "original",
+    model: str | None = None,
+) -> dict[str, str]:
+    """Generate summary/detailed on mini and hook on gpt-4o (unless model overrides hook)."""
+    if not settings.openai_api_key:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="OPENAI_API_KEY is not configured.")
+    if target_length not in ALLOWED_TARGET_LENGTHS:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="target_length must be short or long.")
+    if narration_language not in ALLOWED_NARRATION_LANGUAGES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="narration_language must be original, ko, en, or ja.",
+        )
+    draft_model = DRAFT_SCRIPT_MODEL
+    hook_model = _resolve_hook_script_model(model)
+    language = _narration_language_guidance(narration_language)
+    shared_rules = f"""
+Shared rules:
+- {language}
+- Use only facts present in the blog text. Do not invent claims.
+- Keep it natural when read aloud as a short-form voiceover.
+- Do not include stage directions, timestamps, markdown, hashtags, or the title text itself.
+- Avoid exaggerated or misleading claims.
+- Each value must be a plain string (the full narration script for that tone).
+
+Blog title: {blog_title}
+
+Blog text:
+{blog_text}
+""".strip()
+
+    client = OpenAI(api_key=settings.openai_api_key)
+    draft_prompt = f"""
+Create short AI narration scripts for a vertical shorts video based on one blog post.
+Return ONLY valid JSON with keys: "summary", "detailed", and "hook".
+"summary" and "detailed" are the primary outputs. "hook" is a fallback if a later hook pass fails.
+
+{_draft_length_guidance(target_length)}
+
+{_narration_hook_guidance()}
+
+{shared_rules}
+""".strip()
+    draft_payload = _openai_json_completion(
+        client,
+        model=draft_model,
+        system=(
+            "You write voiceover narration for vertical Shorts/Reels. "
+            "Respond with JSON only."
+        ),
+        user=draft_prompt,
+    )
+    summary = _clean_script_tone(draft_payload, "summary")
+    detailed = _clean_script_tone(draft_payload, "detailed")
+    fallback_hook = _clean_script_tone(draft_payload, "hook")
+    for tone, script in (("summary", summary), ("detailed", detailed)):
         if not script:
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
                 detail=f"AI returned an empty '{tone}' narration script.",
             )
-        candidates[tone] = script[:900]
-    return candidates
+
+    hook = ""
+    hook_source = "fallback_mini"
+    hook_prompt = f"""
+Write ONE promotional Shorts voiceover for the "hook" tone.
+Return ONLY valid JSON: {{"hook":"..."}}.
+
+{_hook_length_guidance(target_length)}
+
+{_narration_hook_guidance()}
+
+{shared_rules}
+""".strip()
+    try:
+        hook_payload = _openai_json_completion(
+            client,
+            model=hook_model,
+            system=(
+                "You write voiceover narration for vertical Shorts/Reels. "
+                "Write like a polished product or local-service promo short "
+                "made of short punchy caption sentences (one idea each) that also work on-screen. "
+                "Use curiosity gap, FOMO/time-change, contrast, concrete scene, or result-first. "
+                "Respond with JSON only."
+            ),
+            user=hook_prompt,
+        )
+        hook = _clean_script_tone(hook_payload, "hook")
+        if hook:
+            hook_source = "primary"
+    except HTTPException:
+        logger.warning(
+            "Hook narration call failed (model=%s); falling back to mini hook.",
+            hook_model,
+            exc_info=True,
+        )
+        hook = ""
+
+    if not hook:
+        hook = fallback_hook
+        hook_source = "fallback_mini"
+    if not hook:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="AI returned an empty 'hook' narration script.",
+        )
+
+    logger.info(
+        "Narration scripts generated draft_model=%s hook_model=%s hook_source=%s",
+        draft_model,
+        hook_model,
+        hook_source,
+    )
+    return {"summary": summary, "hook": hook, "detailed": detailed}
 
 
 def blog_clip_script_candidates(blog_clip: BlogClip) -> dict[str, str]:
@@ -3286,6 +3419,8 @@ def _apply_visual_style_early(conn: sqlite3.Connection, blog_clip: BlogClip, vis
         overlay["titleFont"] = normalize_font_id(str(previous_overlay.get("titleFont")))
     if previous_overlay.get("captionFont"):
         overlay["captionFont"] = normalize_font_id(str(previous_overlay.get("captionFont")))
+    if previous_overlay.get("captionAnimation"):
+        overlay["captionAnimation"] = previous_overlay["captionAnimation"]
     overlay = merge_style_overlay(slug, overlay)
 
     set_parts = [
@@ -3350,7 +3485,7 @@ def create_blog_clip_job(
     *,
     target_length: str = "short",
     narration_language: str = "original",
-    script_model: str = "gpt-4o-mini",
+    script_model: str = "gpt-4o",
 ) -> BlogClip:
     """Insert a `pending` blog_clips row and return immediately.
 
@@ -3504,6 +3639,7 @@ def run_blog_clip_pipeline(blog_clip_id: int, user_id: int, url: str, style: str
                         f"({len(downloaded)}개, 최소 {settings.blog_image_min_count}개 필요)."
                     ),
                 )
+            downloaded = _maybe_rank_product_images(url, blog_content.title, downloaded)
             _replace_blog_clip_image_candidates(conn, blog_clip_id, downloaded)
 
             _update_blog_clip_progress(conn, blog_clip_id, PROGRESS_GENERATING_SCRIPT)

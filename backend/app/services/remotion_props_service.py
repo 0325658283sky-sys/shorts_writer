@@ -38,6 +38,29 @@ def resolve_board_duration_sec(board: BlogClipBoard) -> float:
     return DEFAULT_BOARD_DURATION_SEC
 
 
+def _estimate_word_timings(text: str, duration_sec: float) -> list[dict]:
+    """Split board text by whitespace and assign durations proportional to character length."""
+    words = (text or "").split()
+    if not words:
+        return []
+    duration = max(0.0, float(duration_sec))
+    weights = [max(1, len(word)) for word in words]
+    total = sum(weights)
+    cursor = 0.0
+    out: list[dict] = []
+    for word, weight in zip(words, weights):
+        span = duration * (weight / total) if total else 0.0
+        out.append(
+            {
+                "text": word,
+                "startSec": round(cursor, 3),
+                "endSec": round(cursor + span, 3),
+            }
+        )
+        cursor += span
+    return out
+
+
 def build_blog_shorts_props(
     conn: sqlite3.Connection,
     user_id: int,
@@ -164,6 +187,7 @@ def _props_from_boards(
                 "animated": animated,
                 "text": board.text or "",
                 "durationSec": duration_sec,
+                "words": _estimate_word_timings(board.text or "", duration_sec),
                 "backgroundColor": None,
                 "speaker": board.speaker,
             }

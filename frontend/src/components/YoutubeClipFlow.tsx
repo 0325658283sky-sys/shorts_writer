@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { authorizedBlob, authorizedRequest } from "../api/client";
-import { VIDEO_STATUS_LABELS, friendlyProgressFromVideoStatus } from "../constants";
+import { friendlyProgressFromVideoStatus } from "../constants";
 import type { Clip, ClipMetadata, Highlight, SubtitleStyle, Transcript, TtsMode, Video, VideoStatusResponse } from "../types";
 import { AliveProgressBar } from "./AliveProgressBar";
 
@@ -312,40 +312,27 @@ export function YoutubeClipFlow({
 
   return (
     <div className="flow-shell">
-      <header className="flow-topbar">
-        <button className="ghost-button" type="button" onClick={onBackToStudio}>
-          ← 작업실로
-        </button>
-        <div className="flow-brand">
-          <strong>New Cut</strong>
-          <span>유튜브 클립</span>
-        </div>
-        <span className={`status-badge status-${video.status}`}>{VIDEO_STATUS_LABELS[video.status]}</span>
-      </header>
+      <nav className="flow-progress-bar" aria-label="제작 단계">
+        <ol className="flow-stepper-list">
+          {FLOW_STEPS.map((item, index) => {
+            const isCurrent = index === stepIndex;
+            const isDone = index < stepIndex;
+            return (
+              <li key={item.id}>
+                <div
+                  className={`flow-stepper-item ${isCurrent ? "is-current" : ""} ${isDone ? "is-done" : ""}`}
+                  aria-current={isCurrent ? "step" : undefined}
+                >
+                  <span className="flow-step-dot">{index + 1}</span>
+                  <span>{item.label}</span>
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+      </nav>
 
-      <div className="flow-body">
-        <aside className="flow-stepper" aria-label="제작 단계">
-          <p className="flow-stepper-title">진행 단계</p>
-          <ol className="flow-stepper-list">
-            {FLOW_STEPS.map((item, index) => {
-              const isCurrent = index === stepIndex;
-              const isDone = index < stepIndex;
-              return (
-                <li key={item.id}>
-                  <div
-                    className={`flow-stepper-item ${isCurrent ? "is-current" : ""} ${isDone ? "is-done" : ""}`}
-                    aria-current={isCurrent ? "step" : undefined}
-                  >
-                    <span className="flow-step-dot">{index + 1}</span>
-                    <span>{item.label}</span>
-                  </div>
-                </li>
-              );
-            })}
-          </ol>
-        </aside>
-
-        <main className="flow-main">
+      <main className="flow-main">
           {step === "progress" || step === "generating" ? (
             <section className="flow-card flow-progress-card" aria-live="polite">
               <p className="create-kicker">{step === "generating" ? "쇼츠 생성" : "AI 편집점"}</p>
@@ -412,7 +399,6 @@ export function YoutubeClipFlow({
             </section>
           ) : null}
         </main>
-      </div>
     </div>
   );
 }

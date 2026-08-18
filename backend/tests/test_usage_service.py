@@ -12,7 +12,7 @@ from app.services.usage_service import (
 def test_plan_policy_defaults_to_free():
     assert plan_policy(None)["id"] == "free"
     assert plan_policy("unknown")["monthly_video_limit"] == 3
-    assert plan_policy("pro")["monthly_video_limit"] == 150
+    assert plan_policy("pro")["monthly_video_limit"] == 80
 
 
 def test_sync_user_usage_policy_remaining(conn):

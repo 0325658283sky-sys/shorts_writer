@@ -113,7 +113,7 @@ def conn() -> sqlite3.Connection:
     connection.execute(
         """
         INSERT INTO audio_assets (user_id, kind, name, slug, storage_path, duration_seconds)
-        VALUES (NULL, 'bgm', '소프트 패드', 'soft_pad', '/tmp/soft_pad.mp3', 12.0)
+        VALUES (NULL, 'bgm', '소프트 패드', 'soft_pad_1', '/tmp/soft_pad_1.mp3', 12.0)
         """
     )
     connection.commit()

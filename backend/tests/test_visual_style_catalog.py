@@ -25,12 +25,13 @@ def test_remotion_style_payload_includes_transition_type():
     assert payload["header"] == "viral_cyan"
     assert payload["caption"] == "black_box"
     assert payload["mediaFit"] == "cover"
+    assert payload["captionAnimation"] == "highlight"
     assert "accent" in payload
 
 
 def test_style_pack_recommendations_present():
     style = resolve_visual_style("info_black")
-    assert style["recommendedBgmSlug"] == "soft_pad"
+    assert style["recommendedBgmSlug"] == "soft_pad_1"
     assert style["packHint"]
     assert style["layout"] == "letterbox"
     assert style["mediaFit"] == "cover"
@@ -55,3 +56,6 @@ def test_default_overlay_and_merge():
     assert merged["caption"]["y"] == 0.8
     assert merged["caption"]["fontSize"] == 40
     assert merged["title"]["fontSize"] == 110
+    assert merged["captionAnimation"] == "highlight"
+    none = merge_style_overlay("info_black", {"captionAnimation": "none"})
+    assert none["captionAnimation"] == "none"

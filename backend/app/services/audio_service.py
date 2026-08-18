@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+import random
 import sqlite3
 import uuid
 from pathlib import Path
@@ -9,15 +11,16 @@ from pathlib import Path
 from fastapi import HTTPException, UploadFile, status
 
 from app.db.models import AudioAsset
+from app.services.bgm_mood_catalog import bundled_bgm_slugs, get_bgm_mood
 from app.services.ffmpeg_service import (
     FFmpegAudioError,
     FFmpegNotAvailableError,
-    generate_pulse_bed_mp3,
-    generate_soft_pad_mp3,
     generate_tone_mp3,
     get_video_duration_seconds,
 )
 from app.services.video_service import STORAGE_ROOT
+
+logger = logging.getLogger(__name__)
 
 AUDIO_ROOT = STORAGE_ROOT / "audio"
 SYSTEM_AUDIO_ROOT = AUDIO_ROOT / "system"
@@ -35,6 +38,29 @@ _ASSET_COLUMNS = """
 
 # Preference order for auto-pick moved to bgm_mood_catalog (KR Shorts moods).
 _SFX_ROTATION = ["tick", "pop", "whoosh", "click", "swell"]
+
+# Display names for bundled BGM slugs (files live at SYSTEM_AUDIO_ROOT/<slug>.mp3).
+_BGM_SEED_NAMES: dict[str, str] = {
+    "promo_pulse_1": "프로모 펄스 1",
+    "promo_pulse_2": "프로모 펄스 2",
+    "promo_pulse_3": "프로모 펄스 3",
+    "promo_pulse_4": "프로모 펄스 4",
+    "bright_lift_1": "브라이트 리프트 1",
+    "bright_lift_2": "브라이트 리프트 2",
+    "bright_lift_3": "브라이트 리프트 3",
+    "bright_lift_4": "브라이트 리프트 4",
+    "light_warm_1": "라이트 웜 1",
+    "light_warm_2": "라이트 웜 2",
+    "light_warm_3": "라이트 웜 3",
+    "soft_pad_1": "소프트 패드 1",
+    "soft_pad_2": "소프트 패드 2",
+    "soft_pad_3": "소프트 패드 3",
+    "soft_pad_4": "소프트 패드 4",
+    "soft_pad_5": "소프트 패드 5",
+    "calm_drone_1": "칼름 드론 1",
+    "calm_drone_2": "칼름 드론 2",
+    "calm_drone_3": "칼름 드론 3",
+}
 
 
 def _row_to_asset(row: sqlite3.Row) -> AudioAsset:
@@ -118,6 +144,15 @@ def get_system_audio_by_slug(conn: sqlite3.Connection, slug: str) -> AudioAsset 
     return _row_to_asset(row) if row else None
 
 
+def _asset_file_ready(asset: AudioAsset | None) -> AudioAsset | None:
+    if asset is None:
+        return None
+    path = Path(asset.storage_path)
+    if not path.is_file() or path.stat().st_size <= 0:
+        return None
+    return asset
+
+
 def pick_default_bgm(
     conn: sqlite3.Connection,
     script_tone: str | None,
@@ -125,28 +160,47 @@ def pick_default_bgm(
     visual_style: str | None = None,
     *,
     mood_id: str | None = None,
+    seed: int | None = None,
 ) -> AudioAsset | None:
-    """Pick a system BGM from KR Shorts mood (style/tone) + length bias."""
+    """Pick a system BGM with weighted random among ready bundled tracks.
+
+    Mood-primary slugs get higher weight than length/fallback slugs.
+    ``seed`` (typically blog_clip.id) keeps the same clip on the same track
+    across re-renders while still rotating across new clips.
+    """
     from app.services.bgm_mood_catalog import resolve_candidate_slugs
 
-    _mood, candidates = resolve_candidate_slugs(
+    mood_key, candidates = resolve_candidate_slugs(
         script_tone=script_tone,
         visual_style=visual_style,
         target_length=target_length,
         mood_id=mood_id,
     )
-    for slug in candidates:
-        asset = get_system_audio_by_slug(conn, slug)
-        if asset is not None:
-            return asset
-    return None
+    mood = get_bgm_mood(mood_key)
+    primary = set(mood["slugs"]) if mood else set()
+
+    available: list[AudioAsset] = []
+    weights: list[int] = []
+    for index, slug in enumerate(candidates):
+        asset = _asset_file_ready(get_system_audio_by_slug(conn, slug))
+        if asset is None:
+            continue
+        available.append(asset)
+        # Prefer mood playlist; earlier candidates still slightly heavier.
+        base = 4 if slug in primary else 1
+        weights.append(max(1, base + max(0, len(candidates) - index) // 8))
+
+    if not available:
+        return None
+    rng = random.Random(seed) if seed is not None else random.Random()
+    return rng.choices(available, weights=weights, k=1)[0]
 
 
 def pick_default_sfx(conn: sqlite3.Connection, *, board_index: int = 1) -> AudioAsset | None:
     """Pick a system transition SFX; rotate by board index for variety."""
     order = _SFX_ROTATION[board_index % len(_SFX_ROTATION) :] + _SFX_ROTATION[: board_index % len(_SFX_ROTATION)]
     for slug in order:
-        asset = get_system_audio_by_slug(conn, slug)
+        asset = _asset_file_ready(get_system_audio_by_slug(conn, slug))
         if asset is not None:
             return asset
     return None
@@ -194,25 +248,15 @@ def _insert_system_asset(
     )
 
 
-def _ensure_seed_file(path: Path, recipe: str) -> None:
+def _ensure_sfx_seed_file(path: Path, recipe: str) -> None:
+    """Synthesize short transition SFX when missing. BGM is never synthesized."""
     if path.exists() and path.stat().st_size > 0:
         return
-    if recipe == "soft_pad":
-        generate_soft_pad_mp3(str(path), duration=12.0, freq_a=196, freq_b=294, volume=0.40)
-    elif recipe == "light_warm":
-        generate_soft_pad_mp3(str(path), duration=12.0, freq_a=220, freq_b=330, volume=0.38)
-    elif recipe == "calm_drone":
-        generate_soft_pad_mp3(str(path), duration=14.0, freq_a=130.8, freq_b=196, volume=0.36)
-    elif recipe == "bright_lift":
-        generate_soft_pad_mp3(str(path), duration=10.0, freq_a=261.6, freq_b=392, volume=0.34)
-    elif recipe == "promo_pulse":
-        generate_pulse_bed_mp3(str(path), duration=12.0, base_freq=98, pulse_hz=2.2, volume=0.36)
-    elif recipe == "tick":
+    if recipe == "tick":
         generate_tone_mp3(str(path), frequency=1200, duration=0.12, volume=0.42, fade_out=0.08)
     elif recipe == "pop":
         generate_tone_mp3(str(path), frequency=660, duration=0.18, volume=0.45, fade_out=0.1)
     elif recipe == "whoosh":
-        # Descending chirp approximation: short mid tone with quick fade.
         generate_tone_mp3(str(path), frequency=480, duration=0.28, volume=0.4, fade_out=0.22)
     elif recipe == "click":
         generate_tone_mp3(str(path), frequency=1800, duration=0.07, volume=0.38, fade_out=0.05)
@@ -223,28 +267,46 @@ def _ensure_seed_file(path: Path, recipe: str) -> None:
 
 
 def seed_system_audio_assets(conn: sqlite3.Connection) -> None:
-    """Create bundled demo BGM/SFX tones if missing (no third-party music license)."""
+    """Register bundled BGM mp3s if present; synthesize SFX tones if missing.
+
+    BGM files are expected at ``SYSTEM_AUDIO_ROOT/<slug>.mp3`` (see LICENSES.md).
+    Missing BGM is a warning-only skip so startup never fails.
+    """
     SYSTEM_AUDIO_ROOT.mkdir(parents=True, exist_ok=True)
-    seeds = [
-        ("bgm", "소프트 패드", "soft_pad", SYSTEM_AUDIO_ROOT / "soft_pad.mp3", "soft_pad"),
-        ("bgm", "라이트 웜", "light_warm", SYSTEM_AUDIO_ROOT / "light_warm.mp3", "light_warm"),
-        ("bgm", "칼름 드론", "calm_drone", SYSTEM_AUDIO_ROOT / "calm_drone.mp3", "calm_drone"),
-        ("bgm", "브라이트 리프트", "bright_lift", SYSTEM_AUDIO_ROOT / "bright_lift.mp3", "bright_lift"),
-        ("bgm", "프로모 펄스", "promo_pulse", SYSTEM_AUDIO_ROOT / "promo_pulse.mp3", "promo_pulse"),
-        ("sfx", "틱", "tick", SYSTEM_AUDIO_ROOT / "tick.mp3", "tick"),
-        ("sfx", "팝", "pop", SYSTEM_AUDIO_ROOT / "pop.mp3", "pop"),
-        ("sfx", "후슈", "whoosh", SYSTEM_AUDIO_ROOT / "whoosh.mp3", "whoosh"),
-        ("sfx", "클릭", "click", SYSTEM_AUDIO_ROOT / "click.mp3", "click"),
-        ("sfx", "스웰", "swell", SYSTEM_AUDIO_ROOT / "swell.mp3", "swell"),
+
+    expected = list(bundled_bgm_slugs())
+    seeded = 0
+    for slug in expected:
+        path = SYSTEM_AUDIO_ROOT / f"{slug}.mp3"
+        if not path.is_file() or path.stat().st_size <= 0:
+            logger.debug("Bundled BGM missing; skip seeding slug=%s path=%s", slug, path)
+            continue
+        name = _BGM_SEED_NAMES.get(slug, slug)
+        _insert_system_asset(conn, kind="bgm", name=name, slug=slug, path=path)
+        seeded += 1
+    if seeded == 0:
+        logger.warning(
+            "Bundled BGM library is empty: 0 of %s tracks found under %s "
+            "(add mp3s named after bundled slugs; see LICENSES.md)",
+            len(expected),
+            SYSTEM_AUDIO_ROOT,
+        )
+
+    sfx_seeds = [
+        ("틱", "tick", SYSTEM_AUDIO_ROOT / "tick.mp3", "tick"),
+        ("팝", "pop", SYSTEM_AUDIO_ROOT / "pop.mp3", "pop"),
+        ("후슈", "whoosh", SYSTEM_AUDIO_ROOT / "whoosh.mp3", "whoosh"),
+        ("클릭", "click", SYSTEM_AUDIO_ROOT / "click.mp3", "click"),
+        ("스웰", "swell", SYSTEM_AUDIO_ROOT / "swell.mp3", "swell"),
     ]
     try:
-        for kind, name, slug, path, recipe in seeds:
-            _ensure_seed_file(path, recipe)
-            _insert_system_asset(conn, kind=kind, name=name, slug=slug, path=path)
-        conn.commit()
+        for name, slug, path, recipe in sfx_seeds:
+            _ensure_sfx_seed_file(path, recipe)
+            _insert_system_asset(conn, kind="sfx", name=name, slug=slug, path=path)
     except (FFmpegNotAvailableError, FFmpegAudioError):
-        # Seeding is best-effort at startup; upload path still works without seeds.
-        return
+        logger.warning("SFX seed skipped; FFmpeg unavailable")
+
+    conn.commit()
 
 
 async def create_user_audio_asset(

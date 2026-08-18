@@ -5,7 +5,6 @@ import type {
   Clip,
   ClipMetadata,
   Highlight,
-  Plan,
   NarrationLanguage,
   ScriptModel,
   SubtitleStyle,
@@ -13,7 +12,6 @@ import type {
   Transcript,
   TtsMode,
   Usage,
-  User,
   Video,
   VisualStyleSlug,
 } from "../types";
@@ -23,9 +21,7 @@ import { ProjectsPage } from "./ProjectsPage";
 import { YoutubeConfirmStep, type YoutubePreview } from "./YoutubeConfirmStep";
 
 export function Dashboard({
-  user,
   usage,
-  plans,
   uploadMessage,
   selectedFile,
   isUploading,
@@ -54,7 +50,6 @@ export function Dashboard({
   analyzingId,
   transcribingId,
   highlightingId,
-  onLogout,
   onUpload,
   onSelectedFileChange,
   onPreviewYoutube,
@@ -93,9 +88,7 @@ export function Dashboard({
   focusVideoId,
   onProjectsTabRequestConsumed,
 }: {
-  user: User;
   usage: Usage | null;
-  plans: Plan[];
   uploadMessage: string;
   selectedFile: File | null;
   isUploading: boolean;
@@ -126,7 +119,6 @@ export function Dashboard({
   analyzingId: number | null;
   transcribingId: number | null;
   highlightingId: number | null;
-  onLogout: () => void;
   onUpload: (event: FormEvent<HTMLFormElement>) => void;
   onSelectedFileChange: (file: File | null) => void;
   onPreviewYoutube: (event: FormEvent<HTMLFormElement>) => void;
@@ -164,64 +156,10 @@ export function Dashboard({
   onProjectsTabRequestConsumed?: () => void;
 }) {
   const [source, setSource] = useState<CreateSource>("blog");
-  const activePlan = plans.find((plan) => plan.id === usage?.plan);
 
   return (
-    <div className="studio">
-      <header className="studio-topbar">
-        <div className="studio-topbar-left">
-          <div className="studio-brand">
-            <span className="brand-mark" aria-hidden="true" />
-            <strong className="brand-name">New Cut</strong>
-          </div>
-          <nav className="studio-nav" aria-label="스튜디오 메뉴">
-            <button
-              type="button"
-              className={`studio-nav-link ${studioNav === "create" ? "is-active" : ""}`}
-              onClick={() => onStudioNavChange("create")}
-            >
-              만들기
-            </button>
-            <button
-              type="button"
-              className={`studio-nav-link ${studioNav === "projects" ? "is-active" : ""}`}
-              onClick={() => onStudioNavChange("projects")}
-            >
-              프로젝트
-              {blogClips.length + videos.length > 0 ? (
-                <span className="studio-nav-count">{blogClips.length + videos.length}</span>
-              ) : null}
-            </button>
-            <button
-              type="button"
-              className={`studio-nav-link ${studioNav === "usage" ? "is-active" : ""}`}
-              onClick={() => onStudioNavChange("usage")}
-            >
-              요금제
-            </button>
-          </nav>
-        </div>
-        <div className="studio-topbar-meta">
-          <button
-            type="button"
-            className="usage-chip"
-            title={activePlan?.name}
-            onClick={() => onStudioNavChange("usage")}
-          >
-            <span>{usage?.plan_name ?? "요금제"}</span>
-            <strong>
-              {usage ? `${usage.remaining}남음` : "—"}
-            </strong>
-          </button>
-          <span className="account-chip">{user.email}</span>
-          <button className="btn-ghost" type="button" onClick={onLogout}>
-            로그아웃
-          </button>
-        </div>
-      </header>
-
-      <main className="studio-main">
-        {studioNav === "create" ? (
+    <div className="studio-main">
+      {studioNav === "create" ? (
           <>
             {youtubePreview ? (
               <YoutubeConfirmStep
@@ -315,7 +253,6 @@ export function Dashboard({
           </>
         ) : null}
         {studioNav === "usage" ? <MembershipPage usage={usage} /> : null}
-      </main>
     </div>
   );
 }

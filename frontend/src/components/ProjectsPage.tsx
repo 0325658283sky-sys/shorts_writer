@@ -313,16 +313,17 @@ export function ProjectsPage({
             ) : null}
           </div>
         ) : (
-          <ul className="projects-list">
+          <ul className="projects-grid">
             {filteredItems.map((item) => {
               const blogClip = item.blogClip;
               const downloadableBlog = blogClip ? canDownloadBlogClip(blogClip) : false;
               const downloadingBlog = blogClip != null && downloadingBlogClipId === blogClip.id;
               const downloadingClip = item.clip != null && downloadingClipId === item.clip.id;
+              const progressPercent = item.bucket === "in_progress" ? (blogClip?.progress_percent ?? 0) : null;
               return (
-                <li key={item.key}>
+                <li key={item.key} className="projects-card">
                   <div
-                    className="projects-row"
+                    className="projects-card-thumb-wrap"
                     role="button"
                     tabIndex={0}
                     onClick={() => resumeItem(item)}
@@ -336,21 +337,16 @@ export function ProjectsPage({
                     {item.kind === "blog" && blogClip ? (
                       <BlogClipThumb blogClipId={blogClip.id} title={blogClip.blog_title} />
                     ) : (
-                      <div className="projects-thumb projects-thumb-fallback" aria-hidden>
-                        {PROJECT_SOURCE_LABELS[item.source].slice(0, 1)}
+                      <div className="projects-thumb" aria-hidden>
+                        <span className="projects-thumb-fallback">{PROJECT_SOURCE_LABELS[item.source].slice(0, 1)}</span>
                       </div>
                     )}
-                    <div className="projects-row-main">
-                      <strong>{item.title}</strong>
-                      <span className="projects-row-meta">
-                        {PROJECT_SOURCE_LABELS[item.source]} · {formatDate(item.updatedAt)}
-                        {item.progressLabel ? ` · ${item.progressLabel}` : ""}
-                      </span>
-                      <span className={`status-badge status-${item.blogClip?.status ?? item.clip?.status ?? "uploaded"}`}>
-                        {item.statusLabel}
-                      </span>
-                    </div>
-                    <div className="projects-row-actions" onClick={stopRow}>
+                    {progressPercent != null ? (
+                      <div className="projects-card-progress" aria-hidden>
+                        <span style={{ width: `${Math.min(100, Math.max(0, progressPercent))}%` }} />
+                      </div>
+                    ) : null}
+                    <div className="projects-card-actions" onClick={stopRow}>
                       {item.kind === "blog" && blogClip && downloadableBlog ? (
                         <button
                           className="small-button ghost-small"
@@ -375,6 +371,16 @@ export function ProjectsPage({
                         {primaryActionLabel(item)}
                       </button>
                     </div>
+                  </div>
+                  <div className="projects-card-copy">
+                    <strong>{item.title}</strong>
+                    <span className="projects-card-meta">
+                      {PROJECT_SOURCE_LABELS[item.source]} · {formatDate(item.updatedAt)}
+                      {item.progressLabel ? ` · ${item.progressLabel}` : ""}
+                    </span>
+                    <span className={`status-badge status-${item.blogClip?.status ?? item.clip?.status ?? "uploaded"}`}>
+                      {item.statusLabel}
+                    </span>
                   </div>
                 </li>
               );

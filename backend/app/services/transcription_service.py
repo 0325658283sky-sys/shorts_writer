@@ -125,10 +125,46 @@ def _audio_chunks(audio_path: Path, max_bytes: int) -> list[tuple[Path, float]]:
     return chunks
 
 
+def _normalize_words(raw: Any, offset_seconds: float) -> list[dict[str, Any]]:
+    """Whisper word objects → [{word, start, end}] with chunk offset applied."""
+    if not isinstance(raw, list):
+        return []
+    words: list[dict[str, Any]] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        token = str(item.get("word") or item.get("text") or "")
+        if not token.strip():
+            continue
+        try:
+            start = float(item.get("start") or 0) + offset_seconds
+            end = float(item.get("end") or start) + offset_seconds
+        except (TypeError, ValueError):
+            continue
+        if end < start:
+            end = start
+        words.append({"word": token, "start": start, "end": end})
+    return words
+
+
+def _words_overlapping_segment(
+    words: list[dict[str, Any]],
+    segment_start: float,
+    segment_end: float,
+) -> list[dict[str, Any]]:
+    assigned: list[dict[str, Any]] = []
+    for word in words:
+        mid = (float(word["start"]) + float(word["end"])) / 2.0
+        if segment_start <= mid <= segment_end:
+            assigned.append(word)
+    return assigned
+
+
 def _extract_segments(response: Any, offset_seconds: float) -> tuple[str, list[dict[str, Any]]]:
     data = response.model_dump() if hasattr(response, "model_dump") else dict(response)
     text = str(data.get("text") or "")
     raw_segments = data.get("segments") or []
+    top_level_words = _normalize_words(data.get("words"), offset_seconds)
     segments: list[dict[str, Any]] = []
     for item in raw_segments:
         if not isinstance(item, dict):
@@ -136,8 +172,19 @@ def _extract_segments(response: Any, offset_seconds: float) -> tuple[str, list[d
         start = float(item.get("start") or 0) + offset_seconds
         end = float(item.get("end") or start) + offset_seconds
         segment_text = str(item.get("text") or "").strip()
-        if segment_text:
-            segments.append({"index": len(segments), "start": start, "end": end, "text": segment_text})
+        if not segment_text:
+            continue
+        nested = _normalize_words(item.get("words"), offset_seconds)
+        words = nested or _words_overlapping_segment(top_level_words, start, end)
+        segments.append(
+            {
+                "index": len(segments),
+                "start": start,
+                "end": end,
+                "text": segment_text,
+                "words": words,
+            }
+        )
     return text.strip(), segments
 
 
@@ -156,7 +203,7 @@ def _transcribe_audio_file(audio_path: str) -> tuple[str, list[dict[str, Any]]]:
                 file=audio_file,
                 model=settings.openai_transcription_model,
                 response_format="verbose_json",
-                timestamp_granularities=["segment"],
+                timestamp_granularities=["segment", "word"],
             )
         text, segments = _extract_segments(response, offset)
         if text:

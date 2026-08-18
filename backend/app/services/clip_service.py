@@ -17,7 +17,7 @@ from app.services.ffmpeg_service import (
     get_video_duration_seconds,
     replace_video_audio_with_narration,
 )
-from app.services.subtitle_utils import clean_subtitle_text, split_text_for_duration, write_ass_file
+from app.services.subtitle_utils import subtitle_events_for_segment, write_ass_file
 from app.services.transcription_service import get_transcript_for_video, transcript_segments
 from app.services.tts_service import generate_narration_script, synthesize_openai_tts
 from app.services.video_service import STORAGE_ROOT, get_video_for_user
@@ -226,33 +226,7 @@ def _subtitle_events_for_clip(conn: sqlite3.Connection, clip: Clip) -> list[tupl
     events: list[tuple[float, float, str]] = []
 
     for segment in transcript_segments(transcript):
-        try:
-            segment_start = float(segment.get("start") or 0)
-            segment_end = float(segment.get("end") or segment_start)
-        except (TypeError, ValueError):
-            continue
-        if segment_end <= clip_start or segment_start >= clip_end:
-            continue
-
-        text = clean_subtitle_text(str(segment.get("text") or ""))
-        if not text:
-            continue
-
-        relative_start = max(segment_start, clip_start) - clip_start
-        relative_end = min(segment_end, clip_end) - clip_start
-        duration = max(0.8, relative_end - relative_start)
-        chunks = split_text_for_duration(text, duration, 18)
-        if not chunks:
-            continue
-
-        chunk_duration = duration / len(chunks)
-        for index, chunk in enumerate(chunks):
-            start = min(clip_duration, relative_start + index * chunk_duration)
-            end = min(clip_duration, relative_start + (index + 1) * chunk_duration)
-            if end - start < 0.4:
-                end = min(clip_duration, start + 0.8)
-            if end > start:
-                events.append((start, end, chunk))
+        events.extend(subtitle_events_for_segment(segment, clip_start, clip_end, clip_duration))
 
     if not events:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="No transcript segments overlap this clip range.")

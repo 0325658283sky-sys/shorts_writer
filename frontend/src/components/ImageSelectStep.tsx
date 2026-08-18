@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import { authorizedRequest } from "../api/client";
 import { BLOG_IMAGE_MAX_COUNT, BLOG_IMAGE_MIN_COUNT } from "../constants";
-import { normalizeVisualStyleSlug } from "../lib/blogShortsProps";
-import type { BlogClip, BlogClipImageCandidate, VisualStyle, VisualStyleSlug } from "../types";
+import type { BlogClip, BlogClipImageCandidate, VisualStyleSlug } from "../types";
 import { useCandidateImageUrl } from "./useCandidateImageUrl";
 
 function CandidateThumb({
@@ -47,15 +46,6 @@ export function ImageSelectStep({
   const [candidates, setCandidates] = useState<BlogClipImageCandidate[]>([]);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
-  const [styles, setStyles] = useState<VisualStyle[]>([]);
-  const [loadingStyles, setLoadingStyles] = useState(true);
-  const [selectedStyle, setSelectedStyle] = useState(() =>
-    normalizeVisualStyleSlug(blogClip.visual_style || "impact_full"),
-  );
-
-  useEffect(() => {
-    setSelectedStyle(normalizeVisualStyleSlug(blogClip.visual_style || "impact_full"));
-  }, [blogClip.id, blogClip.visual_style]);
 
   useEffect(() => {
     let cancelled = false;
@@ -82,32 +72,6 @@ export function ImageSelectStep({
     };
   }, [blogClip.id]);
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoadingStyles(true);
-    authorizedRequest<VisualStyle[]>("/visual-styles")
-      .then((loaded) => {
-        if (cancelled) return;
-        setStyles(loaded);
-        setSelectedStyle((current) => {
-          const normalized = normalizeVisualStyleSlug(current);
-          if (normalized && loaded.some((item) => item.slug === normalized)) return normalized;
-          return loaded[0]?.slug ?? "impact_full";
-        });
-      })
-      .catch((error) => {
-        if (!cancelled) {
-          onMessage(error instanceof Error ? error.message : "템플릿 목록을 불러오지 못했습니다.");
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingStyles(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [blogClip.id]);
-
   function toggle(imageId: number) {
     setSelectedIds((current) => {
       if (current.includes(imageId)) {
@@ -125,19 +89,14 @@ export function ImageSelectStep({
     .filter((item) => selectedIds.includes(item.id))
     .sort((a, b) => selectedIds.indexOf(a.id) - selectedIds.indexOf(b.id));
   const canContinue =
-    selectedIds.length >= BLOG_IMAGE_MIN_COUNT &&
-    selectedIds.length <= BLOG_IMAGE_MAX_COUNT &&
-    !confirming &&
-    !loadingStyles &&
-    Boolean(selectedStyle);
+    selectedIds.length >= BLOG_IMAGE_MIN_COUNT && selectedIds.length <= BLOG_IMAGE_MAX_COUNT && !confirming;
 
   return (
     <section className="flow-card flow-images-card">
-      <p className="create-kicker">이미지 · 템플릿</p>
-      <h1>{blogClip.blog_title ?? "이미지와 템플릿을 고르세요"}</h1>
+      <p className="create-kicker">이미지</p>
+      <h1>{blogClip.blog_title ?? "이미지를 고르세요"}</h1>
       <p className="flow-lead">
-        {BLOG_IMAGE_MIN_COUNT}–{BLOG_IMAGE_MAX_COUNT}장을 고르고 템플릿을 선택한 뒤 다음으로 가면 대본 톤을 고릅니다.
-        선택 {selectedIds.length}장.
+        {BLOG_IMAGE_MIN_COUNT}–{BLOG_IMAGE_MAX_COUNT}장을 고르면 대본 톤을 선택합니다. 선택 {selectedIds.length}장.
       </p>
 
       {loading ? <p className="create-note">이미지 불러오는 중…</p> : null}
@@ -180,49 +139,11 @@ export function ImageSelectStep({
         </div>
       ) : null}
 
-      <div className="image-template-block">
-        <div className="yt-confirm-templates-head">
-          <h2 className="image-section-title">템플릿</h2>
-          <span className="muted">프리셋</span>
-        </div>
-        {loadingStyles ? <p className="create-note">템플릿 불러오는 중…</p> : null}
-        <div className="style-gallery style-gallery-compact" role="listbox" aria-label="쇼츠 템플릿">
-          {styles.map((style) => (
-            <button
-              key={style.slug}
-              type="button"
-              role="option"
-              aria-selected={selectedStyle === style.slug}
-              className={`style-card ${selectedStyle === style.slug ? "is-selected" : ""}`}
-              disabled={confirming}
-              onClick={() => setSelectedStyle(style.slug)}
-            >
-              {style.badge ? <span className="style-card-badge">{style.badge}</span> : null}
-              {selectedStyle === style.slug ? (
-                <span className="style-card-check" aria-hidden="true">
-                  ✓
-                </span>
-              ) : null}
-              <div className="style-card-preview">
-                {style.previewImage ? (
-                  <img src={style.previewImage} alt="" />
-                ) : (
-                  <div className={`style-card-fallback style-fallback-${style.slug}`} />
-                )}
-              </div>
-              <strong>{style.label}</strong>
-              <span className="muted">{style.description}</span>
-            </button>
-          ))}
-        </div>
-        <p className="create-note">선택한 템플릿은 이후 보드·미리보기 레이아웃과 자막 스타일에 반영됩니다.</p>
-      </div>
-
       <button
         className="cta-button flow-primary-cta"
         type="button"
         disabled={!canContinue}
-        onClick={() => onConfirm(selectedIds, selectedStyle)}
+        onClick={() => onConfirm(selectedIds, blogClip.visual_style || "impact_full")}
       >
         {confirming ? "확인 중…" : "다음 · 대본 선택"}
       </button>

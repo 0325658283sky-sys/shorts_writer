@@ -76,6 +76,122 @@ def test_hook_guidance_asks_for_short_caption_sentences():
     assert "caption" in guidance or "subtitle" in guidance
     assert "short" in guidance
     assert "one idea" in guidance or "sequence" in guidance
+    assert "curiosity" in guidance
+    assert "fomo" in guidance or "contrast" in guidance
+
+
+def test_narration_candidates_use_mini_then_gpt4o_for_hook(monkeypatch):
+    import json
+    from types import SimpleNamespace
+
+    from app.core.config import settings
+    from app.services.blog_service import generate_blog_narration_script_candidates
+
+    calls: list[str] = []
+
+    class _Completions:
+        def create(self, **kwargs):
+            calls.append(kwargs["model"])
+            if kwargs["model"] == "gpt-4o":
+                payload = {"hook": "훅 문장입니다. 바로 이 장면입니다."}
+            else:
+                payload = {
+                    "summary": "요약 나레이션입니다.",
+                    "detailed": "상세 나레이션입니다.",
+                    "hook": "미니 훅입니다.",
+                }
+            return SimpleNamespace(
+                choices=[SimpleNamespace(message=SimpleNamespace(content=json.dumps(payload, ensure_ascii=False)))]
+            )
+
+    class _Client:
+        def __init__(self, **_kwargs):
+            self.chat = SimpleNamespace(completions=_Completions())
+
+    monkeypatch.setattr(settings, "openai_api_key", "sk-test")
+    monkeypatch.setattr("app.services.blog_service.OpenAI", _Client)
+
+    result = generate_blog_narration_script_candidates(
+        "제목",
+        "본문 사실입니다.",
+        model=None,
+    )
+    assert calls == ["gpt-4o-mini", "gpt-4o"]
+    assert set(result) == {"summary", "hook", "detailed"}
+    assert result["summary"] == "요약 나레이션입니다."
+    assert result["detailed"] == "상세 나레이션입니다."
+    assert result["hook"] == "훅 문장입니다. 바로 이 장면입니다."
+
+
+def test_explicit_script_model_forces_hook_model(monkeypatch):
+    import json
+    from types import SimpleNamespace
+
+    from app.core.config import settings
+    from app.services.blog_service import generate_blog_narration_script_candidates
+
+    calls: list[str] = []
+
+    class _Completions:
+        def create(self, **kwargs):
+            calls.append(kwargs["model"])
+            payload = {
+                "summary": "요약입니다.",
+                "detailed": "상세입니다.",
+                "hook": f"{kwargs['model']} 훅입니다.",
+            }
+            return SimpleNamespace(
+                choices=[SimpleNamespace(message=SimpleNamespace(content=json.dumps(payload, ensure_ascii=False)))]
+            )
+
+    class _Client:
+        def __init__(self, **_kwargs):
+            self.chat = SimpleNamespace(completions=_Completions())
+
+    monkeypatch.setattr(settings, "openai_api_key", "sk-test")
+    monkeypatch.setattr("app.services.blog_service.OpenAI", _Client)
+
+    result = generate_blog_narration_script_candidates(
+        "제목",
+        "본문",
+        model="gpt-4o-mini",
+    )
+    assert calls == ["gpt-4o-mini", "gpt-4o-mini"]
+    assert result["hook"] == "gpt-4o-mini 훅입니다."
+
+
+def test_hook_call_failure_falls_back_to_mini_hook(monkeypatch):
+    import json
+    from types import SimpleNamespace
+
+    from fastapi import HTTPException
+
+    from app.core.config import settings
+    from app.services.blog_service import generate_blog_narration_script_candidates
+
+    class _Completions:
+        def create(self, **kwargs):
+            if kwargs["model"] == "gpt-4o":
+                raise HTTPException(status_code=429, detail="OpenAI rate limit reached. Try again later.")
+            payload = {
+                "summary": "요약입니다.",
+                "detailed": "상세입니다.",
+                "hook": "미니 폴백 훅입니다.",
+            }
+            return SimpleNamespace(
+                choices=[SimpleNamespace(message=SimpleNamespace(content=json.dumps(payload, ensure_ascii=False)))]
+            )
+
+    class _Client:
+        def __init__(self, **_kwargs):
+            self.chat = SimpleNamespace(completions=_Completions())
+
+    monkeypatch.setattr(settings, "openai_api_key", "sk-test")
+    monkeypatch.setattr("app.services.blog_service.OpenAI", _Client)
+
+    result = generate_blog_narration_script_candidates("제목", "본문", model=None)
+    assert result["hook"] == "미니 폴백 훅입니다."
+    assert result["summary"] == "요약입니다."
 
 
 def test_update_wizard_step(conn, awaiting_boards_clip):

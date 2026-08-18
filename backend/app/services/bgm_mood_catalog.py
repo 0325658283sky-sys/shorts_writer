@@ -6,48 +6,50 @@ from typing import Any
 
 from app.services.visual_style_catalog import normalize_visual_style
 
+# Bundled royalty-free tracks (files: storage/audio/system/<slug>.mp3).
+# 6 moods × 3+ slugs — unique filenames so pick_default_bgm can rotate.
 BGM_MOODS: dict[str, dict[str, Any]] = {
     "hook_upbeat": {
         "id": "hook_upbeat",
         "label": "훅·임팩트",
         "description": "오프닝, 챌린지식 첫 3초",
         "keywords": ["upbeat", "energetic", "promo", "short punchy"],
-        "slugs": ["promo_pulse", "bright_lift"],
+        "slugs": ["promo_pulse_1", "promo_pulse_2", "bright_lift_1", "bright_lift_2"],
     },
     "bright_vlog": {
         "id": "bright_vlog",
         "label": "밝은 브이로그",
         "description": "리뷰, 일상, 카페",
         "keywords": ["warm", "feel good", "light pop", "vlog"],
-        "slugs": ["light_warm", "bright_lift"],
+        "slugs": ["light_warm_1", "light_warm_2", "bright_lift_3"],
     },
     "info_soft": {
         "id": "info_soft",
         "label": "정보·설명",
         "description": "설치/사용법, 레터박스 정보형",
         "keywords": ["soft corporate", "calm tech", "clean pad"],
-        "slugs": ["soft_pad", "calm_drone"],
+        "slugs": ["soft_pad_1", "soft_pad_2", "calm_drone_1"],
     },
     "calm_mood": {
         "id": "calm_mood",
         "label": "감성·차분",
         "description": "야경, 후기, 롱폼 설명",
         "keywords": ["lofi", "chill", "ambient", "soft drone"],
-        "slugs": ["calm_drone", "soft_pad"],
+        "slugs": ["calm_drone_2", "calm_drone_3", "soft_pad_3"],
     },
     "promo_pulse": {
         "id": "promo_pulse",
         "label": "프로모·세일",
         "description": "할인, CTA, 바이럴 톤",
         "keywords": ["marketing", "pulse", "electronic promo"],
-        "slugs": ["promo_pulse", "bright_lift"],
+        "slugs": ["promo_pulse_3", "promo_pulse_4", "bright_lift_4"],
     },
     "neutral_bed": {
         "id": "neutral_bed",
         "label": "중립 배경",
         "description": "애매할 때 기본",
         "keywords": ["background", "underscore", "gentle"],
-        "slugs": ["soft_pad", "light_warm"],
+        "slugs": ["soft_pad_4", "light_warm_3", "soft_pad_5"],
     },
 }
 
@@ -66,9 +68,21 @@ _MOOD_BY_STYLE = {
 }
 
 _LENGTH_SLUG_BIAS = {
-    "short": ["promo_pulse", "bright_lift", "soft_pad", "light_warm"],
-    "long": ["calm_drone", "light_warm", "soft_pad", "promo_pulse"],
+    "short": ["promo_pulse_1", "bright_lift_1", "soft_pad_1", "light_warm_1"],
+    "long": ["calm_drone_1", "light_warm_1", "soft_pad_1", "promo_pulse_1"],
 }
+
+
+def bundled_bgm_slugs() -> list[str]:
+    """Unique bundled BGM slugs in mood-catalog order."""
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for mood in BGM_MOODS.values():
+        for slug in mood["slugs"]:
+            if slug not in seen:
+                seen.add(slug)
+                ordered.append(slug)
+    return ordered
 
 
 def list_bgm_moods() -> list[dict[str, Any]]:
@@ -111,7 +125,7 @@ def candidate_slugs_for_mood(
     for slug in _LENGTH_SLUG_BIAS[length_key]:
         if slug not in candidates:
             candidates.append(slug)
-    for slug in ("soft_pad", "light_warm", "promo_pulse", "bright_lift", "calm_drone"):
+    for slug in bundled_bgm_slugs():
         if slug not in candidates:
             candidates.append(slug)
     return candidates

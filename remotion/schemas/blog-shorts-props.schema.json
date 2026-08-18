@@ -54,7 +54,8 @@
         "accent": { "type": "string" },
         "transitionSec": { "type": "number", "minimum": 0, "maximum": 2 },
         "transitionType": { "type": "string", "enum": ["fade", "none", "slide"] },
-        "kenBurns": { "type": "boolean" }
+        "kenBurns": { "type": "boolean" },
+        "captionAnimation": { "type": "string", "enum": ["none", "highlight"] }
       }
     },
     "overlay": {
@@ -69,6 +70,7 @@
           "type": "string",
           "enum": ["pretendard", "paperlogy", "gmarket_sans", "suit", "jalnan"]
         },
+        "captionAnimation": { "type": "string", "enum": ["none", "highlight"] },
         "title": { "$ref": "#/$defs/overlayLayer" },
         "subtitle": { "$ref": "#/$defs/overlayLayer" },
         "caption": { "$ref": "#/$defs/overlayLayer" }
@@ -111,6 +113,19 @@
         },
         "text": { "type": "string" },
         "durationSec": { "type": "number", "exclusiveMinimum": 0, "maximum": 120 },
+        "words": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["text", "startSec", "endSec"],
+            "properties": {
+              "text": { "type": "string" },
+              "startSec": { "type": "number" },
+              "endSec": { "type": "number" }
+            }
+          }
+        },
         "backgroundColor": { "type": ["string", "null"] },
         "speaker": { "type": ["string", "null"] }
       }

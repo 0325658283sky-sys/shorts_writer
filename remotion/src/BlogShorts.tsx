@@ -7,6 +7,7 @@ import {
   OffthreadVideo,
   Sequence,
   interpolate,
+  spring,
   staticFile,
   useCurrentFrame,
   useVideoConfig,
@@ -16,6 +17,8 @@ import type {
   BlogBoardProps,
   BlogShortsProps,
   BlogShortsStyleProps,
+  CaptionAnimation,
+  CaptionWordTiming,
   StyleOverlayLayer,
   StyleOverlayProps,
   TransitionType,
@@ -79,6 +82,7 @@ const STYLE_BY_VISUAL: Record<string, BlogShortsStyleProps> = {
     transitionSec: 0.35,
     transitionType: "fade",
     kenBurns: true,
+    captionAnimation: "highlight",
   },
   info_black: {
     layout: "letterbox",
@@ -91,6 +95,7 @@ const STYLE_BY_VISUAL: Record<string, BlogShortsStyleProps> = {
     transitionSec: 0.35,
     transitionType: "fade",
     kenBurns: false,
+    captionAnimation: "highlight",
   },
   info_navy: {
     layout: "letterbox",
@@ -103,6 +108,7 @@ const STYLE_BY_VISUAL: Record<string, BlogShortsStyleProps> = {
     transitionSec: 0.35,
     transitionType: "fade",
     kenBurns: false,
+    captionAnimation: "highlight",
   },
   viral_cyan: {
     layout: "header_stack",
@@ -115,6 +121,7 @@ const STYLE_BY_VISUAL: Record<string, BlogShortsStyleProps> = {
     transitionSec: 0.25,
     transitionType: "slide",
     kenBurns: true,
+    captionAnimation: "highlight",
   },
   card_white: {
     layout: "card",
@@ -127,6 +134,7 @@ const STYLE_BY_VISUAL: Record<string, BlogShortsStyleProps> = {
     transitionSec: 0.35,
     transitionType: "fade",
     kenBurns: true,
+    captionAnimation: "highlight",
   },
   yt_profile: {
     layout: "letterbox",
@@ -139,6 +147,7 @@ const STYLE_BY_VISUAL: Record<string, BlogShortsStyleProps> = {
     transitionSec: 0.35,
     transitionType: "fade",
     kenBurns: false,
+    captionAnimation: "highlight",
   },
 };
 
@@ -218,6 +227,7 @@ function resolveStyle(props: BlogShortsProps): BlogShortsStyleProps {
     transitionSec: props.style.transitionSec ?? props.transitionSec ?? fallback.transitionSec,
     transitionType: props.style.transitionType ?? props.transitionType ?? fallback.transitionType,
     kenBurns: props.style.kenBurns ?? fallback.kenBurns,
+    captionAnimation: props.style.captionAnimation ?? fallback.captionAnimation ?? "highlight",
   };
 }
 
@@ -256,6 +266,7 @@ function mergeOverlay(slug: string, custom?: StyleOverlayProps | null) {
   const out = {
     titleFont: normalizeShortsFontId(custom?.titleFont),
     captionFont: normalizeShortsFontId(custom?.captionFont),
+    captionAnimation: (custom?.captionAnimation === "none" ? "none" : "highlight") as CaptionAnimation,
     title: { ...base.title },
     subtitle: { ...base.subtitle },
     caption: { ...base.caption },
@@ -386,21 +397,21 @@ function TitleLayers({
 }
 
 function CaptionBlock({
-  text,
+  children,
   caption,
   layer,
   captionFontId,
   captionY,
   captionOpacity,
 }: {
-  text: string;
+  children: React.ReactNode;
   caption: BlogShortsStyleProps["caption"];
   layer: StyleOverlayLayer;
   captionFontId: string;
   captionY: number;
   captionOpacity: number;
 }) {
-  if (!layer.visible || !text.trim()) return null;
+  if (!layer.visible) return null;
   const captionFont = shortsFontCss(captionFontId, "caption");
 
   const box: React.CSSProperties = {
@@ -430,7 +441,7 @@ function CaptionBlock({
               "0 0 0 #000, 3px 3px 0 #000, -3px 3px 0 #000, 3px -3px 0 #000, -3px -3px 0 #000",
           }}
         >
-          {text}
+          {children}
         </div>
       </div>
     );
@@ -454,7 +465,7 @@ function CaptionBlock({
               "0 2px 0 #000, 2px 0 0 #000, -2px 0 0 #000, 0 -2px 0 #000, 0 3px 10px rgba(0,0,0,0.55)",
           }}
         >
-          {text}
+          {children}
         </div>
       </div>
     );
@@ -479,7 +490,7 @@ function CaptionBlock({
             whiteSpace: "pre-wrap",
           }}
         >
-          {text}
+          {children}
         </div>
       </div>
     );
@@ -506,9 +517,102 @@ function CaptionBlock({
           boxShadow: "0 10px 28px rgba(0,0,0,0.18)",
         }}
       >
-        {text}
+        {children}
       </div>
     </div>
+  );
+}
+
+function activeWordIndex(words: CaptionWordTiming[], timeSec: number): number {
+  if (!words.length) return -1;
+  for (let index = 0; index < words.length; index += 1) {
+    const word = words[index];
+    if (timeSec >= word.startSec && timeSec < word.endSec) return index;
+  }
+  if (timeSec >= words[words.length - 1].endSec) return words.length - 1;
+  return 0;
+}
+
+function KineticCaptionBlock({
+  text,
+  words,
+  caption,
+  layer,
+  captionFontId,
+  captionY,
+  captionOpacity,
+  captionAnimation,
+}: {
+  text: string;
+  words?: CaptionWordTiming[] | null;
+  caption: BlogShortsStyleProps["caption"];
+  layer: StyleOverlayLayer;
+  captionFontId: string;
+  captionY: number;
+  captionOpacity: number;
+  captionAnimation: CaptionAnimation;
+}) {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const trimmed = text.trim();
+  if (!layer.visible || !trimmed) return null;
+
+  const timed = (words ?? []).filter((word) => Boolean(word?.text));
+  const staticCaption = captionAnimation === "none" || timed.length === 0;
+
+  if (staticCaption) {
+    return (
+      <CaptionBlock
+        caption={caption}
+        layer={layer}
+        captionFontId={captionFontId}
+        captionY={captionY}
+        captionOpacity={captionOpacity}
+      >
+        {text}
+      </CaptionBlock>
+    );
+  }
+
+  const timeSec = frame / fps;
+  const active = activeWordIndex(timed, timeSec);
+  const highlight = caption === "white_pill" ? "#E85D04" : "#FFE566";
+
+  return (
+    <CaptionBlock
+      caption={caption}
+      layer={layer}
+      captionFontId={captionFontId}
+      captionY={captionY}
+      captionOpacity={captionOpacity}
+    >
+      {timed.map((word, index) => {
+        const isActive = index === active;
+        const local = Math.max(0, frame - Math.round(word.startSec * fps));
+        const pop = isActive
+          ? spring({
+              frame: local,
+              fps,
+              config: { damping: 14, stiffness: 180, mass: 0.35 },
+            })
+          : 0;
+        const scale = interpolate(pop, [0, 1], [1, 1.08], { extrapolateRight: "clamp" });
+        return (
+          <span
+            key={`${word.startSec}-${index}`}
+            style={{
+              display: "inline-block",
+              color: isActive ? highlight : undefined,
+              transform: `scale(${scale})`,
+              transformOrigin: "center bottom",
+            }}
+          >
+            {word.text}
+            {index < timed.length - 1 ? " " : ""}
+          </span>
+        );
+      })}
+    </CaptionBlock>
   );
 }
 
@@ -842,13 +946,15 @@ function BoardCaption({
 
   // Hard-cut captions — never share fade/slide with media transitions.
   return (
-    <CaptionBlock
+    <KineticCaptionBlock
       text={board.text}
+      words={board.words}
       caption={style.caption}
       layer={overlay.caption}
       captionFontId={overlay.captionFont}
       captionY={0}
       captionOpacity={1}
+      captionAnimation={overlay.captionAnimation ?? style.captionAnimation ?? "highlight"}
     />
   );
 }

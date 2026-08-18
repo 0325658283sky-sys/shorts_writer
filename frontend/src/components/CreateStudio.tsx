@@ -161,7 +161,7 @@ export function CreateStudio({
                 </select>
               </label>
               <label className="create-field inline-field">
-                <span>AI 모델 (임시)</span>
+                <span>훅 대본 모델</span>
                 <select
                   value={blogScriptModel}
                   onChange={(event) => onBlogScriptModelChange(event.target.value as ScriptModel)}

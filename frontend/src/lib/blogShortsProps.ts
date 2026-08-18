@@ -1,4 +1,4 @@
-import type { BlogShortsProps, BlogShortsStyleProps, TransitionType } from "@new-cut/remotion/types";
+import type { BlogShortsProps, BlogShortsStyleProps, CaptionWordTiming, TransitionType } from "@new-cut/remotion/types";
 import type { BlogClip, Board } from "../types";
 import { mergeStyleOverlay } from "./styleOverlay";
 
@@ -29,6 +29,7 @@ const STYLE_BY_VISUAL: Record<string, BlogShortsStyleProps> = {
     transitionSec: 0.35,
     transitionType: "fade",
     kenBurns: true,
+    captionAnimation: "highlight",
   },
   info_black: {
     layout: "letterbox",
@@ -41,6 +42,7 @@ const STYLE_BY_VISUAL: Record<string, BlogShortsStyleProps> = {
     transitionSec: 0.35,
     transitionType: "fade",
     kenBurns: false,
+    captionAnimation: "highlight",
   },
   info_navy: {
     layout: "letterbox",
@@ -53,6 +55,7 @@ const STYLE_BY_VISUAL: Record<string, BlogShortsStyleProps> = {
     transitionSec: 0.35,
     transitionType: "fade",
     kenBurns: false,
+    captionAnimation: "highlight",
   },
   viral_cyan: {
     layout: "header_stack",
@@ -65,6 +68,7 @@ const STYLE_BY_VISUAL: Record<string, BlogShortsStyleProps> = {
     transitionSec: 0.25,
     transitionType: "slide",
     kenBurns: true,
+    captionAnimation: "highlight",
   },
   card_white: {
     layout: "card",
@@ -77,6 +81,7 @@ const STYLE_BY_VISUAL: Record<string, BlogShortsStyleProps> = {
     transitionSec: 0.35,
     transitionType: "fade",
     kenBurns: true,
+    captionAnimation: "highlight",
   },
   yt_profile: {
     layout: "letterbox",
@@ -89,8 +94,25 @@ const STYLE_BY_VISUAL: Record<string, BlogShortsStyleProps> = {
     transitionSec: 0.35,
     transitionType: "fade",
     kenBurns: false,
+    captionAnimation: "highlight",
   },
 };
+
+export function estimateWordTimings(text: string, durationSec: number): CaptionWordTiming[] {
+  const words = (text || "").split(/\s+/).filter(Boolean);
+  if (!words.length) return [];
+  const duration = Math.max(0, durationSec);
+  const weights = words.map((word) => Math.max(1, word.length));
+  const total = weights.reduce((sum, weight) => sum + weight, 0);
+  let cursor = 0;
+  return words.map((word, index) => {
+    const span = total ? duration * (weights[index] / total) : 0;
+    const startSec = Math.round(cursor * 1000) / 1000;
+    cursor += span;
+    const endSec = Math.round(cursor * 1000) / 1000;
+    return { text: word, startSec, endSec };
+  });
+}
 
 export function normalizeVisualStyleSlug(slug?: string | null): string {
   const key = (slug || "impact_full").trim().toLowerCase();
@@ -149,18 +171,23 @@ export function buildBlogShortsProps(options: {
     style,
     overlay,
     suppressText: Boolean(suppressText),
-    boards: boards.map((board) => ({
-      boardId: board.id,
-      imageUrl: imageUrls[board.id] ?? null,
-      // Blob preview URLs lack .gif — Remotion MediaLayer needs this flag.
-      animated: boardIsAnimatedPath(board.image_path),
-      text: board.id === selectedBoardId ? draftText : board.text,
-      durationSec:
+    boards: boards.map((board) => {
+      const text = board.id === selectedBoardId ? draftText : board.text;
+      const durationSec =
         board.duration_seconds != null && board.duration_seconds > 0
           ? board.duration_seconds
-          : DEFAULT_BOARD_DURATION_SEC,
-      backgroundColor: null,
-      speaker: board.speaker,
-    })),
+          : DEFAULT_BOARD_DURATION_SEC;
+      return {
+        boardId: board.id,
+        imageUrl: imageUrls[board.id] ?? null,
+        // Blob preview URLs lack .gif — Remotion MediaLayer needs this flag.
+        animated: boardIsAnimatedPath(board.image_path),
+        text,
+        durationSec,
+        words: estimateWordTimings(text || "", durationSec),
+        backgroundColor: null,
+        speaker: board.speaker,
+      };
+    }),
   };
 }

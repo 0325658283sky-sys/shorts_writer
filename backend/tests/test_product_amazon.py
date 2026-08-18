@@ -92,3 +92,89 @@ def test_ensure_min_images_pads_with_first(monkeypatch):
         "https://img.example/a.jpg",
     ]
     assert _ensure_min_images([]) == []
+
+
+def test_amazon_classify_falls_back_when_vision_errors(monkeypatch):
+    from app.services.product_service import classify_product_images
+    import app.services.product_image_filter as image_filter
+
+    monkeypatch.setattr(image_filter.settings, "openai_api_key", "sk-test")
+
+    def _boom(**_kwargs):
+        raise RuntimeError("quota exceeded")
+
+    monkeypatch.setattr(image_filter, "OpenAI", _boom)
+    urls = [
+        "https://m.media-amazon.com/images/I/banner.jpg",
+        "https://m.media-amazon.com/images/I/hero.jpg",
+    ]
+    assert classify_product_images(urls, "Test Gadget Pro") == []
+
+
+def test_amazon_vision_failure_keeps_scrape_order(monkeypatch):
+    from pathlib import Path
+
+    from app.services.product_image_filter import reorder_downloaded_product_images
+
+    scraped = [
+        (Path("1.jpg"), "https://m.media-amazon.com/images/I/banner.jpg"),
+        (Path("2.jpg"), "https://m.media-amazon.com/images/I/chart.jpg"),
+        (Path("3.jpg"), "https://m.media-amazon.com/images/I/hero.jpg"),
+    ]
+
+    def _fail(_urls, _title):
+        raise RuntimeError("vision unavailable")
+
+    monkeypatch.setattr(
+        "app.services.product_image_filter.classify_product_images",
+        _fail,
+    )
+    ranked = reorder_downloaded_product_images(scraped, "Test Gadget Pro")
+    assert ranked == scraped
+
+
+def test_amazon_banner_and_size_chart_rank_below_product_shot(monkeypatch):
+    from pathlib import Path
+
+    from app.services.product_image_filter import reorder_downloaded_product_images
+
+    hero = "https://m.media-amazon.com/images/I/hero.jpg"
+    banner = "https://m.media-amazon.com/images/I/banner.jpg"
+    chart = "https://m.media-amazon.com/images/I/chart.jpg"
+    scraped = [
+        (Path("1.jpg"), banner),
+        (Path("2.jpg"), chart),
+        (Path("3.jpg"), hero),
+    ]
+    monkeypatch.setattr(
+        "app.services.product_image_filter.classify_product_images",
+        lambda _urls, _title: [
+            {"url": banner, "category": "banner_text", "score": 6},
+            {"url": chart, "category": "size_chart", "score": 11},
+            {"url": hero, "category": "product_shot", "score": 94},
+        ],
+    )
+    ranked = reorder_downloaded_product_images(scraped, "Test Gadget Pro")
+    assert [url for _path, url in ranked] == [hero, chart, banner]
+
+
+def test_amazon_pipeline_ranking_never_raises(monkeypatch):
+    from pathlib import Path
+
+    from app.services.blog_service import _maybe_rank_product_images
+
+    downloaded = [(Path("1.jpg"), "https://m.media-amazon.com/images/I/a.jpg")]
+
+    def _fail(_downloaded, _title):
+        raise RuntimeError("vision ranking exploded")
+
+    monkeypatch.setattr(
+        "app.services.product_image_filter.reorder_downloaded_product_images",
+        _fail,
+    )
+    out = _maybe_rank_product_images(
+        "https://www.amazon.com/dp/B08N5WRWNW",
+        "Test Gadget Pro",
+        downloaded,
+    )
+    assert out == downloaded

@@ -8,7 +8,7 @@ export type TargetLength = "short" | "long";
 export type NarrationLanguage = "original" | "ko" | "en" | "ja";
 export type ScriptModel = "gpt-4o-mini" | "gpt-4o";
 export type TtsMode = "original_audio" | "ai_narration";
-export type WizardBoardsStep = "video_style" | "edit_mode" | "quick" | "ready";
+export type WizardBoardsStep = "video_style" | "quick" | "ready";
 export type VisualStyleSlug =
   | "impact_full"
   | "info_black"
@@ -44,14 +44,12 @@ export type VisualStyle = {
   recommendedAutoSfx?: boolean;
 };
 
-/** Normalize persisted wizard_step; legacy boards/voice/style → edit_mode. */
+/** Normalize persisted wizard_step; legacy fork/linear steps → video_style. */
 export function parseWizardBoardsStep(value: string | null | undefined): WizardBoardsStep {
-  if (value === "video_style" || value === "quick" || value === "ready" || value === "edit_mode") {
+  if (value === "video_style" || value === "quick" || value === "ready") {
     return value;
   }
-  // Legacy linear steps collapse into the new fork screen.
-  if (value === "boards" || value === "voice" || value === "style") return "edit_mode";
-  return "edit_mode";
+  return "video_style";
 }
 
 export type User = {
@@ -216,6 +214,7 @@ export type BlogClip = {
   style_overlay?: {
     titleFont?: string;
     captionFont?: string;
+    captionAnimation?: "none" | "highlight";
     title?: Partial<{
       x: number;
       y: number;

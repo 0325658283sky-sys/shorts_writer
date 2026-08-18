@@ -21,6 +21,7 @@ export type StyleOverlayLayer = {
 export type StyleOverlay = {
   titleFont: ShortsFontId;
   captionFont: ShortsFontId;
+  captionAnimation: "none" | "highlight";
   title: StyleOverlayLayer;
   subtitle: StyleOverlayLayer;
   caption: StyleOverlayLayer;
@@ -29,6 +30,7 @@ export type StyleOverlay = {
 export type StyleOverlayPatch = {
   titleFont?: ShortsFontId | string;
   captionFont?: ShortsFontId | string;
+  captionAnimation?: "none" | "highlight";
   title?: Partial<StyleOverlayLayer>;
   subtitle?: Partial<StyleOverlayLayer>;
   caption?: Partial<StyleOverlayLayer>;
@@ -39,6 +41,7 @@ const DEFAULT_OVERLAYS: Record<string, StyleOverlay> = {
   impact_full: {
     titleFont: DEFAULT_SHORTS_FONT_ID,
     captionFont: DEFAULT_SHORTS_FONT_ID,
+    captionAnimation: "highlight",
     title: { x: 0.5, y: 0.08, fontSize: 72, color: "#ffffff", align: "center", maxWidth: 0.86, visible: false },
     subtitle: { x: 0.5, y: 0.14, fontSize: 56, color: "#ffffff", align: "center", maxWidth: 0.86, visible: false },
     caption: { x: 0.5, y: 0.42, fontSize: 92, color: "#ffffff", align: "center", maxWidth: 0.82, visible: true },
@@ -47,6 +50,7 @@ const DEFAULT_OVERLAYS: Record<string, StyleOverlay> = {
   info_black: {
     titleFont: DEFAULT_SHORTS_FONT_ID,
     captionFont: DEFAULT_SHORTS_FONT_ID,
+    captionAnimation: "highlight",
     title: { x: 0.5, y: 0.055, fontSize: 110, color: "#ffffff", align: "center", maxWidth: 0.92, visible: true },
     subtitle: { x: 0.5, y: 0.118, fontSize: 110, color: "#FFE566", align: "center", maxWidth: 0.92, visible: true },
     caption: { x: 0.5, y: 0.70, fontSize: 48, color: "#ffffff", align: "center", maxWidth: 0.88, visible: true },
@@ -54,6 +58,7 @@ const DEFAULT_OVERLAYS: Record<string, StyleOverlay> = {
   info_navy: {
     titleFont: DEFAULT_SHORTS_FONT_ID,
     captionFont: DEFAULT_SHORTS_FONT_ID,
+    captionAnimation: "highlight",
     title: { x: 0.5, y: 0.055, fontSize: 110, color: "#ffffff", align: "center", maxWidth: 0.92, visible: true },
     subtitle: { x: 0.5, y: 0.118, fontSize: 110, color: "#7CFFB2", align: "center", maxWidth: 0.92, visible: true },
     caption: { x: 0.5, y: 0.685, fontSize: 46, color: "#ffffff", align: "center", maxWidth: 0.86, visible: true },
@@ -61,6 +66,7 @@ const DEFAULT_OVERLAYS: Record<string, StyleOverlay> = {
   viral_cyan: {
     titleFont: DEFAULT_SHORTS_FONT_ID,
     captionFont: DEFAULT_SHORTS_FONT_ID,
+    captionAnimation: "highlight",
     title: { x: 0.5, y: 0.05, fontSize: 110, color: "#5EF2D0", align: "center", maxWidth: 0.92, visible: true },
     subtitle: { x: 0.5, y: 0.113, fontSize: 110, color: "#ffffff", align: "center", maxWidth: 0.92, visible: true },
     caption: { x: 0.5, y: 0.64, fontSize: 46, color: "#ffffff", align: "center", maxWidth: 0.84, visible: true },
@@ -68,6 +74,7 @@ const DEFAULT_OVERLAYS: Record<string, StyleOverlay> = {
   card_white: {
     titleFont: DEFAULT_SHORTS_FONT_ID,
     captionFont: DEFAULT_SHORTS_FONT_ID,
+    captionAnimation: "highlight",
     title: { x: 0.5, y: 0.05, fontSize: 110, color: "#151515", align: "center", maxWidth: 0.9, visible: true },
     subtitle: { x: 0.5, y: 0.113, fontSize: 110, color: "#151515", align: "center", maxWidth: 0.9, visible: false },
     caption: { x: 0.5, y: 0.72, fontSize: 44, color: "#151515", align: "center", maxWidth: 0.84, visible: true },
@@ -75,6 +82,7 @@ const DEFAULT_OVERLAYS: Record<string, StyleOverlay> = {
   yt_profile: {
     titleFont: DEFAULT_SHORTS_FONT_ID,
     captionFont: DEFAULT_SHORTS_FONT_ID,
+    captionAnimation: "highlight",
     title: { x: 0.5, y: 0.06, fontSize: 92, color: "#ffffff", align: "center", maxWidth: 0.9, visible: true },
     subtitle: { x: 0.5, y: 0.125, fontSize: 92, color: "#FFE566", align: "center", maxWidth: 0.9, visible: true },
     caption: { x: 0.5, y: 0.58, fontSize: 40, color: "#ffffff", align: "center", maxWidth: 0.86, visible: true },
@@ -85,6 +93,7 @@ function cloneOverlay(overlay: StyleOverlay): StyleOverlay {
   return {
     titleFont: overlay.titleFont,
     captionFont: overlay.captionFont,
+    captionAnimation: overlay.captionAnimation,
     title: { ...overlay.title },
     subtitle: { ...overlay.subtitle },
     caption: { ...overlay.caption },
@@ -104,6 +113,9 @@ export function mergeStyleOverlay(
   if (!custom) return base;
   if (custom.titleFont != null) base.titleFont = normalizeShortsFontId(custom.titleFont);
   if (custom.captionFont != null) base.captionFont = normalizeShortsFontId(custom.captionFont);
+  if (custom.captionAnimation === "none" || custom.captionAnimation === "highlight") {
+    base.captionAnimation = custom.captionAnimation;
+  }
   for (const key of ["title", "subtitle", "caption"] as const) {
     const layer = custom[key];
     if (!layer) continue;

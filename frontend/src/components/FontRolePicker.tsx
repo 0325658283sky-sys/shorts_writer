@@ -8,7 +8,7 @@ type Props = {
   titleFont: string;
   captionFont: string;
   disabled?: boolean;
-  onChange: (next: { titleFont: ShortsFontId | string; captionFont: ShortsFontId | string }) => void;
+  onChange: (next: { titleFont: ShortsFontId; captionFont: ShortsFontId }) => void;
   /** When set, only show the control for that role (toolbar mode). */
   focusRole?: "title" | "caption";
 };

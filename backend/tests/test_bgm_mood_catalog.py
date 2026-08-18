@@ -46,10 +46,19 @@ def test_resolve_mood_legacy_style_slug():
 
 
 def test_candidate_slugs_priority():
-    assert candidate_slugs_for_mood("hook_upbeat")[0] == "promo_pulse"
-    assert candidate_slugs_for_mood("info_soft")[0] == "soft_pad"
-    assert candidate_slugs_for_mood("calm_mood")[0] == "calm_drone"
-    assert get_bgm_mood("promo_pulse")["slugs"][0] == "promo_pulse"
+    assert candidate_slugs_for_mood("hook_upbeat")[0] == "promo_pulse_1"
+    assert candidate_slugs_for_mood("info_soft")[0] == "soft_pad_1"
+    assert candidate_slugs_for_mood("calm_mood")[0] == "calm_drone_2"
+    assert get_bgm_mood("promo_pulse")["slugs"][0] == "promo_pulse_3"
+
+
+def test_each_mood_has_at_least_three_tracks():
+    from app.services.bgm_mood_catalog import bundled_bgm_slugs
+
+    moods = list_bgm_moods()
+    for mood in moods:
+        assert len(mood["slugs"]) >= 3
+    assert len(bundled_bgm_slugs()) >= 15
 
 
 def test_resolve_candidate_slugs_with_explicit_mood():
@@ -60,4 +69,4 @@ def test_resolve_candidate_slugs_with_explicit_mood():
         target_length="short",
     )
     assert mood_id == "bright_vlog"
-    assert slugs[0] == "light_warm"
+    assert slugs[0] == "light_warm_1"

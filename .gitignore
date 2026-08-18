@@ -17,7 +17,11 @@ remotion/public/clips/
 
 # Local media outputs
 backend/app/storage/uploads/
-backend/app/storage/audio/
+backend/app/storage/audio/*
+!backend/app/storage/audio/system/
+backend/app/storage/audio/system/*
+!backend/app/storage/audio/system/LICENSES.md
+!backend/app/storage/audio/system/.gitkeep
 backend/app/storage/transcripts/
 backend/app/storage/subtitles/
 backend/app/storage/outputs/

@@ -6,6 +6,7 @@ from app.services.remotion_props_service import (
     build_blog_shorts_props,
     build_remotion_render_props,
     resolve_board_duration_sec,
+    _estimate_word_timings,
     _props_from_boards,
 )
 from tests.conftest import make_blog_clip, make_board
@@ -19,6 +20,25 @@ def test_resolve_board_duration_uses_board_value():
 def test_resolve_board_duration_defaults_when_missing():
     board = make_board(duration_seconds=None)
     assert resolve_board_duration_sec(board) == DEFAULT_BOARD_DURATION_SEC
+
+
+def test_estimate_word_timings_empty_and_single_word():
+    assert _estimate_word_timings("", 3.0) == []
+    assert _estimate_word_timings("   ", 3.0) == []
+    words = _estimate_word_timings("훅", 2.0)
+    assert len(words) == 1
+    assert words[0]["text"] == "훅"
+    assert words[0]["startSec"] == 0.0
+    assert words[0]["endSec"] == 2.0
+
+
+def test_estimate_word_timings_weights_by_character_length():
+    words = _estimate_word_timings("가나 다", 3.0)
+    assert [item["text"] for item in words] == ["가나", "다"]
+    assert words[0]["startSec"] == 0.0
+    assert words[0]["endSec"] == 2.0
+    assert words[1]["startSec"] == 2.0
+    assert words[1]["endSec"] == 3.0
 
 
 def test_props_from_boards_applies_clip_transition_overrides(conn):
@@ -50,6 +70,8 @@ def test_props_from_boards_applies_clip_transition_overrides(conn):
     assert len(props["boards"]) == 2
     assert props["boards"][0]["durationSec"] == 3.0
     assert props["boards"][1]["durationSec"] == DEFAULT_BOARD_DURATION_SEC
+    assert props["boards"][0]["words"] == _estimate_word_timings("하나", 3.0)
+    assert props["style"]["captionAnimation"] == "highlight"
     assert props["boards"][0]["imageUrl"].endswith("/blog-clips/1/boards/1/image")
 
 

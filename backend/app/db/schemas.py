@@ -194,8 +194,8 @@ class BlogClipCreateRequest(BaseModel):
     style: SubtitleStyle = "shorts"
     target_length: TargetLength = "short"
     narration_language: NarrationLanguage = "original"
-    # Temporary per-job override for narration/metadata GPT calls.
-    script_model: ScriptModel = "gpt-4o-mini"
+    # Hook-tone override. Default gpt-4o; pass gpt-4o-mini to force the cheaper hook path.
+    script_model: ScriptModel = "gpt-4o"
 
 
 class BlogClipSelectScriptRequest(BaseModel):
@@ -231,13 +231,21 @@ class BoardResponse(BaseModel):
     updated_at: str
 
 
+class BlogShortsWordTiming(BaseModel):
+    text: str
+    startSec: float
+    endSec: float
+
+
 class BlogShortsBoardProps(BaseModel):
     """Remotion BlogShorts board (see remotion/schemas/blog-shorts-props.schema.json)."""
 
     boardId: int | None = None
     imageUrl: str | None = None
+    animated: bool | None = None
     text: str
     durationSec: float = Field(gt=0, le=120)
+    words: list[BlogShortsWordTiming] | None = None
     backgroundColor: str | None = None
     speaker: str | None = None
 
@@ -253,6 +261,7 @@ class BlogShortsStyleProps(BaseModel):
     transitionSec: float = 0.35
     transitionType: Literal["fade", "none", "slide"] = "fade"
     kenBurns: bool = True
+    captionAnimation: Literal["none", "highlight"] = "highlight"
 
 
 class StyleOverlayLayer(BaseModel):
@@ -268,6 +277,7 @@ class StyleOverlayLayer(BaseModel):
 class StyleOverlayProps(BaseModel):
     titleFont: str | None = None
     captionFont: str | None = None
+    captionAnimation: Literal["none", "highlight"] | None = None
     title: StyleOverlayLayer | None = None
     subtitle: StyleOverlayLayer | None = None
     caption: StyleOverlayLayer | None = None
@@ -527,7 +537,7 @@ class BlogClipResponse(BaseModel):
     active_version_id: int | None = None
     target_length: str = "short"
     narration_language: str = "original"
-    script_model: str = "gpt-4o-mini"
+    script_model: str = "gpt-4o"
     default_voice: str | None = None
     auto_bgm: bool = False
     auto_sfx: bool = False

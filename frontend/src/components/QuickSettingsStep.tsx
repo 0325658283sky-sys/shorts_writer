@@ -15,6 +15,7 @@ export function QuickSettingsStep({
   onSaveDefaultVoice,
   onAudioSettings,
   onBack,
+  onOpenBoardEditor,
   onRender,
   onMessage,
 }: {
@@ -28,6 +29,7 @@ export function QuickSettingsStep({
     bgm_asset_id?: number | null;
   }) => Promise<void>;
   onBack: () => void;
+  onOpenBoardEditor?: () => void;
   onRender: () => void;
   onMessage: (message: string) => void;
 }) {
@@ -137,7 +139,7 @@ export function QuickSettingsStep({
 
   return (
     <section className="flow-card">
-      <p className="create-kicker">퀵 모드</p>
+      <p className="create-kicker">오디오</p>
       <h1>보이스와 오디오를 정하세요</h1>
       <p className="flow-lead">
         영상 스타일은 이전 단계에서 적용됩니다. 보이스를 고르지 않으면 목록의 첫 보이스가 기본으로 쓰입니다.
@@ -274,6 +276,11 @@ export function QuickSettingsStep({
         <button className="ghost-button" type="button" onClick={onBack} disabled={blocked}>
           ← 스타일
         </button>
+        {onOpenBoardEditor ? (
+          <button className="ghost-button" type="button" onClick={onOpenBoardEditor} disabled={blocked}>
+            보드 직접 편집
+          </button>
+        ) : null}
         <button className="cta-button flow-primary-cta" type="button" disabled={blocked} onClick={() => void handleRender()}>
           {submitting || busy ? "시작 중…" : "프로젝트 만들기"}
         </button>

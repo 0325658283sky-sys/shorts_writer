@@ -8,6 +8,8 @@ from typing import Any
 DEFAULT_VISUAL_STYLE = "impact_full"
 ALLOWED_TRANSITION_TYPES = frozenset({"fade", "none", "slide"})
 DEFAULT_TRANSITION_TYPE = "fade"
+ALLOWED_CAPTION_ANIMATIONS = frozenset({"none", "highlight"})
+DEFAULT_CAPTION_ANIMATION = "highlight"
 DEFAULT_FONT_ID = "gmarket_sans"
 ALLOWED_FONT_IDS = frozenset(
     {"pretendard", "paperlogy", "gmarket_sans", "suit", "jalnan"}
@@ -128,9 +130,10 @@ VISUAL_STYLES: dict[str, dict[str, Any]] = {
         "transitionSec": 0.35,
         "transitionType": "fade",
         "kenBurns": True,
+        "captionAnimation": "highlight",
         "packHint": "브라이트 BGM · 전환 SFX",
         "recommendedVoice": "alloy",
-        "recommendedBgmSlug": "bright_lift",
+        "recommendedBgmSlug": "bright_lift_1",
         "recommendedAutoSfx": True,
     },
     "info_black": {
@@ -149,9 +152,10 @@ VISUAL_STYLES: dict[str, dict[str, Any]] = {
         "transitionSec": 0.35,
         "transitionType": "fade",
         "kenBurns": False,
+        "captionAnimation": "highlight",
         "packHint": "소프트 패드 BGM",
         "recommendedVoice": "nova",
-        "recommendedBgmSlug": "soft_pad",
+        "recommendedBgmSlug": "soft_pad_1",
         "recommendedAutoSfx": False,
     },
     "info_navy": {
@@ -170,9 +174,10 @@ VISUAL_STYLES: dict[str, dict[str, Any]] = {
         "transitionSec": 0.35,
         "transitionType": "fade",
         "kenBurns": False,
+        "captionAnimation": "highlight",
         "packHint": "칼름 드론 BGM",
         "recommendedVoice": "onyx",
-        "recommendedBgmSlug": "calm_drone",
+        "recommendedBgmSlug": "calm_drone_1",
         "recommendedAutoSfx": False,
     },
     "viral_cyan": {
@@ -191,9 +196,10 @@ VISUAL_STYLES: dict[str, dict[str, Any]] = {
         "transitionSec": 0.25,
         "transitionType": "slide",
         "kenBurns": True,
+        "captionAnimation": "highlight",
         "packHint": "프로모 펄스 · 전환 SFX",
         "recommendedVoice": "shimmer",
-        "recommendedBgmSlug": "promo_pulse",
+        "recommendedBgmSlug": "promo_pulse_3",
         "recommendedAutoSfx": True,
     },
     "card_white": {
@@ -212,9 +218,10 @@ VISUAL_STYLES: dict[str, dict[str, Any]] = {
         "transitionSec": 0.35,
         "transitionType": "fade",
         "kenBurns": True,
+        "captionAnimation": "highlight",
         "packHint": "라이트 웜 BGM",
         "recommendedVoice": "nova",
-        "recommendedBgmSlug": "light_warm",
+        "recommendedBgmSlug": "light_warm_1",
         "recommendedAutoSfx": False,
     },
     "yt_profile": {
@@ -233,9 +240,10 @@ VISUAL_STYLES: dict[str, dict[str, Any]] = {
         "transitionSec": 0.35,
         "transitionType": "fade",
         "kenBurns": False,
+        "captionAnimation": "highlight",
         "packHint": "정보형 쇼츠 · 채널 프로필",
         "recommendedVoice": "onyx",
-        "recommendedBgmSlug": "calm_drone",
+        "recommendedBgmSlug": "calm_drone_2",
         "recommendedAutoSfx": False,
     },
 }
@@ -274,13 +282,23 @@ def normalize_transition_type(value: str | None) -> str:
     return DEFAULT_TRANSITION_TYPE
 
 
+def normalize_caption_animation(value: str | None) -> str:
+    if value and value in ALLOWED_CAPTION_ANIMATIONS:
+        return value
+    return DEFAULT_CAPTION_ANIMATION
+
+
 def resolve_visual_style(slug: str | None) -> dict[str, Any]:
     return dict(VISUAL_STYLES[normalize_visual_style(slug)])
 
 
 def default_style_overlay(slug: str | None) -> dict[str, Any]:
     key = normalize_visual_style(slug)
-    return copy.deepcopy(DEFAULT_OVERLAYS[key])
+    overlay = copy.deepcopy(DEFAULT_OVERLAYS[key])
+    overlay["captionAnimation"] = resolve_visual_style(key).get(
+        "captionAnimation", DEFAULT_CAPTION_ANIMATION
+    )
+    return overlay
 
 
 def merge_style_overlay(slug: str | None, custom: dict[str, Any] | None) -> dict[str, Any]:
@@ -291,6 +309,8 @@ def merge_style_overlay(slug: str | None, custom: dict[str, Any] | None) -> dict
         base["titleFont"] = normalize_font_id(str(custom.get("titleFont") or ""))
     if "captionFont" in custom:
         base["captionFont"] = normalize_font_id(str(custom.get("captionFont") or ""))
+    if "captionAnimation" in custom:
+        base["captionAnimation"] = normalize_caption_animation(str(custom.get("captionAnimation") or ""))
     for key in ALLOWED_OVERLAY_KEYS:
         layer = custom.get(key)
         if not isinstance(layer, dict):
@@ -322,6 +342,8 @@ def sanitize_style_overlay(payload: dict[str, Any] | None) -> dict[str, Any]:
         out["titleFont"] = normalize_font_id(str(payload.get("titleFont") or ""))
     if "captionFont" in payload:
         out["captionFont"] = normalize_font_id(str(payload.get("captionFont") or ""))
+    if "captionAnimation" in payload:
+        out["captionAnimation"] = normalize_caption_animation(str(payload.get("captionAnimation") or ""))
     for key in ALLOWED_OVERLAY_KEYS:
         layer = payload.get(key)
         if not isinstance(layer, dict):
@@ -359,6 +381,7 @@ def remotion_style_payload(slug: str | None) -> dict[str, Any]:
         "transitionSec": style["transitionSec"],
         "transitionType": style.get("transitionType", DEFAULT_TRANSITION_TYPE),
         "kenBurns": style["kenBurns"],
+        "captionAnimation": style.get("captionAnimation", DEFAULT_CAPTION_ANIMATION),
     }
 
 

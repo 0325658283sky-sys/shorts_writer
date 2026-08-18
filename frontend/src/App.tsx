@@ -4,13 +4,16 @@ import { AuthPanel } from "./components/AuthPanel";
 import { BlogClipFlow } from "./components/BlogClipFlow";
 import { BoardEditor } from "./components/board/BoardEditor";
 import { Dashboard } from "./components/Dashboard";
+import { StudioShell } from "./components/StudioShell";
 import { type YoutubePreview } from "./components/YoutubeConfirmStep";
 import { YoutubeClipFlow } from "./components/YoutubeClipFlow";
 import { YoutubeWorkspaceEditor } from "./components/YoutubeWorkspaceEditor";
 import {
   BLOG_CLIP_POLL_INTERVAL_MS,
+  BLOG_CLIP_STATUS_LABELS,
   CLIP_STATUS_LABELS,
   TOKEN_KEY,
+  VIDEO_STATUS_LABELS,
 } from "./constants";
 import {
   parseAppRoute,
@@ -1150,14 +1153,34 @@ export function App() {
     writeAppRoute({ kind: "studio", tab: "create" }, "replace");
   }
 
-  if (view === "dashboard" && user && editingYoutubeClip) {
-    const workspaceTitle =
-      editingYoutubeMeta?.title ||
-      editingYoutubeVideo?.original_filename ||
-      `영상 #${editingYoutubeClip.video_id}`;
-    const workspaceStyle = editingYoutubeMeta?.visualStyle || preferredYoutubeVisualStyle || "yt_profile";
-    return (
-      <main className="app-root">
+  if (view === "dashboard" && user) {
+    const isBoardEditor = Boolean(editingBlogClip && editingBlogClip.status === "awaiting_boards");
+    const isYoutubeEditor = Boolean(editingYoutubeClip);
+    const isEditor = isBoardEditor || isYoutubeEditor;
+    const isFlow = !isEditor && Boolean(focusYoutubeVideo || focusBlogClip);
+    const bodyMode = isEditor ? "editor" : isFlow ? "flow" : "page";
+    const title = isYoutubeEditor
+      ? "쇼츠 세부 편집"
+      : isBoardEditor
+        ? "보드 편집"
+        : focusBlogClip
+          ? focusBlogClip.blog_title || "쇼츠"
+          : focusYoutubeVideo
+            ? focusYoutubeMeta?.title || focusYoutubeVideo.original_filename || "영상"
+            : studioNav === "projects"
+              ? "프로젝트"
+              : studioNav === "usage"
+                ? "요금 · 사용량"
+                : "만들기";
+
+    let body;
+    if (editingYoutubeClip) {
+      const workspaceTitle =
+        editingYoutubeMeta?.title ||
+        editingYoutubeVideo?.original_filename ||
+        `영상 #${editingYoutubeClip.video_id}`;
+      const workspaceStyle = editingYoutubeMeta?.visualStyle || preferredYoutubeVisualStyle || "yt_profile";
+      body = (
         <YoutubeWorkspaceEditor
           clips={editingWorkspaceClips.length > 0 ? editingWorkspaceClips : [editingYoutubeClip]}
           highlights={highlights[editingYoutubeClip.video_id] ?? []}
@@ -1187,28 +1210,21 @@ export function App() {
           onTtsModeChange={(clipId, mode) => setTtsModes((current) => ({ ...current, [clipId]: mode }))}
           onMessage={setUploadMessage}
         />
-      </main>
-    );
-  }
-
-
-  if (editingBlogClip && editingBlogClip.status === "awaiting_boards") {
-    return (
-      <BoardEditor
-        blogClip={editingBlogClip}
-        onClose={handleCloseBoardEditor}
-        onRendered={handleBoardEditorRendered}
-        onClipUpdated={(updated) => {
-          setBlogClips((current) => current.map((item) => (item.id === updated.id ? updated : item)));
-        }}
-        onMessage={setUploadMessage}
-      />
-    );
-  }
-
-  if (view === "dashboard" && user && focusYoutubeVideo) {
-    return (
-      <main className="app-root">
+      );
+    } else if (isBoardEditor && editingBlogClip) {
+      body = (
+        <BoardEditor
+          blogClip={editingBlogClip}
+          onClose={handleCloseBoardEditor}
+          onRendered={handleBoardEditorRendered}
+          onClipUpdated={(updated) => {
+            setBlogClips((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+          }}
+          onMessage={setUploadMessage}
+        />
+      );
+    } else if (focusYoutubeVideo) {
+      body = (
         <YoutubeClipFlow
           video={focusYoutubeVideo}
           highlights={highlights[focusYoutubeVideo.id] ?? []}
@@ -1234,13 +1250,9 @@ export function App() {
           onOpenDetailedEditor={(clip) => setEditingYoutubeClipId(clip.id)}
           onMessage={setUploadMessage}
         />
-      </main>
-    );
-  }
-
-  if (view === "dashboard" && user && focusBlogClip) {
-    return (
-      <main className="app-root">
+      );
+    } else if (focusBlogClip) {
+      body = (
         <BlogClipFlow
           blogClip={focusBlogClip}
           boardCount={blogBoardCounts[focusBlogClip.id]}
@@ -1271,17 +1283,11 @@ export function App() {
           onMessage={setUploadMessage}
           flowMessage={uploadMessage}
         />
-      </main>
-    );
-  }
-
-  if (view === "dashboard" && user) {
-    return (
-      <main className="app-root">
+      );
+    } else {
+      body = (
         <Dashboard
-          user={user}
           usage={usage}
-          plans={plans}
           uploadMessage={uploadMessage}
           selectedFile={selectedFile}
           isUploading={isUploading}
@@ -1312,7 +1318,6 @@ export function App() {
           analyzingId={analyzingId}
           transcribingId={transcribingId}
           highlightingId={highlightingId}
-          onLogout={handleLogout}
           onUpload={handleUpload}
           onSelectedFileChange={setSelectedFile}
           onPreviewYoutube={handlePreviewYoutube}
@@ -1349,7 +1354,33 @@ export function App() {
           focusVideoId={focusVideoId}
           onProjectsTabRequestConsumed={() => setProjectsTabRequest(null)}
         />
-      </main>
+      );
+    }
+
+    return (
+      <StudioShell
+        title={title}
+        activeTab={studioNav}
+        projectCount={blogClips.length + videos.length}
+        email={user.email}
+        planLabel={usage?.plan_name ?? usage?.plan}
+        bodyMode={bodyMode}
+        titleAside={
+          isFlow && focusBlogClip ? (
+            <span className={`status-badge status-${focusBlogClip.status}`}>
+              {BLOG_CLIP_STATUS_LABELS[focusBlogClip.status]}
+            </span>
+          ) : isFlow && focusYoutubeVideo ? (
+            <span className={`status-badge status-${focusYoutubeVideo.status}`}>
+              {VIDEO_STATUS_LABELS[focusYoutubeVideo.status]}
+            </span>
+          ) : null
+        }
+        onNavChange={handleStudioNavChange}
+        onLogout={handleLogout}
+      >
+        {body}
+      </StudioShell>
     );
   }
 

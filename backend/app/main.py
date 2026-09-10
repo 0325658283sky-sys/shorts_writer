@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import audio, auth, blog, clips, templates, users, videos, visual_styles, voices
+from app.api import audio, auth, blog, clips, projects, templates, users, videos, visual_styles, voices
 from app.core.config import settings
 from app.db.database import init_db
 from app.services.remotion_render_service import check_remotion_service_health
@@ -37,6 +37,7 @@ app.include_router(voices.router)
 app.include_router(templates.router)
 app.include_router(visual_styles.router)
 app.include_router(audio.router)
+app.include_router(projects.router)
 
 
 @app.get("/health")

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { authorizedBlob, authorizedRequest } from "../api/client";
 import { friendlyProgressFromVideoStatus } from "../constants";
+import type { YoutubeLengthBand } from "../constants";
 import type { Clip, ClipMetadata, Highlight, SubtitleStyle, Transcript, TtsMode, Video, VideoStatusResponse } from "../types";
 import { AliveProgressBar } from "./AliveProgressBar";
 
@@ -12,49 +13,17 @@ const FLOW_STEPS = [
 
 type FlowStep = (typeof FLOW_STEPS)[number]["id"];
 
-const AUTO_SHORTS_COUNT = 2;
+function durationMatchesBand(seconds: number, band: YoutubeLengthBand): boolean {
+  if (band === "short") return seconds <= 25;
+  if (band === "long") return seconds > 45;
+  return seconds > 25 && seconds <= 45;
+}
 
-function CompletedProjectCard({
-  video,
-  shortsCount,
-  thumbnailUrl,
-  channel,
-  title,
-  onOpen,
-}: {
-  video: Video;
-  shortsCount: number;
-  thumbnailUrl: string | null;
-  channel: string | null;
-  title: string;
-  onOpen: () => void;
-}) {
-  const dateLabel = useMemo(() => {
-    try {
-      const d = new Date(video.updated_at || video.created_at);
-      return `${d.getFullYear()}. ${d.getMonth() + 1}. ${d.getDate()}.`;
-    } catch {
-      return "";
-    }
-  }, [video.updated_at, video.created_at]);
-
-  return (
-    <button type="button" className="yt-hub-card" onClick={onOpen}>
-      <div className="yt-hub-thumb">
-        {thumbnailUrl ? <img src={thumbnailUrl} alt="" /> : <span className="muted">미리보기</span>}
-        <span className="yt-hub-duration-badge">{shortsCount} Shorts</span>
-      </div>
-      <div className="yt-hub-copy">
-        <strong>{title}</strong>
-        {channel ? <span className="muted">{channel}</span> : null}
-        <div className="yt-hub-status">
-          <span className="yt-hub-done">✓ 완료</span>
-          <span className="muted">{shortsCount} Shorts</span>
-          {dateLabel ? <span className="muted">{dateLabel}</span> : null}
-        </div>
-      </div>
-    </button>
-  );
+function pickHighlightTargets(highlights: Highlight[], count: number, band: YoutubeLengthBand): Highlight[] {
+  const ranked = [...highlights].sort((a, b) => b.score - a.score || a.start_time - b.start_time);
+  const inBand = ranked.filter((item) => durationMatchesBand(Math.max(0, item.end_time - item.start_time), band));
+  const pool = inBand.length >= Math.min(count, ranked.length) ? inBand : ranked;
+  return pool.slice(0, count);
 }
 
 export function YoutubeClipFlow({
@@ -75,6 +44,8 @@ export function YoutubeClipFlow({
   onStyleChange,
   onOpenDetailedEditor,
   onMessage,
+  shortsCount = 2,
+  lengthBand = "medium",
 }: {
   video: Video;
   highlights: Highlight[];
@@ -105,6 +76,8 @@ export function YoutubeClipFlow({
   onTtsModeChange?: (clipId: number, mode: TtsMode) => void;
   onOpenDetailedEditor: (clip: Clip) => void;
   onMessage: (message: string) => void;
+  shortsCount?: number;
+  lengthBand?: YoutubeLengthBand;
 }) {
   const [step, setStep] = useState<FlowStep>("progress");
   const [progress, setProgress] = useState(8);
@@ -127,11 +100,8 @@ export function YoutubeClipFlow({
   }, [clips, video.id]);
 
   const pickHighlights = useMemo(
-    () =>
-      [...highlights]
-        .sort((a, b) => b.score - a.score || a.start_time - b.start_time)
-        .slice(0, AUTO_SHORTS_COUNT),
-    [highlights],
+    () => pickHighlightTargets(highlights, shortsCount, lengthBand),
+    [highlights, shortsCount, lengthBand],
   );
 
   useEffect(() => {
@@ -167,9 +137,7 @@ export function YoutubeClipFlow({
     autoGenRef.current = true;
     setStep("generating");
     setPipelineError("");
-    const targets = [...items]
-      .sort((a, b) => b.score - a.score || a.start_time - b.start_time)
-      .slice(0, AUTO_SHORTS_COUNT);
+    const targets = pickHighlightTargets(items, shortsCount, lengthBand);
 
     if (targets.length === 0) {
       setPipelineError("생성할 하이라이트가 없습니다.");
@@ -299,7 +267,6 @@ export function YoutubeClipFlow({
 
   const stepIndex = step === "progress" ? 0 : step === "generating" ? 1 : 2;
   const workspaceClips = localClips.length > 0 ? localClips : videoClips;
-  const shortsCount = Math.max(generatedCount, workspaceClips.length);
 
   function handleOpenWorkspace() {
     const first = workspaceClips[0];
@@ -344,7 +311,7 @@ export function YoutubeClipFlow({
               <p className="flow-lead">
                 {step === "generating"
                   ? "선택한 템플릿에 맞춰 자막을 입히고 미리보기를 준비합니다."
-                  : "롱폼에서 하이라이트를 잡은 뒤 쇼츠로 자동 변환합니다."}
+                  : "롱폼에서 하이라이트를 잡은 뒤 쇼츠로 자동 변환합니다. 프로젝트 탭으로 나가도 됩니다."}
               </p>
               <AliveProgressBar percent={progress} active={!pipelineError && progress < 100} label={stageLabel} />
               {pipelineError ? (
@@ -365,27 +332,34 @@ export function YoutubeClipFlow({
                 </>
               ) : null}
               <p className="create-note muted">{displayTitle}</p>
+              <button className="ghost-button" type="button" onClick={onBackToStudio}>
+                프로젝트 목록으로
+              </button>
             </section>
           ) : null}
 
           {step === "hub" ? (
             <section className="flow-card yt-hub-section">
-              <p className="create-kicker">완료된 프로젝트</p>
-              <h1>쇼츠가 준비되었습니다</h1>
-              <p className="flow-lead">카드를 누르면 세부 편집 화면으로 이동합니다.</p>
+              <p className="create-kicker">프로젝트</p>
+              <h1>{displayTitle}</h1>
+              <p className="flow-lead">쇼츠 카드를 누르면 미리보기와 자막·음성을 고칩니다.</p>
               <div className="yt-hub-grid">
-                <CompletedProjectCard
-                  video={video}
-                  shortsCount={shortsCount || AUTO_SHORTS_COUNT}
-                  thumbnailUrl={hubThumb}
-                  channel={projectChannel ?? null}
-                  title={displayTitle}
-                  onOpen={handleOpenWorkspace}
-                />
+                {workspaceClips.map((clip, index) => (
+                  <button key={clip.id} type="button" className="yt-hub-card" onClick={() => onOpenDetailedEditor(clip)}>
+                    <div className="yt-hub-thumb">
+                      {hubThumb ? <img src={hubThumb} alt="" /> : <span className="muted">미리보기</span>}
+                      <span className="yt-hub-duration-badge">쇼츠 {index + 1}</span>
+                    </div>
+                    <div className="yt-hub-copy">
+                      <strong>쇼츠 {index + 1}</strong>
+                      <span className="muted">{projectChannel || "하이라이트"}</span>
+                    </div>
+                  </button>
+                ))}
               </div>
               <div className="flow-step-actions">
                 <button className="ghost-button" type="button" onClick={onBackToStudio}>
-                  작업실로
+                  프로젝트 목록
                 </button>
                 <button
                   className="cta-button flow-primary-cta"
@@ -393,7 +367,7 @@ export function YoutubeClipFlow({
                   disabled={workspaceClips.length === 0}
                   onClick={handleOpenWorkspace}
                 >
-                  세부 편집 열기 →
+                  첫 쇼츠 편집 →
                 </button>
               </div>
             </section>

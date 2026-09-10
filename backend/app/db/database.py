@@ -400,6 +400,8 @@ def _migrate_blog_clip_versions_table(conn: sqlite3.Connection) -> None:
         return
     if "render_spec_json" not in columns:
         conn.execute("ALTER TABLE blog_clip_versions ADD COLUMN render_spec_json TEXT")
+    if "override_json" not in columns:
+        conn.execute("ALTER TABLE blog_clip_versions ADD COLUMN override_json TEXT")
 
 
 def _migrate_blog_clips_awaiting_script_status(conn: sqlite3.Connection) -> None:
@@ -682,6 +684,27 @@ def _create_audio_assets_table(conn: sqlite3.Connection) -> None:
     conn.execute("CREATE INDEX IF NOT EXISTS idx_audio_assets_kind ON audio_assets (kind)")
 
 
+def _create_projects_table(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS projects (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            source_type TEXT NOT NULL CHECK (source_type IN ('blog', 'video')),
+            blog_clip_id INTEGER UNIQUE,
+            video_id INTEGER UNIQUE,
+            title TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users (id),
+            FOREIGN KEY (blog_clip_id) REFERENCES blog_clips (id),
+            FOREIGN KEY (video_id) REFERENCES videos (id)
+        )
+        """
+    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_projects_user_id ON projects (user_id)")
+
+
 def init_db() -> None:
     DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
     with sqlite3.connect(DATABASE_PATH) as conn:
@@ -715,9 +738,12 @@ def init_db() -> None:
         _migrate_blog_clip_versions_table(conn)
         _create_subtitle_templates_table(conn)
         _create_audio_assets_table(conn)
+        _create_projects_table(conn)
         from app.services.audio_service import seed_system_audio_assets
+        from app.services.project_service import backfill_projects
         from app.services.template_service import seed_system_templates
 
         seed_system_templates(conn)
         seed_system_audio_assets(conn)
+        backfill_projects(conn)
         conn.commit()

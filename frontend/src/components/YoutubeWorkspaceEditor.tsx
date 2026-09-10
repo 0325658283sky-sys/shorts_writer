@@ -198,6 +198,7 @@ export function YoutubeWorkspaceEditor({
   const [loadingPreview, setLoadingPreview] = useState(true);
   const [rendering, setRendering] = useState(false);
   const [thumbUrls, setThumbUrls] = useState<Record<number, string>>({});
+  const [sideTab, setSideTab] = useState<"screen" | "voice" | "motion">("screen");
   const urlRef = useRef<string | null>(null);
   const thumbRefs = useRef<Record<number, string>>({});
 
@@ -312,7 +313,7 @@ export function YoutubeWorkspaceEditor({
     <div className="board-editor yt-workspace" role="dialog" aria-modal="true" aria-label="쇼츠 세부 편집">
       <header className="board-editor-header">
         <div>
-          <p className="eyebrow">생성된 쇼츠</p>
+          <p className="eyebrow">쇼츠 편집</p>
           <h2>{videoTitle}</h2>
           <span className="muted">
             {clips.length}개 · {styleMeta?.label ?? "템플릿"} · {channel || "YouTube"}
@@ -325,10 +326,18 @@ export function YoutubeWorkspaceEditor({
             onClick={() => void handleRender()}
             disabled={!hasOutput || rendering || subtitlingClipId === clip.id}
           >
-            {rendering || subtitlingClipId === clip.id ? "렌더링 중…" : "템플릿 적용 · 렌더"}
+            {rendering || subtitlingClipId === clip.id ? "렌더링 중…" : "렌더"}
+          </button>
+          <button
+            className="ghost-button"
+            type="button"
+            disabled={downloadingClipId === clip.id || !hasOutput}
+            onClick={() => onDownloadClip(clip)}
+          >
+            {downloadingClipId === clip.id ? "다운로드 중…" : "다운로드"}
           </button>
           <button className="primary-button" type="button" onClick={onClose}>
-            목록으로
+            완료
           </button>
         </div>
       </header>
@@ -383,20 +392,6 @@ export function YoutubeWorkspaceEditor({
                         onClick={() => onDownloadClip(item)}
                       >
                         {downloadingClipId === item.id ? "…" : "다운로드"}
-                      </button>
-                      <button
-                        className="yt-action-btn yt-action-dup"
-                        type="button"
-                        onClick={() => onMessage("복제 기능은 곧 추가됩니다.")}
-                      >
-                        복제
-                      </button>
-                      <button
-                        className="yt-action-btn yt-action-del"
-                        type="button"
-                        onClick={() => onMessage("삭제 기능은 곧 추가됩니다.")}
-                      >
-                        삭제
                       </button>
                     </div>
                   </div>
@@ -460,80 +455,101 @@ export function YoutubeWorkspaceEditor({
         </section>
 
         <aside className="media-panel yt-workspace-side" aria-label="쇼츠 설정">
-          <p className="create-note">
-            AI가 앞부분에 훅 하이라이트를 배치했습니다. <strong>템플릿 적용 · 렌더</strong>를 누르면 Remotion으로
-            템플릿이 합성된 MP4를 만들고, 다운로드에 사용합니다. Remotion(3100)이 켜져 있어야 합니다.
-          </p>
-          <div className="flow-step-actions">
-            <button
-              className="cta-button"
-              type="button"
-              disabled={downloadingClipId === clip.id || !hasOutput}
-              onClick={() => onDownloadClip(clip)}
-            >
-              {downloadingClipId === clip.id ? "다운로드 중…" : "다운로드"}
-            </button>
+          <div className="media-tabs" role="tablist">
+            {(
+              [
+                ["screen", "화면"],
+                ["voice", "음성"],
+                ["motion", "모션"],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                className={`media-tab ${sideTab === id ? "active" : ""}`}
+                type="button"
+                role="tab"
+                aria-selected={sideTab === id}
+                onClick={() => setSideTab(id)}
+              >
+                {label}
+              </button>
+            ))}
           </div>
 
-          <label className="create-field inline-field">
-            <span>자막 스타일</span>
-            <select
-              value={selectedStyle}
-              onChange={(event) => onStyleChange(clip.id, event.target.value as SubtitleStyle)}
-            >
-              {SUBTITLE_STYLES.map((style) => (
-                <option value={style} key={style}>
-                  {SUBTITLE_STYLE_LABELS[style]}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="create-field inline-field">
-            <span>음성 모드</span>
-            <select
-              value={selectedTtsMode}
-              onChange={(event) => onTtsModeChange(clip.id, event.target.value as TtsMode)}
-            >
-              {TTS_MODES.map((mode) => (
-                <option value={mode} key={mode}>
-                  {TTS_MODE_LABELS[mode]}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button
-            className="small-button"
-            type="button"
-            disabled={narratingClipId === clip.id || !hasOutput}
-            onClick={() => void onApplyNarration(clip)}
-          >
-            {narratingClipId === clip.id ? "음성 적용 중…" : "음성 적용"}
-          </button>
-
-          {highlight ? (
-            <p className="create-note">
-              원본 구간 {formatTime(highlight.start_time)}–{formatTime(highlight.end_time)}
-            </p>
+          {sideTab === "screen" ? (
+            <div className="media-tab-body">
+              <p className="create-note">자막 스타일을 고른 뒤 헤더의 렌더로 파일을 갱신합니다.</p>
+              <label className="create-field inline-field">
+                <span>자막 스타일</span>
+                <select
+                  value={selectedStyle}
+                  onChange={(event) => onStyleChange(clip.id, event.target.value as SubtitleStyle)}
+                >
+                  {SUBTITLE_STYLES.map((style) => (
+                    <option value={style} key={style}>
+                      {SUBTITLE_STYLE_LABELS[style]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                className="small-button metadata-button"
+                type="button"
+                disabled={generatingMetadataId === clip.id || Boolean(metadata)}
+                onClick={() => void onGenerateMetadata(clip)}
+              >
+                {generatingMetadataId === clip.id ? "작성 중…" : metadata ? "메타데이터 준비됨" : "메타데이터 생성"}
+              </button>
+              {metadata ? (
+                <MetadataBox
+                  copiedKey={copiedKey}
+                  idPrefix={`yt-ws-${metadata.id}`}
+                  titleCandidates={metadata.title_candidates}
+                  description={metadata.description}
+                  hashtags={metadata.hashtags}
+                  onCopyText={onCopyText}
+                />
+              ) : null}
+            </div>
           ) : null}
-          {clip.narration_script ? <p className="narration-script">{clip.narration_script}</p> : null}
 
-          <button
-            className="small-button metadata-button"
-            type="button"
-            disabled={generatingMetadataId === clip.id || Boolean(metadata)}
-            onClick={() => void onGenerateMetadata(clip)}
-          >
-            {generatingMetadataId === clip.id ? "작성 중…" : metadata ? "메타데이터 준비됨" : "메타데이터 생성"}
-          </button>
-          {metadata ? (
-            <MetadataBox
-              copiedKey={copiedKey}
-              idPrefix={`yt-ws-${metadata.id}`}
-              titleCandidates={metadata.title_candidates}
-              description={metadata.description}
-              hashtags={metadata.hashtags}
-              onCopyText={onCopyText}
-            />
+          {sideTab === "voice" ? (
+            <div className="media-tab-body">
+              <label className="create-field inline-field">
+                <span>음성 모드</span>
+                <select
+                  value={selectedTtsMode}
+                  onChange={(event) => onTtsModeChange(clip.id, event.target.value as TtsMode)}
+                >
+                  {TTS_MODES.map((mode) => (
+                    <option value={mode} key={mode}>
+                      {TTS_MODE_LABELS[mode]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                className="small-button"
+                type="button"
+                disabled={narratingClipId === clip.id || !hasOutput}
+                onClick={() => void onApplyNarration(clip)}
+              >
+                {narratingClipId === clip.id ? "음성 적용 중…" : "음성 적용"}
+              </button>
+              {clip.narration_script ? <p className="narration-script">{clip.narration_script}</p> : null}
+            </div>
+          ) : null}
+
+          {sideTab === "motion" ? (
+            <div className="media-tab-body">
+              {highlight ? (
+                <p className="create-note">
+                  원본 구간 {formatTime(highlight.start_time)}–{formatTime(highlight.end_time)}
+                </p>
+              ) : (
+                <p className="muted">하이라이트 구간 정보가 없습니다.</p>
+              )}
+            </div>
           ) : null}
         </aside>
       </div>

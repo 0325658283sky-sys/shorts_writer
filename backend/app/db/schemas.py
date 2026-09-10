@@ -385,8 +385,11 @@ class BlogClipAudioSettingsRequest(BaseModel):
 
 
 class BlogClipVersionCreateRequest(BaseModel):
-    mode: Literal["boards", "tone", "all_tones"] = "boards"
+    mode: Literal["boards", "tone", "all_tones", "restyle"] = "boards"
     tone: ScriptTone | None = None
+    visual_style: str | None = None
+    default_voice: str | None = None
+    bgm_asset_id: int | None = None
     set_active: bool = False
 
 
@@ -550,6 +553,21 @@ class BlogClipResponse(BaseModel):
     transition_type: str | None = None
     # Temporary debug/ops payload from the last successful render (engine, duration, …).
     render_spec: dict | None = None
+    created_at: str
+    updated_at: str
+
+
+class ProjectResponse(BaseModel):
+    id: int
+    source_type: Literal["blog", "video"]
+    source_kind: Literal["blog", "product", "youtube", "mp4"]
+    blog_clip_id: int | None = None
+    video_id: int | None = None
+    title: str
+    status: str | None = None
+    progress_percent: int | None = None
+    shorts_count: int = 0
+    source_url: str | None = None
     created_at: str
     updated_at: str
 

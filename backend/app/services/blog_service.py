@@ -4,7 +4,7 @@ import re
 import shutil
 import sqlite3
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 from urllib.parse import urljoin, urlparse
@@ -261,7 +261,7 @@ def blog_clip_download_path(blog_clip: BlogClip) -> Path:
 _BLOG_CLIP_VERSION_COLUMNS = """
     id, blog_clip_id, label, source, script_tone, narration_script, video_path, subtitled_video_path,
     status, progress_stage, progress_percent, error_message, title_candidates_json, description,
-    hashtags_json, metadata_error, render_spec_json, created_at, updated_at
+    hashtags_json, metadata_error, render_spec_json, override_json, created_at, updated_at
 """
 
 
@@ -285,6 +285,7 @@ def _row_to_blog_clip_version(row: sqlite3.Row) -> BlogClipVersion:
         hashtags_json=row["hashtags_json"],
         metadata_error=row["metadata_error"],
         render_spec_json=row["render_spec_json"] if "render_spec_json" in keys else None,
+        override_json=row["override_json"] if "override_json" in keys else None,
         created_at=row["created_at"],
         updated_at=row["updated_at"],
     )
@@ -547,6 +548,57 @@ def _build_tone_render_boards(
     ]
 
 
+def parse_version_overrides(raw: str | None) -> dict[str, Any] | None:
+    if not raw:
+        return None
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        return None
+    return parsed if isinstance(parsed, dict) else None
+
+
+def _apply_render_overrides(blog_clip: BlogClip, overrides: dict[str, Any] | None) -> BlogClip:
+    if not overrides:
+        return blog_clip
+    from app.services.visual_style_catalog import (
+        default_style_overlay,
+        merge_style_overlay,
+        normalize_font_id,
+        normalize_visual_style,
+        resolve_visual_style,
+    )
+
+    updates: dict[str, Any] = {}
+    slug_raw = overrides.get("visual_style")
+    if slug_raw:
+        slug = normalize_visual_style(str(slug_raw))
+        style = resolve_visual_style(slug)
+        previous_overlay = blog_clip_style_overlay(blog_clip) or {}
+        overlay = default_style_overlay(slug)
+        if previous_overlay.get("titleFont"):
+            overlay["titleFont"] = normalize_font_id(str(previous_overlay.get("titleFont")))
+        if previous_overlay.get("captionFont"):
+            overlay["captionFont"] = normalize_font_id(str(previous_overlay.get("captionFont")))
+        if previous_overlay.get("captionAnimation"):
+            overlay["captionAnimation"] = previous_overlay["captionAnimation"]
+        overlay = merge_style_overlay(slug, overlay)
+        updates["visual_style"] = slug
+        updates["transition_sec"] = float(style.get("transitionSec", 0.35))
+        updates["transition_type"] = str(style.get("transitionType") or "fade")
+        updates["style_overlay_json"] = json.dumps(overlay, ensure_ascii=False)
+    if overrides.get("default_voice"):
+        updates["default_voice"] = str(overrides["default_voice"])
+    if "bgm_asset_id" in overrides:
+        bgm = overrides["bgm_asset_id"]
+        updates["bgm_asset_id"] = int(bgm) if bgm is not None else None
+        if bgm is not None:
+            updates["auto_bgm"] = False
+    if not updates:
+        return blog_clip
+    return replace(blog_clip, **updates)
+
+
 def _insert_pending_version(
     conn: sqlite3.Connection,
     blog_clip_id: int,
@@ -555,16 +607,17 @@ def _insert_pending_version(
     source: str,
     script_tone: str | None,
     narration_script: str | None,
+    override_json: str | None = None,
 ) -> BlogClipVersion:
     cursor = conn.execute(
         """
         INSERT INTO blog_clip_versions (
             blog_clip_id, label, source, script_tone, narration_script,
-            status, progress_stage, progress_percent
+            status, progress_stage, progress_percent, override_json
         )
-        VALUES (?, ?, ?, ?, ?, 'pending', 'queued', 0)
+        VALUES (?, ?, ?, ?, ?, 'pending', 'queued', 0, ?)
         """,
-        (blog_clip_id, label, source, script_tone, narration_script),
+        (blog_clip_id, label, source, script_tone, narration_script, override_json),
     )
     conn.commit()
     row = conn.execute(
@@ -582,10 +635,13 @@ def create_blog_clip_versions(
     blog_clip_id: int,
     mode: str,
     tone: str | None = None,
+    visual_style: str | None = None,
+    default_voice: str | None = None,
+    bgm_asset_id: int | None = None,
 ) -> list[BlogClipVersion]:
     """Queue one or more additional renders for a completed blog clip."""
-    if mode not in {"boards", "tone", "all_tones"}:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="mode must be boards, tone, or all_tones.")
+    if mode not in {"boards", "tone", "all_tones", "restyle"}:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="mode must be boards, tone, all_tones, or restyle.")
 
     blog_clip = get_blog_clip_for_user(conn, user_id, blog_clip_id)
     if blog_clip is None:
@@ -598,6 +654,53 @@ def create_blog_clip_versions(
     _ensure_legacy_blog_clip_version(conn, blog_clip)
 
     created: list[BlogClipVersion] = []
+    if mode == "restyle":
+        from app.services.tts_service import validate_voice_id
+        from app.services.visual_style_catalog import (
+            ALLOWED_VISUAL_STYLES,
+            VISUAL_STYLES,
+            normalize_visual_style,
+        )
+
+        if not visual_style and not default_voice and bgm_asset_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="restyle requires visual_style, default_voice, or bgm_asset_id.",
+            )
+        override: dict[str, Any] = {}
+        label_parts: list[str] = []
+        if visual_style:
+            slug = (visual_style or "").strip().lower()
+            if slug not in ALLOWED_VISUAL_STYLES:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="visual_style must be a known template slug.",
+                )
+            slug = normalize_visual_style(slug)
+            override["visual_style"] = slug
+            label_parts.append(str(VISUAL_STYLES.get(slug, {}).get("label") or slug))
+        if default_voice:
+            override["default_voice"] = validate_voice_id(default_voice)
+            label_parts.append(override["default_voice"])
+        if bgm_asset_id is not None:
+            assert_audio_asset_usable(conn, user_id, int(bgm_asset_id), kind="bgm")
+            override["bgm_asset_id"] = int(bgm_asset_id)
+            label_parts.append(f"BGM #{int(bgm_asset_id)}")
+        boards = list_blog_clip_boards(conn, user_id, blog_clip_id)
+        if not boards:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="보드가 없습니다. 최소 1개 이상의 보드가 필요합니다.")
+        created.append(
+            _insert_pending_version(
+                conn,
+                blog_clip_id,
+                label=" · ".join(label_parts) + " · 스타일",
+                source="boards",
+                script_tone=blog_clip.script_tone,
+                narration_script=blog_clip.narration_script,
+                override_json=json.dumps(override, ensure_ascii=False),
+            )
+        )
+        return created
     if mode == "boards":
         boards = list_blog_clip_boards(conn, user_id, blog_clip_id)
         if not boards:
@@ -3720,6 +3823,7 @@ def _render_boards_media(
     *,
     output_tag: str,
     on_progress,
+    overrides: dict[str, Any] | None = None,
 ) -> tuple[str, str, str, dict[str, Any]]:
     """Shared TTS/slideshow/subtitle path.
 
@@ -3730,6 +3834,7 @@ def _render_boards_media(
     refreshed = get_blog_clip_for_user(conn, user_id, blog_clip.id)
     if refreshed is not None:
         blog_clip = refreshed
+    blog_clip = _apply_render_overrides(blog_clip, overrides)
     prepare_overlay = blog_clip_style_overlay(blog_clip) or {}
     logger.info(
         "render_prepare clip=%s overlay=%s fonts_title=%s fonts_caption=%s bgm=%s",
@@ -3791,6 +3896,7 @@ def _render_boards_media(
             latest_clip = get_blog_clip_for_user(conn, user_id, blog_clip.id)
             if latest_clip is not None:
                 blog_clip = latest_clip
+            blog_clip = _apply_render_overrides(blog_clip, overrides)
             props = build_remotion_render_props(
                 conn,
                 user_id,
@@ -3892,6 +3998,8 @@ def _build_render_spec(
         "board_count": len(boards),
         "duration_seconds": round(sum(float(d) for d in board_durations), 2),
         "tts_speed": float(blog_clip.tts_speed),
+        "visual_style": blog_clip.visual_style,
+        "default_voice": blog_clip.default_voice,
         "bgm": blog_clip.bgm_asset_id is not None,
         "bgm_volume": float(blog_clip.bgm_volume) if blog_clip.bgm_asset_id is not None else None,
         "sfx_boards": sum(1 for board in boards if board.sfx_asset_id is not None),
@@ -4008,6 +4116,7 @@ def run_blog_clip_version_pipeline(blog_clip_id: int, user_id: int, version_id: 
                 boards,
                 output_tag=f"v{version_id}",
                 on_progress=lambda checkpoint: _update_version_progress(conn, version_id, checkpoint),
+                overrides=parse_version_overrides(version.override_json),
             )
         except HTTPException as exc:
             _update_version_failed(conn, version_id, str(exc.detail))

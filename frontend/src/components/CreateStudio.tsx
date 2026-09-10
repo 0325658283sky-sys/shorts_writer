@@ -8,9 +8,14 @@ import {
   SUBTITLE_STYLES,
   TARGET_LENGTH_LABELS,
   TARGET_LENGTHS,
+  YOUTUBE_LENGTH_BAND_LABELS,
+  YOUTUBE_LENGTH_BANDS,
+  YOUTUBE_SHORTS_COUNTS,
+  type YoutubeLengthBand,
 } from "../constants";
-import type { NarrationLanguage, ScriptModel, SubtitleStyle, TargetLength } from "../types";
+import type { NarrationLanguage, ScriptModel, SubtitleStyle, TargetLength, Usage, VisualStyleSlug } from "../types";
 import { formatBytes } from "../utils/format";
+import { YoutubeConfirmStep, type YoutubePreview } from "./YoutubeConfirmStep";
 
 export type CreateSource = "blog" | "product" | "youtube" | "mp4";
 
@@ -20,6 +25,31 @@ const SOURCES: Array<{ id: CreateSource; label: string; hint: string }> = [
   { id: "youtube", label: "유튜브 URL", hint: "영상 가져와 클립" },
   { id: "mp4", label: "MP4 업로드", hint: "로컬 파일로 시작" },
 ];
+
+function CreateUsageHint({ usage, source }: { usage: Usage | null; source: CreateSource }) {
+  if (!usage) return null;
+  const isBlog = source === "blog" || source === "product";
+  if (isBlog) {
+    if (usage.shorts_remaining == null && usage.shorts_limit == null) return null;
+    const remaining = usage.shorts_remaining ?? usage.remaining;
+    const limit = usage.shorts_limit ?? usage.usage_limit;
+    const low = remaining <= 1;
+    return (
+      <p className={`create-usage-hint${low ? " is-low" : ""}`}>
+        첫 렌더 완료 시 쇼츠 <strong>1회</strong> 차감 · 남은 {remaining}/{limit}
+        <span className="create-usage-hint-sub">스타일 다시 입히기는 차감되지 않습니다.</span>
+      </p>
+    );
+  }
+  const remaining = usage.remaining;
+  const limit = usage.usage_limit;
+  const low = remaining <= 1;
+  return (
+    <p className={`create-usage-hint${low ? " is-low" : ""}`}>
+      분석 시작 시 <strong>1회</strong> 차감 · 소스 최대 {usage.max_video_minutes}분 · 남은 {remaining}/{limit}
+    </p>
+  );
+}
 
 export function CreateStudio({
   source,
@@ -45,6 +75,15 @@ export function CreateStudio({
   onSelectedFileChange,
   onUpload,
   isPreviewingYoutube = false,
+  youtubePreview = null,
+  onCancelYoutubePreview,
+  onConfirmYoutubeImport,
+  onToastMessage,
+  youtubeShortsCount = 2,
+  youtubeLengthBand = "medium",
+  onYoutubeShortsCountChange,
+  onYoutubeLengthBandChange,
+  usage = null,
 }: {
   source: CreateSource;
   onSourceChange: (source: CreateSource) => void;
@@ -69,9 +108,23 @@ export function CreateStudio({
   onPreviewYoutube: (event: FormEvent<HTMLFormElement>) => void;
   onSelectedFileChange: (file: File | null) => void;
   onUpload: (event: FormEvent<HTMLFormElement>) => void;
+  youtubePreview?: YoutubePreview | null;
+  onCancelYoutubePreview?: () => void;
+  onConfirmYoutubeImport?: (visualStyle: VisualStyleSlug | string) => void;
+  onToastMessage?: (message: string) => void;
+  youtubeShortsCount?: number;
+  youtubeLengthBand?: YoutubeLengthBand;
+  onYoutubeShortsCountChange?: (value: number) => void;
+  onYoutubeLengthBandChange?: (value: YoutubeLengthBand) => void;
+  usage?: Usage | null;
 }) {
   const busy = isCreatingBlogShort || isImportingYoutube || isUploading || isPreviewingYoutube;
   const isProduct = source === "product";
+
+  function handleSourceChange(next: CreateSource) {
+    if (next !== "youtube" && youtubePreview) onCancelYoutubePreview?.();
+    onSourceChange(next);
+  }
 
   return (
     <section className="create-studio" aria-label="쇼츠 만들기">
@@ -89,7 +142,7 @@ export function CreateStudio({
             role="tab"
             aria-selected={source === item.id}
             className={`source-tab ${source === item.id ? "is-active" : ""}`}
-            onClick={() => onSourceChange(item.id)}
+            onClick={() => handleSourceChange(item.id)}
           >
             <span className="source-tab-label">{item.label}</span>
             <span className="source-tab-hint">{item.hint}</span>
@@ -119,66 +172,76 @@ export function CreateStudio({
                 </button>
               </div>
             </label>
+            <CreateUsageHint usage={usage} source={source} />
 
-            <div className="create-options" aria-label="생성 옵션">
-              <label className="create-field inline-field">
-                <span>영상 길이</span>
-                <select
-                  value={blogTargetLength}
-                  onChange={(event) => onBlogTargetLengthChange(event.target.value as TargetLength)}
-                >
-                  {TARGET_LENGTHS.map((length) => (
-                    <option value={length} key={length}>
-                      {TARGET_LENGTH_LABELS[length]}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="create-field inline-field">
-                <span>나레이션 언어</span>
-                <select
-                  value={blogNarrationLanguage}
-                  onChange={(event) => onBlogNarrationLanguageChange(event.target.value as NarrationLanguage)}
-                >
-                  {NARRATION_LANGUAGES.map((language) => (
-                    <option value={language} key={language}>
-                      {NARRATION_LANGUAGE_LABELS[language]}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="create-field inline-field">
-                <span>자막 스타일</span>
-                <select
-                  value={blogSubtitleStyle}
-                  onChange={(event) => onBlogSubtitleStyleChange(event.target.value as SubtitleStyle)}
-                >
-                  {SUBTITLE_STYLES.map((style) => (
-                    <option value={style} key={style}>
-                      {SUBTITLE_STYLE_LABELS[style]}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="create-field inline-field">
-                <span>훅 대본 모델</span>
-                <select
-                  value={blogScriptModel}
-                  onChange={(event) => onBlogScriptModelChange(event.target.value as ScriptModel)}
-                >
-                  {SCRIPT_MODELS.map((model) => (
-                    <option value={model} key={model}>
-                      {SCRIPT_MODEL_LABELS[model]}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
+            <details className="create-advanced">
+              <summary>
+                세부 설정
+                <span className="create-advanced-summary">
+                  {TARGET_LENGTH_LABELS[blogTargetLength]} · {NARRATION_LANGUAGE_LABELS[blogNarrationLanguage]} ·{" "}
+                  {SUBTITLE_STYLE_LABELS[blogSubtitleStyle]}
+                </span>
+              </summary>
+              <div className="create-options" aria-label="생성 옵션">
+                <label className="create-field inline-field">
+                  <span>영상 길이</span>
+                  <select
+                    value={blogTargetLength}
+                    onChange={(event) => onBlogTargetLengthChange(event.target.value as TargetLength)}
+                  >
+                    {TARGET_LENGTHS.map((length) => (
+                      <option value={length} key={length}>
+                        {TARGET_LENGTH_LABELS[length]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="create-field inline-field">
+                  <span>나레이션 언어</span>
+                  <select
+                    value={blogNarrationLanguage}
+                    onChange={(event) => onBlogNarrationLanguageChange(event.target.value as NarrationLanguage)}
+                  >
+                    {NARRATION_LANGUAGES.map((language) => (
+                      <option value={language} key={language}>
+                        {NARRATION_LANGUAGE_LABELS[language]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="create-field inline-field">
+                  <span>자막 스타일</span>
+                  <select
+                    value={blogSubtitleStyle}
+                    onChange={(event) => onBlogSubtitleStyleChange(event.target.value as SubtitleStyle)}
+                  >
+                    {SUBTITLE_STYLES.map((style) => (
+                      <option value={style} key={style}>
+                        {SUBTITLE_STYLE_LABELS[style]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="create-field inline-field">
+                  <span>훅 대본 모델</span>
+                  <select
+                    value={blogScriptModel}
+                    onChange={(event) => onBlogScriptModelChange(event.target.value as ScriptModel)}
+                  >
+                    {SCRIPT_MODELS.map((model) => (
+                      <option value={model} key={model}>
+                        {SCRIPT_MODEL_LABELS[model]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            </details>
 
             <ol className="create-steps">
               <li>{isProduct ? "상품 정보·이미지 수집" : "글 읽고 대본 3종 생성"}</li>
-              <li>톤 선택 → 보드 편집</li>
-              <li>렌더 · 다운로드 · 버전</li>
+              <li>이미지 · 톤 선택</li>
+              <li>렌더 · 다운로드</li>
             </ol>
             {isProduct ? (
               <p className="create-note">
@@ -205,10 +268,57 @@ export function CreateStudio({
                 </button>
               </div>
             </label>
+            <CreateUsageHint usage={usage} source="youtube" />
+            {youtubePreview && onCancelYoutubePreview && onConfirmYoutubeImport && onToastMessage ? (
+              <YoutubeConfirmStep
+                preview={youtubePreview}
+                importing={isImportingYoutube}
+                inline
+                onCancel={onCancelYoutubePreview}
+                onConfirm={onConfirmYoutubeImport}
+                onMessage={onToastMessage}
+              />
+            ) : null}
+            <details className="create-advanced">
+              <summary>
+                세부 설정
+                <span className="create-advanced-summary">
+                  쇼츠 {youtubeShortsCount}편 · {YOUTUBE_LENGTH_BAND_LABELS[youtubeLengthBand]}
+                </span>
+              </summary>
+              <div className="create-options" aria-label="생성 옵션">
+                <label className="create-field inline-field">
+                  <span>생성 개수</span>
+                  <select
+                    value={youtubeShortsCount}
+                    onChange={(event) => onYoutubeShortsCountChange?.(Number(event.target.value))}
+                  >
+                    {YOUTUBE_SHORTS_COUNTS.map((count) => (
+                      <option value={count} key={count}>
+                        {count}편
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="create-field inline-field">
+                  <span>쇼츠 길이</span>
+                  <select
+                    value={youtubeLengthBand}
+                    onChange={(event) => onYoutubeLengthBandChange?.(event.target.value as YoutubeLengthBand)}
+                  >
+                    {YOUTUBE_LENGTH_BANDS.map((band) => (
+                      <option value={band} key={band}>
+                        {YOUTUBE_LENGTH_BAND_LABELS[band]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            </details>
             <ol className="create-steps">
               <li>영상 확인 후 템플릿 선택</li>
-              <li>음성·하이라이트 자동 추출</li>
-              <li>퀵 / 세부 편집 → 렌더</li>
+              <li>하이라이트 상위 {youtubeShortsCount}편 자동 생성</li>
+              <li>프로젝트에서 쇼츠 편집 · 다운로드</li>
             </ol>
             <p className="create-note">본인이 소유했거나 처리 권한이 있는 영상만 사용하세요.</p>
           </form>
@@ -230,12 +340,51 @@ export function CreateStudio({
             <button className="cta-button" type="submit" disabled={busy || !selectedFile}>
               {isUploading ? "업로드 중…" : "클립 만들기"}
             </button>
+            <CreateUsageHint usage={usage} source="mp4" />
+            <details className="create-advanced">
+              <summary>
+                세부 설정
+                <span className="create-advanced-summary">
+                  쇼츠 {youtubeShortsCount}편 · {YOUTUBE_LENGTH_BAND_LABELS[youtubeLengthBand]}
+                </span>
+              </summary>
+              <div className="create-options" aria-label="생성 옵션">
+                <label className="create-field inline-field">
+                  <span>생성 개수</span>
+                  <select
+                    value={youtubeShortsCount}
+                    onChange={(event) => onYoutubeShortsCountChange?.(Number(event.target.value))}
+                  >
+                    {YOUTUBE_SHORTS_COUNTS.map((count) => (
+                      <option value={count} key={count}>
+                        {count}편
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="create-field inline-field">
+                  <span>쇼츠 길이</span>
+                  <select
+                    value={youtubeLengthBand}
+                    onChange={(event) => onYoutubeLengthBandChange?.(event.target.value as YoutubeLengthBand)}
+                  >
+                    {YOUTUBE_LENGTH_BANDS.map((band) => (
+                      <option value={band} key={band}>
+                        {YOUTUBE_LENGTH_BAND_LABELS[band]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            </details>
             <ol className="create-steps">
               <li>음성·하이라이트 자동 추출</li>
-              <li>하이라이트 썸네일 선택</li>
-              <li>퀵 / 세부 편집 → 렌더</li>
+              <li>상위 {youtubeShortsCount}편 자동 생성</li>
+              <li>프로젝트에서 쇼츠 편집 · 다운로드</li>
             </ol>
-            <p className="create-note">유튜브와 같은 가이드 흐름으로 이어집니다. Projects → 영상에서도 고전 방식으로 다시 작업할 수 있습니다.</p>
+            <p className="create-note">
+              유튜브와 같은 가이드 흐름으로 이어집니다. 업로드가 끝날 때까지 이 탭을 닫거나 새로고침하지 마세요.
+            </p>
           </form>
         ) : null}
       </div>

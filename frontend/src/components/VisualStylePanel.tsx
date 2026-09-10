@@ -29,6 +29,7 @@ export function VisualStylePanel({
   savingCopy,
   savingMotion,
   onMessage,
+  variant = "all",
 }: {
   blogClipId: number;
   appliedStyle?: string | null;
@@ -49,6 +50,7 @@ export function VisualStylePanel({
   savingCopy: boolean;
   savingMotion: boolean;
   onMessage: (message: string) => void;
+  variant?: "all" | "screen" | "motion";
 }) {
   const [styles, setStyles] = useState<VisualStyle[]>([]);
   const [loading, setLoading] = useState(true);
@@ -168,6 +170,8 @@ export function VisualStylePanel({
 
   return (
     <div className="media-tab-body">
+      {variant !== "motion" ? (
+        <>
       <p className="muted">
         썸네일을 클릭하면 템플릿·훅 타이틀이 함께 적용됩니다. 강조 단어는 <code>*이렇게*</code> 감싸세요.
       </p>
@@ -209,7 +213,10 @@ export function VisualStylePanel({
         disabled={savingFonts || applying}
         onChange={(next) => void saveFonts(next)}
       />
+        </>
+      ) : null}
 
+      {variant !== "screen" ? (
       <div className="motion-settings">
         <p className="muted">보드 전환</p>
         <div className="motion-settings-row">
@@ -244,7 +251,10 @@ export function VisualStylePanel({
           />
         </label>
       </div>
+      ) : null}
 
+      {variant !== "motion" ? (
+        <>
       {loading ? <p className="muted">템플릿 불러오는 중…</p> : null}
       <p className="style-gallery-label">템플릿</p>
       <div className="style-gallery style-gallery-compact">
@@ -274,6 +284,8 @@ export function VisualStylePanel({
         })}
       </div>
       {applying ? <p className="muted">스타일 적용 중…</p> : null}
+        </>
+      ) : null}
     </div>
   );
 }

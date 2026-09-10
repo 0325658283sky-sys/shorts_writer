@@ -15,12 +15,14 @@ export function BlogClipVersionsPanel({
   onCopyText,
   onBlogClipUpdated,
   onMessage,
+  refreshKey = 0,
 }: {
   blogClip: BlogClip;
   copiedKey: string | null;
   onCopyText: (key: string, text: string) => void;
   onBlogClipUpdated?: (blogClip: BlogClip) => void;
   onMessage?: (message: string) => void;
+  refreshKey?: number;
 }) {
   const [versions, setVersions] = useState<BlogClipVersion[]>([]);
   const [versionsLoading, setVersionsLoading] = useState(false);
@@ -40,6 +42,11 @@ export function BlogClipVersionsPanel({
         if (cancelled) return;
         setVersions(loaded);
         const busy = loaded.some((version) => version.status === "pending" || version.status === "processing");
+        const active = loaded.find((version) => version.is_active);
+        if (!busy && active && active.id !== blogClip.active_version_id) {
+          const parent = await authorizedRequest<BlogClip>(`/blog-clips/${blogClip.id}`);
+          if (!cancelled) onBlogClipUpdated?.(parent);
+        }
         if (busy) {
           timer = window.setTimeout(() => {
             void loadVersions();
@@ -59,7 +66,7 @@ export function BlogClipVersionsPanel({
       cancelled = true;
       if (timer !== undefined) window.clearTimeout(timer);
     };
-  }, [blogClip.id, blogClip.active_version_id, blogClip.updated_at, versionPollToken]);
+  }, [blogClip.id, blogClip.active_version_id, blogClip.updated_at, versionPollToken, refreshKey]);
 
   async function handleCreateVersions(mode: "all_tones" | "boards") {
     setCreatingVersions(true);

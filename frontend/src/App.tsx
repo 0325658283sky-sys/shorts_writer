@@ -14,6 +14,7 @@ import {
   CLIP_STATUS_LABELS,
   TOKEN_KEY,
   VIDEO_STATUS_LABELS,
+  type YoutubeLengthBand,
 } from "./constants";
 import {
   parseAppRoute,
@@ -30,6 +31,7 @@ import type {
   ClipMetadata,
   Highlight,
   Plan,
+  ProjectRecord,
   NarrationLanguage,
   ScriptModel,
   ScriptTone,
@@ -89,6 +91,7 @@ export function App() {
   const [blogNarrationLanguage, setBlogNarrationLanguage] = useState<NarrationLanguage>("original");
   const [blogScriptModel, setBlogScriptModel] = useState<ScriptModel>("gpt-4o-mini");
   const [blogClips, setBlogClips] = useState<BlogClip[]>([]);
+  const [projects, setProjects] = useState<ProjectRecord[]>([]);
   const [isCreatingBlogShort, setIsCreatingBlogShort] = useState(false);
   const [selectingBlogScriptId, setSelectingBlogScriptId] = useState<number | null>(null);
   const [confirmingImageSelectionId, setConfirmingImageSelectionId] = useState<number | null>(null);
@@ -99,6 +102,8 @@ export function App() {
   const [editingBlogClipId, setEditingBlogClipId] = useState<number | null>(null);
   const [focusBlogClipId, setFocusBlogClipId] = useState<number | null>(null);
   const [studioNav, setStudioNav] = useState<StudioTab>("create");
+  const [youtubeShortsCount, setYoutubeShortsCount] = useState(2);
+  const [youtubeLengthBand, setYoutubeLengthBand] = useState<YoutubeLengthBand>("medium");
   const [projectsTabRequest, setProjectsTabRequest] = useState<"in_progress" | "done" | "advanced" | null>(null);
   const [focusVideoId, setFocusVideoId] = useState<number | null>(null);
   const [focusYoutubeVideoId, setFocusYoutubeVideoId] = useState<number | null>(null);
@@ -347,6 +352,14 @@ export function App() {
     };
   }, [view, user, routeReady, blogClips, clips]);
 
+  async function loadProjects() {
+    try {
+      setProjects(await authorizedRequest<ProjectRecord[]>("/projects"));
+    } catch {
+      setProjects([]);
+    }
+  }
+
   async function loadVideos() {
     setVideos(await authorizedRequest<Video[]>("/videos"));
   }
@@ -441,6 +454,7 @@ export function App() {
         loadUsage(),
         loadPlans(),
         loadBlogClips(),
+        loadProjects(),
       ]);
       skipHashSyncRef.current = true;
       await applyAppRoute(parseAppRoute(window.location.hash), loadedBlogClips);
@@ -503,7 +517,7 @@ export function App() {
       setYoutubeUrl("");
       setUploadMessage("업로드가 완료되었습니다. 음성·하이라이트를 자동으로 추출합니다.");
       setVideos((current) => (current.some((item) => item.id === video.id) ? current : [video, ...current]));
-      await Promise.all([loadVideos(), loadUsage(), loadPlans()]);
+      await Promise.all([loadVideos(), loadUsage(), loadPlans(), loadProjects()]);
       setFocusVideoId(video.id);
       setFocusBlogClipId(null);
       setEditingYoutubeClipId(null);
@@ -573,7 +587,7 @@ export function App() {
       setYoutubePreview(null);
       setUploadMessage("유튜브 영상을 가져왔습니다. AI가 편집점을 잡아 쇼츠를 생성합니다.");
       setVideos((current) => (current.some((item) => item.id === video.id) ? current : [video, ...current]));
-      await Promise.all([loadVideos(), loadUsage(), loadPlans()]);
+      await Promise.all([loadVideos(), loadUsage(), loadPlans(), loadProjects()]);
       setFocusVideoId(video.id);
       setFocusBlogClipId(null);
       setFocusYoutubeVideoId(video.id);
@@ -604,6 +618,7 @@ export function App() {
         }),
       });
       setBlogClips((current) => [blogClip, ...current.filter((item) => item.id !== blogClip.id)]);
+      void loadProjects();
       setBlogUrl("");
       setFocusBlogClipId(blogClip.id);
       pollBlogClip(blogClip.id);
@@ -751,7 +766,7 @@ export function App() {
     }
   }
 
-  async function handleSelectBlogScript(blogClip: BlogClip, tone: ScriptTone) {
+  async function handleSelectBlogScript(blogClip: BlogClip, tone: ScriptTone, options?: { openEditor?: boolean }) {
     setSelectingBlogScriptId(blogClip.id);
     setUploadMessage("");
     try {
@@ -763,6 +778,9 @@ export function App() {
       setFocusBlogClipId(updated.id);
       const boards = await authorizedRequest<Board[]>(`/blog-clips/${updated.id}/boards`);
       setBlogBoardCounts((current) => ({ ...current, [updated.id]: boards.length }));
+      if (options?.openEditor) {
+        handleOpenBoardEditor(updated);
+      }
     } catch (error) {
       setUploadMessage(error instanceof Error ? error.message : "대본 선택에 실패했습니다.");
     } finally {
@@ -778,15 +796,11 @@ export function App() {
     setEditingBlogClipId(blogClip.id);
   }
 
-  /** Projects list “편집”: board editor when awaiting boards, else open Flow result. */
+  /** Projects list: awaiting_boards also goes to Flow so default render can start. */
   function handleResumeBlogClip(blogClip: BlogClip) {
     setUploadMessage("");
     setFocusYoutubeVideoId(null);
     setEditingYoutubeClipId(null);
-    if (blogClip.status === "awaiting_boards") {
-      handleOpenBoardEditor(blogClip);
-      return;
-    }
     setEditingBlogClipId(null);
     setFocusBlogClipId(blogClip.id);
     if (blogClip.status === "pending" || blogClip.status === "processing") {
@@ -802,15 +816,6 @@ export function App() {
     setFocusYoutubeVideoId(video.id);
   }
 
-  function handleResumeClip(clip: Clip) {
-    setUploadMessage("");
-    setFocusBlogClipId(null);
-    setEditingBlogClipId(null);
-    setFocusYoutubeVideoId(clip.video_id);
-    setEditingYoutubeClipId(clip.id);
-    setClips((current) => (current[clip.highlight_id] ? current : { ...current, [clip.highlight_id]: clip }));
-  }
-
   function handleOpenBlogClip(blogClip: BlogClip) {
     handleResumeBlogClip(blogClip);
   }
@@ -820,6 +825,9 @@ export function App() {
     setFocusYoutubeVideoId(null);
     setEditingYoutubeClipId(null);
     setUploadMessage("");
+    setStudioNav("projects");
+    skipHashSyncRef.current = true;
+    writeAppRoute({ kind: "studio", tab: "projects" }, "push");
   }
 
   function handleCloseBoardEditor() {
@@ -827,25 +835,12 @@ export function App() {
     setEditingBlogClipId(null);
     if (clipId == null) return;
     setFocusBlogClipId(clipId);
-    setBlogClips((current) =>
-      current.map((item) => (item.id === clipId ? { ...item, wizard_step: "ready" } : item)),
-    );
     void authorizedRequest<Board[]>(`/blog-clips/${clipId}/boards`)
       .then((boards) => {
         setBlogBoardCounts((current) => ({ ...current, [clipId]: boards.length }));
       })
       .catch(() => {
         /* keep previous count */
-      });
-    void authorizedRequest<BlogClip>(`/blog-clips/${clipId}/wizard-step`, {
-      method: "PATCH",
-      body: JSON.stringify({ wizard_step: "ready" }),
-    })
-      .then((updated) => {
-        setBlogClips((current) => current.map((item) => (item.id === updated.id ? updated : item)));
-      })
-      .catch((error) => {
-        setUploadMessage(error instanceof Error ? error.message : "단계 저장에 실패했습니다.");
       });
   }
 
@@ -909,7 +904,7 @@ export function App() {
       mergeVideoStatus(await authorizedRequest<VideoStatusResponse>(`/videos/${videoId}/analyze`, { method: "POST" }));
       await loadUsage();
     } catch (error) {
-      await Promise.all([loadVideos(), loadUsage(), loadPlans()]);
+      await Promise.all([loadVideos(), loadUsage(), loadPlans(), loadProjects()]);
       setUploadMessage(error instanceof Error ? error.message : "오디오 추출에 실패했습니다.");
     } finally {
       setAnalyzingId(null);
@@ -921,9 +916,9 @@ export function App() {
     try {
       const transcript = await authorizedRequest<Transcript>(`/videos/${videoId}/transcript`);
       setTranscripts((current) => ({ ...current, [videoId]: transcript }));
-      await Promise.all([loadVideos(), loadUsage(), loadPlans()]);
+      await Promise.all([loadVideos(), loadUsage(), loadPlans(), loadProjects()]);
     } catch (error) {
-      await Promise.all([loadVideos(), loadUsage(), loadPlans()]);
+      await Promise.all([loadVideos(), loadUsage(), loadPlans(), loadProjects()]);
       setUploadMessage(error instanceof Error ? error.message : "음성 인식에 실패했습니다.");
     } finally {
       setTranscribingId(null);
@@ -957,7 +952,7 @@ export function App() {
         try {
           const transcript = await authorizedRequest<Transcript>(`/videos/${videoId}/transcript`);
           setTranscripts((current) => ({ ...current, [videoId]: transcript }));
-          await Promise.all([loadVideos(), loadUsage(), loadPlans()]);
+          await Promise.all([loadVideos(), loadUsage(), loadPlans(), loadProjects()]);
         } finally {
           setTranscribingId(null);
         }
@@ -968,7 +963,7 @@ export function App() {
       setHighlights((current) => ({ ...current, [videoId]: candidates }));
       setUploadMessage(candidates.length ? `하이라이트 ${candidates.length}개를 추천했습니다.` : "추천된 하이라이트가 없습니다.");
     } catch (error) {
-      await Promise.all([loadVideos(), loadUsage(), loadPlans()]);
+      await Promise.all([loadVideos(), loadUsage(), loadPlans(), loadProjects()]);
       setUploadMessage(error instanceof Error ? error.message : "하이라이트 추천에 실패했습니다.");
     } finally {
       setHighlightingId(null);
@@ -1139,6 +1134,7 @@ export function App() {
     setPreferredYoutubeVisualStyle(null);
     setBlogUrl("");
     setBlogClips([]);
+    setProjects([]);
     setBlogBoardCounts({});
     setSelectingBlogScriptId(null);
     setEditingBlogClipId(null);
@@ -1236,6 +1232,8 @@ export function App() {
           initialSubtitleStyle={subtitleStyleFromVisual(
             focusYoutubeMeta?.visualStyle || preferredYoutubeVisualStyle || "yt_profile",
           )}
+          shortsCount={youtubeShortsCount}
+          lengthBand={youtubeLengthBand}
           onBackToStudio={handleBackToStudio}
           onVideoUpdated={mergeVideoStatus}
           onHighlightsReady={(videoId, items) => {
@@ -1255,15 +1253,11 @@ export function App() {
       body = (
         <BlogClipFlow
           blogClip={focusBlogClip}
-          boardCount={blogBoardCounts[focusBlogClip.id]}
           copiedKey={copiedKey}
           downloadingBlogClipId={downloadingBlogClipId}
           generatingBlogMetadataId={generatingBlogMetadataId}
           selectingBlogScriptId={selectingBlogScriptId}
           confirmingImageSelection={confirmingImageSelectionId === focusBlogClip.id}
-          savingVoice={savingVoiceId === focusBlogClip.id}
-          savingStyle={savingStyleId === focusBlogClip.id}
-          savingVisualStyle={savingVisualStyleId === focusBlogClip.id}
           renderingFromFlow={renderingFromFlowId === focusBlogClip.id}
           onBackToStudio={handleBackToStudio}
           onCopyText={handleCopyText}
@@ -1271,10 +1265,6 @@ export function App() {
           onGenerateMetadata={handleGenerateBlogMetadata}
           onSelectScript={handleSelectBlogScript}
           onConfirmImages={handleConfirmBlogImages}
-          onSaveDefaultVoice={handleSaveDefaultVoice}
-          onApplyVisualStyle={handleApplyVisualStyle}
-          onAudioSettings={handleAudioSettings}
-          onWizardStepChange={handleWizardStepChange}
           onRender={handleRenderFromFlow}
           onOpenBoardEditor={handleOpenBoardEditor}
           onBlogClipUpdated={(updated) => {
@@ -1301,6 +1291,7 @@ export function App() {
           blogNarrationLanguage={blogNarrationLanguage}
           blogScriptModel={blogScriptModel}
           isCreatingBlogShort={isCreatingBlogShort}
+          projects={projects}
           blogClips={blogClips}
           copiedKey={copiedKey}
           videos={videos}
@@ -1335,7 +1326,6 @@ export function App() {
           onOpenBlogClip={handleOpenBlogClip}
           onDownloadBlogClip={handleDownloadBlogClip}
           onResumeVideo={handleResumeVideo}
-          onResumeClip={handleResumeClip}
           downloadingBlogClipId={downloadingBlogClipId}
           onAnalyze={handleAnalyze}
           onTranscript={handleTranscript}
@@ -1353,6 +1343,10 @@ export function App() {
           projectsTabRequest={projectsTabRequest}
           focusVideoId={focusVideoId}
           onProjectsTabRequestConsumed={() => setProjectsTabRequest(null)}
+          youtubeShortsCount={youtubeShortsCount}
+          youtubeLengthBand={youtubeLengthBand}
+          onYoutubeShortsCountChange={setYoutubeShortsCount}
+          onYoutubeLengthBandChange={setYoutubeLengthBand}
         />
       );
     }
@@ -1361,12 +1355,20 @@ export function App() {
       <StudioShell
         title={title}
         activeTab={studioNav}
-        projectCount={blogClips.length + videos.length}
+        projectCount={projects.length || blogClips.length + videos.length}
         email={user.email}
         planLabel={usage?.plan_name ?? usage?.plan}
         bodyMode={bodyMode}
         titleAside={
-          isFlow && focusBlogClip ? (
+          isEditor && editingBlogClip ? (
+            <span className={`status-badge status-${editingBlogClip.status}`}>
+              {BLOG_CLIP_STATUS_LABELS[editingBlogClip.status]}
+            </span>
+          ) : isEditor && editingYoutubeClip ? (
+            <span className={`status-badge status-${editingYoutubeClip.status}`}>
+              {CLIP_STATUS_LABELS[editingYoutubeClip.status]}
+            </span>
+          ) : isFlow && focusBlogClip ? (
             <span className={`status-badge status-${focusBlogClip.status}`}>
               {BLOG_CLIP_STATUS_LABELS[focusBlogClip.status]}
             </span>

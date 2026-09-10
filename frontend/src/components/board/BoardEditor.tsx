@@ -510,10 +510,10 @@ export function BoardEditor({
         </div>
         <div className="board-editor-actions">
           <button className="ghost-button" type="button" onClick={handleRender} disabled={!canRender}>
-            {rendering ? "렌더링 시작 중" : "지금 렌더링"}
+            {rendering ? "렌더링 시작 중" : "렌더"}
           </button>
           <button className="primary-button" type="button" onClick={onClose}>
-            편집 완료
+            완료
           </button>
         </div>
       </header>

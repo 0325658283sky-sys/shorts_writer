@@ -4,6 +4,7 @@ import type {
   Clip,
   ClipMetadata,
   Highlight,
+  ProjectRecord,
   SubtitleStyle,
   Transcript,
   TtsMode,
@@ -43,6 +44,7 @@ function primaryActionLabel(item: ProjectListItem): string {
 }
 
 export function ProjectsPage({
+  projects,
   blogClips,
   videos,
   transcripts,
@@ -64,7 +66,6 @@ export function ProjectsPage({
   onResumeBlogClip,
   onDownloadBlogClip,
   onResumeVideo,
-  onResumeClip,
   onCreateNew,
   onAnalyze,
   onTranscript,
@@ -82,6 +83,7 @@ export function ProjectsPage({
   focusVideoId,
   onProjectsTabRequestConsumed,
 }: {
+  projects: ProjectRecord[];
   blogClips: BlogClip[];
   videos: Video[];
   transcripts: Record<number, Transcript>;
@@ -103,7 +105,6 @@ export function ProjectsPage({
   onResumeBlogClip: (blogClip: BlogClip) => void;
   onDownloadBlogClip: (blogClip: BlogClip) => void;
   onResumeVideo: (video: Video) => void;
-  onResumeClip: (clip: Clip) => void;
   onCreateNew: () => void;
   onAnalyze: (videoId: number) => void;
   onTranscript: (videoId: number) => void;
@@ -132,8 +133,8 @@ export function ProjectsPage({
   }, [projectsTabRequest, onProjectsTabRequestConsumed]);
 
   const allItems = useMemo(
-    () => buildProjectListItems({ blogClips, videos, clips }),
-    [blogClips, videos, clips],
+    () => buildProjectListItems({ projects, blogClips, videos, clips }),
+    [projects, blogClips, videos, clips],
   );
 
   const inProgressCount = useMemo(
@@ -164,10 +165,6 @@ export function ProjectsPage({
     }
     if (item.kind === "video" && item.video) {
       onResumeVideo(item.video);
-      return;
-    }
-    if (item.kind === "clip" && item.clip) {
-      onResumeClip(item.clip);
     }
   }
 
@@ -177,7 +174,7 @@ export function ProjectsPage({
         <header className="projects-header">
           <div>
             <h1 className="projects-title">프로젝트</h1>
-            <p className="projects-lead">작업 중과 완료를 한곳에서 이어하세요. 소스만 다를 뿐 같은 목록입니다.</p>
+            <p className="projects-lead">원본 하나가 카드 하나입니다. 유튜브·MP4는 그 안에서 쇼츠 여러 편을 엽니다.</p>
           </div>
           <button className="btn-primary" type="button" onClick={onCreateNew}>
             새 프로젝트
@@ -318,7 +315,6 @@ export function ProjectsPage({
               const blogClip = item.blogClip;
               const downloadableBlog = blogClip ? canDownloadBlogClip(blogClip) : false;
               const downloadingBlog = blogClip != null && downloadingBlogClipId === blogClip.id;
-              const downloadingClip = item.clip != null && downloadingClipId === item.clip.id;
               const progressPercent = item.bucket === "in_progress" ? (blogClip?.progress_percent ?? 0) : null;
               return (
                 <li key={item.key} className="projects-card">
@@ -338,7 +334,11 @@ export function ProjectsPage({
                       <BlogClipThumb blogClipId={blogClip.id} title={blogClip.blog_title} />
                     ) : (
                       <div className="projects-thumb" aria-hidden>
+                      {item.kind === "video" && item.shortsCount > 0 ? (
+                        <span className="projects-thumb-fallback">{item.shortsCount}</span>
+                      ) : (
                         <span className="projects-thumb-fallback">{PROJECT_SOURCE_LABELS[item.source].slice(0, 1)}</span>
+                      )}
                       </div>
                     )}
                     {progressPercent != null ? (
@@ -357,16 +357,6 @@ export function ProjectsPage({
                           {downloadingBlog ? "다운로드 중" : "다운로드"}
                         </button>
                       ) : null}
-                      {item.kind === "clip" && item.clip ? (
-                        <button
-                          className="small-button ghost-small"
-                          type="button"
-                          disabled={downloadingClip}
-                          onClick={() => onDownloadClip(item.clip!)}
-                        >
-                          {downloadingClip ? "다운로드 중" : "다운로드"}
-                        </button>
-                      ) : null}
                       <button className="small-button" type="button" onClick={() => resumeItem(item)}>
                         {primaryActionLabel(item)}
                       </button>
@@ -375,10 +365,12 @@ export function ProjectsPage({
                   <div className="projects-card-copy">
                     <strong>{item.title}</strong>
                     <span className="projects-card-meta">
-                      {PROJECT_SOURCE_LABELS[item.source]} · {formatDate(item.updatedAt)}
+                      {PROJECT_SOURCE_LABELS[item.source]}
+                      {item.kind === "video" && item.shortsCount > 0 ? ` · 쇼츠 ${item.shortsCount}편` : ""}
+                      {` · ${formatDate(item.updatedAt)}`}
                       {item.progressLabel ? ` · ${item.progressLabel}` : ""}
                     </span>
-                    <span className={`status-badge status-${item.blogClip?.status ?? item.clip?.status ?? "uploaded"}`}>
+                    <span className={`status-badge status-${item.blogClip?.status ?? item.video?.status ?? "uploaded"}`}>
                       {item.statusLabel}
                     </span>
                   </div>

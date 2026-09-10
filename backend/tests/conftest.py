@@ -102,6 +102,32 @@ def conn() -> sqlite3.Connection:
         )
         """
     )
+    connection.execute(
+        """
+        CREATE TABLE blog_clip_versions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            blog_clip_id INTEGER NOT NULL,
+            label TEXT NOT NULL,
+            source TEXT NOT NULL DEFAULT 'boards',
+            script_tone TEXT,
+            narration_script TEXT,
+            video_path TEXT,
+            subtitled_video_path TEXT,
+            status TEXT NOT NULL DEFAULT 'pending',
+            progress_stage TEXT NOT NULL DEFAULT 'queued',
+            progress_percent INTEGER NOT NULL DEFAULT 0,
+            error_message TEXT,
+            title_candidates_json TEXT,
+            description TEXT,
+            hashtags_json TEXT,
+            metadata_error TEXT,
+            render_spec_json TEXT,
+            override_json TEXT,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
     month = datetime.now(timezone.utc).strftime("%Y-%m")
     connection.execute(
         """

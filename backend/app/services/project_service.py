@@ -167,6 +167,19 @@ def get_project_by_video(conn: sqlite3.Connection, user_id: int, video_id: int) 
     return _row_to_project(row) if row else None
 
 
+def classify_project_source_kind(*, source_type: str, source_url: str | None, original_filename: str | None) -> str:
+    if source_type == "blog":
+        from app.services.product_service import is_supported_product_url
+
+        if source_url and is_supported_product_url(source_url):
+            return "product"
+        return "blog"
+    name = (original_filename or "").strip()
+    if name.startswith("YouTube - "):
+        return "youtube"
+    return "mp4"
+
+
 def list_projects_for_user(conn: sqlite3.Connection, user_id: int) -> list[Project]:
     rows = conn.execute(
         """

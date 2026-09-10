@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 
 import pytest
 from bs4 import BeautifulSoup
@@ -398,3 +399,75 @@ def test_create_intro_board_at_front(conn, awaiting_boards_clip, tmp_board_image
 
     boards = list_blog_clip_boards(conn, 1, clip_id)
     assert [b.id for b in boards] == [intro.id, first.id]
+
+
+def test_apply_render_overrides_changes_style_not_parent_object():
+    from app.services.blog_service import _apply_render_overrides
+    from conftest import make_blog_clip
+
+    parent = make_blog_clip(visual_style="impact_full", default_voice="alloy", bgm_asset_id=None)
+    updated = _apply_render_overrides(parent, {"visual_style": "card_white", "default_voice": "nova"})
+    assert parent.visual_style == "impact_full"
+    assert parent.default_voice == "alloy"
+    assert updated.visual_style == "card_white"
+    assert updated.default_voice == "nova"
+    assert updated.transition_type == "fade"
+
+
+def test_restyle_version_persists_override_and_leaves_parent(conn, awaiting_boards_clip, tmp_board_image):
+    from app.services import blog_service
+    from app.services.blog_service import create_blog_clip_versions, get_blog_clip_for_user
+
+    clip_id = awaiting_boards_clip
+    target_dir = blog_service.BLOG_IMAGE_ROOT / "1" / str(clip_id)
+    target_dir.mkdir(parents=True, exist_ok=True)
+    target = target_dir / "shot.jpg"
+    target.write_bytes(tmp_board_image.read_bytes())
+    create_blog_clip_board(conn, 1, clip_id, str(target), text="본문")
+    conn.execute(
+        "UPDATE blog_clips SET status = 'completed', progress_stage = 'done', progress_percent = 100, visual_style = 'impact_full' WHERE id = ?",
+        (clip_id,),
+    )
+    conn.commit()
+
+    created = create_blog_clip_versions(conn, 1, clip_id, "restyle", visual_style="card_white")
+    assert len(created) == 1
+    assert created[0].source == "boards"
+    assert created[0].status == "pending"
+    payload = json.loads(created[0].override_json or "{}")
+    assert payload["visual_style"] == "card_white"
+
+    parent = get_blog_clip_for_user(conn, 1, clip_id)
+    assert parent is not None
+    assert parent.status == "completed"
+    assert parent.visual_style in {"impact_full", "fullscreen"}
+
+
+def test_restyle_rejects_bad_slug(conn, awaiting_boards_clip, tmp_board_image):
+    from app.services import blog_service
+
+    clip_id = awaiting_boards_clip
+    target_dir = blog_service.BLOG_IMAGE_ROOT / "1" / str(clip_id)
+    target_dir.mkdir(parents=True, exist_ok=True)
+    target = target_dir / "shot.jpg"
+    target.write_bytes(tmp_board_image.read_bytes())
+    create_blog_clip_board(conn, 1, clip_id, str(target), text="본문")
+    conn.execute(
+        "UPDATE blog_clips SET status = 'completed', progress_stage = 'done', progress_percent = 100 WHERE id = ?",
+        (clip_id,),
+    )
+    conn.commit()
+
+    from app.services.blog_service import create_blog_clip_versions
+
+    with pytest.raises(HTTPException) as exc:
+        create_blog_clip_versions(conn, 1, clip_id, "restyle", visual_style="not_a_style")
+    assert exc.value.status_code == 400
+
+
+def test_restyle_requires_completed(conn, awaiting_boards_clip):
+    from app.services.blog_service import create_blog_clip_versions
+
+    with pytest.raises(HTTPException) as exc:
+        create_blog_clip_versions(conn, 1, awaiting_boards_clip, "restyle", visual_style="card_white")
+    assert exc.value.status_code == 409

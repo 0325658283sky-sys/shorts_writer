@@ -5,7 +5,7 @@ import { BgmPanel } from "./BgmPanel";
 import { VisualStylePanel } from "../VisualStylePanel";
 import { useBoardImageUrl } from "./useBoardImageUrl";
 
-type MediaTab = "media" | "style" | "voice" | "bgm";
+type MediaTab = "screen" | "voice" | "motion";
 
 function MediaThumb({
   blogClipId,
@@ -106,7 +106,7 @@ export function MediaPanel({
   autoDuration: boolean;
   onAutoDurationChange: (value: boolean) => void;
 }) {
-  const [tab, setTab] = useState<MediaTab>("media");
+  const [tab, setTab] = useState<MediaTab>("screen");
   const [stockQuery, setStockQuery] = useState("");
   const [stockResults, setStockResults] = useState<StockSearchResponse | null>(null);
   const [stockSearching, setStockSearching] = useState(false);
@@ -248,10 +248,9 @@ export function MediaPanel({
       <div className="media-tabs" role="tablist">
         {(
           [
-            ["media", "미디어"],
-            ["style", "스타일"],
+            ["screen", "화면"],
             ["voice", "음성"],
-            ["bgm", "BGM"],
+            ["motion", "모션"],
           ] as const
         ).map(([id, label]) => (
           <button key={id} className={`media-tab ${tab === id ? "active" : ""}`} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}>
@@ -260,7 +259,7 @@ export function MediaPanel({
         ))}
       </div>
 
-      {tab === "media" ? (
+      {tab === "screen" ? (
         <div className="media-tab-body">
           <p className="muted">다운로드된 이미지로 선택 보드를 교체합니다.</p>
           <div className="media-grid">
@@ -312,21 +311,25 @@ export function MediaPanel({
           </section>
 
           <p className="muted media-upload-note">로컬 업로드 — 곧 제공</p>
-
-          {selectedBoard ? (
-            <div className="duration-controls">
-              <label className="duration-auto">
-                <input type="checkbox" checked={autoDuration} onChange={(event) => onAutoDurationChange(event.target.checked)} />
-                길이 자동
-              </label>
-              {!autoDuration ? (
-                <label>
-                  길이(초)
-                  <input type="number" min={0.5} step={0.1} value={durationInput} onChange={(event) => onDurationChange(event.target.value)} onBlur={onDurationBlur} />
-                </label>
-              ) : null}
-            </div>
-          ) : null}
+          <VisualStylePanel
+            blogClipId={blogClipId}
+            appliedStyle={appliedVisualStyle}
+            styleTitle={styleTitle}
+            styleSubtitle={styleSubtitle}
+            styleOverlay={styleOverlay}
+            transitionSec={transitionSec}
+            transitionType={transitionType}
+            onApply={onApplyVisualStyle}
+            onStyleCopyChange={onStyleCopyChange}
+            onMotionChange={onMotionChange}
+            onTitlesGenerated={onTitlesGenerated}
+            onOverlayUpdated={onOverlayUpdated}
+            applying={applyingVisualStyle}
+            savingCopy={savingStyleCopy}
+            savingMotion={savingMotion}
+            onMessage={onMessage}
+            variant="screen"
+          />
         </div>
       ) : null}
 
@@ -396,39 +399,55 @@ export function MediaPanel({
               이 보드만 기본 보이스로
             </button>
           ) : null}
+          <BgmPanel
+            selectedBoard={selectedBoard}
+            bgmAssetId={bgmAssetId}
+            bgmVolume={bgmVolume}
+            onBgmChange={onBgmChange}
+            onSfxChange={onSfxChange}
+            saving={audioSaving}
+          />
         </div>
       ) : null}
 
-      {tab === "style" ? (
-        <VisualStylePanel
-          blogClipId={blogClipId}
-          appliedStyle={appliedVisualStyle}
-          styleTitle={styleTitle}
-          styleSubtitle={styleSubtitle}
-          styleOverlay={styleOverlay}
-          transitionSec={transitionSec}
-          transitionType={transitionType}
-          onApply={onApplyVisualStyle}
-          onStyleCopyChange={onStyleCopyChange}
-          onMotionChange={onMotionChange}
-          onTitlesGenerated={onTitlesGenerated}
-          onOverlayUpdated={onOverlayUpdated}
-          applying={applyingVisualStyle}
-          savingCopy={savingStyleCopy}
-          savingMotion={savingMotion}
-          onMessage={onMessage}
-        />
-      ) : null}
-
-      {tab === "bgm" ? (
-        <BgmPanel
-          selectedBoard={selectedBoard}
-          bgmAssetId={bgmAssetId}
-          bgmVolume={bgmVolume}
-          onBgmChange={onBgmChange}
-          onSfxChange={onSfxChange}
-          saving={audioSaving}
-        />
+      {tab === "motion" ? (
+        <div className="media-tab-body">
+          {selectedBoard ? (
+            <div className="duration-controls">
+              <label className="duration-auto">
+                <input type="checkbox" checked={autoDuration} onChange={(event) => onAutoDurationChange(event.target.checked)} />
+                길이 자동
+              </label>
+              {!autoDuration ? (
+                <label>
+                  길이(초)
+                  <input type="number" min={0.5} step={0.1} value={durationInput} onChange={(event) => onDurationChange(event.target.value)} onBlur={onDurationBlur} />
+                </label>
+              ) : null}
+            </div>
+          ) : (
+            <p className="muted">보드를 선택한 뒤 길이를 조절하세요.</p>
+          )}
+          <VisualStylePanel
+            blogClipId={blogClipId}
+            appliedStyle={appliedVisualStyle}
+            styleTitle={styleTitle}
+            styleSubtitle={styleSubtitle}
+            styleOverlay={styleOverlay}
+            transitionSec={transitionSec}
+            transitionType={transitionType}
+            onApply={onApplyVisualStyle}
+            onStyleCopyChange={onStyleCopyChange}
+            onMotionChange={onMotionChange}
+            onTitlesGenerated={onTitlesGenerated}
+            onOverlayUpdated={onOverlayUpdated}
+            applying={applyingVisualStyle}
+            savingCopy={savingStyleCopy}
+            savingMotion={savingMotion}
+            onMessage={onMessage}
+            variant="motion"
+          />
+        </div>
       ) : null}
     </aside>
   );

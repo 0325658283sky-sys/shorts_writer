@@ -189,6 +189,9 @@ def create_blog_clip(
         narration_language=request.narration_language,
         script_model=request.script_model,
     )
+    from app.services.project_service import ensure_project_for_blog_clip
+
+    ensure_project_for_blog_clip(conn, current_user.id, blog_clip.id, blog_clip.blog_title or url)
     background_tasks.add_task(run_blog_clip_pipeline, blog_clip.id, current_user.id, url, request.style)
     return _to_blog_clip_response(blog_clip)
 
@@ -703,6 +706,9 @@ def create_blog_clip_versions_endpoint(
         blog_clip_id,
         request.mode,
         request.tone,
+        visual_style=request.visual_style,
+        default_voice=request.default_voice,
+        bgm_asset_id=request.bgm_asset_id,
     )
     for version in versions:
         background_tasks.add_task(

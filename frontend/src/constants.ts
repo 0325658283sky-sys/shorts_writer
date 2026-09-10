@@ -16,6 +16,14 @@ export const TARGET_LENGTHS: TargetLength[] = ["short", "long"];
 export const NARRATION_LANGUAGES: NarrationLanguage[] = ["original", "ko", "en", "ja"];
 export const SCRIPT_MODELS: ScriptModel[] = ["gpt-4o", "gpt-4o-mini"];
 export const TTS_MODES: TtsMode[] = ["original_audio", "ai_narration"];
+export const YOUTUBE_SHORTS_COUNTS = [1, 2, 3, 4, 5] as const;
+export const YOUTUBE_LENGTH_BANDS = ["short", "medium", "long"] as const;
+export type YoutubeLengthBand = (typeof YOUTUBE_LENGTH_BANDS)[number];
+export const YOUTUBE_LENGTH_BAND_LABELS: Record<YoutubeLengthBand, string> = {
+  short: "짧음 · ~25초",
+  medium: "보통 · 25–45초",
+  long: "길게 · 45초+",
+};
 
 export const VIDEO_STATUS_LABELS: Record<VideoStatus, string> = {
   uploaded: "업로드됨",

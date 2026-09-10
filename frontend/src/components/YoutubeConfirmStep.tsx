@@ -23,12 +23,14 @@ function formatDuration(seconds: number | null): string {
 export function YoutubeConfirmStep({
   preview,
   importing,
+  inline = false,
   onCancel,
   onConfirm,
   onMessage,
 }: {
   preview: YoutubePreview;
   importing: boolean;
+  inline?: boolean;
   onCancel: () => void;
   onConfirm: (visualStyle: VisualStyleSlug | string) => void;
   onMessage: (message: string) => void;
@@ -65,12 +67,14 @@ export function YoutubeConfirmStep({
   const durationLabel = formatDuration(preview.duration_seconds);
 
   return (
-    <section className="yt-confirm" aria-label="유튜브 확인">
-      <header className="yt-confirm-header">
-        <p className="create-kicker">하이라이트 쇼츠</p>
-        <h2>영상이 맞는지 확인하세요</h2>
-        <p className="create-lead">아래 영상이 맞다면 템플릿을 고른 뒤 생성하기를 눌러 주세요. AI가 편집점을 잡아 쇼츠를 만듭니다.</p>
-      </header>
+    <section className={`yt-confirm${inline ? " yt-confirm-inline" : ""}`} aria-label="유튜브 확인">
+      {inline ? null : (
+        <header className="yt-confirm-header">
+          <p className="create-kicker">하이라이트 쇼츠</p>
+          <h2>영상이 맞는지 확인하세요</h2>
+          <p className="create-lead">아래 영상이 맞다면 템플릿을 고른 뒤 생성하기를 눌러 주세요. AI가 편집점을 잡아 쇼츠를 만듭니다.</p>
+        </header>
+      )}
 
       <div className="yt-confirm-bar" role="status">
         <span className="yt-confirm-bar-hint">⬇️ 템플릿을 고른 뒤 생성하기를 눌러주세요.</span>

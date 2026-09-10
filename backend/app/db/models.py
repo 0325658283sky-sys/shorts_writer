@@ -173,6 +173,7 @@ class BlogClipVersion:
     hashtags_json: str | None
     metadata_error: str | None
     render_spec_json: str | None
+    override_json: str | None
     created_at: str
     updated_at: str
 

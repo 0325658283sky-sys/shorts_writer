@@ -283,6 +283,21 @@ export type BlogClipVersion = {
   updated_at: string;
 };
 
+export type ProjectRecord = {
+  id: number;
+  source_type: "blog" | "video";
+  source_kind: "blog" | "product" | "youtube" | "mp4";
+  blog_clip_id: number | null;
+  video_id: number | null;
+  title: string;
+  status: string | null;
+  progress_percent: number | null;
+  shorts_count: number;
+  source_url: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type Voice = {
   id: string;
   name: string;

@@ -99,6 +99,9 @@ def upload_video(
     conn: sqlite3.Connection = Depends(get_connection),
 ) -> VideoResponse:
     video = create_video(conn, current_user.id, file)
+    from app.services.project_service import ensure_project_for_video
+
+    ensure_project_for_video(conn, current_user.id, video.id, video.original_filename)
     return _to_response(video)
 
 
@@ -109,6 +112,9 @@ def import_youtube(
     conn: sqlite3.Connection = Depends(get_connection),
 ) -> VideoResponse:
     video = import_youtube_video(conn, current_user.id, str(request.url))
+    from app.services.project_service import ensure_project_for_video
+
+    ensure_project_for_video(conn, current_user.id, video.id, video.original_filename)
     return _to_response(video)
 
 

@@ -137,7 +137,7 @@ export function StudioShell({
   onLogout,
 }: Props) {
   const createActive = bodyMode === "page" && activeTab === "create";
-  const projectsActive = bodyMode !== "page" || activeTab === "projects";
+  const projectsActive = bodyMode === "page" && activeTab === "projects";
   const usageActive = bodyMode === "page" && activeTab === "usage";
 
   return (
@@ -153,18 +153,18 @@ export function StudioShell({
               블로그
             </a>
           ) : null}
-          <button type="button" className={`studio-rail-link${createActive ? " is-active" : ""}`} onClick={() => onNavChange("create")}>
+          <button type="button" className={`studio-rail-link${createActive ? " is-active" : ""}`} aria-current={createActive ? "page" : undefined} onClick={() => onNavChange("create")}>
             <IconPlus />
             만들기
           </button>
-          <button type="button" className={`studio-rail-link${projectsActive ? " is-active" : ""}`} onClick={() => onNavChange("projects")}>
+          <button type="button" className={`studio-rail-link${projectsActive ? " is-active" : ""}`} aria-current={projectsActive ? "page" : undefined} onClick={() => onNavChange("projects")}>
             <IconFolder />
             프로젝트
             {projectCount > 0 ? <span className="studio-rail-count">{projectCount}</span> : null}
           </button>
         </nav>
         <div className="studio-rail-foot">
-          <button type="button" className={`studio-rail-link${usageActive ? " is-active" : ""}`} onClick={() => onNavChange("usage")}>
+          <button type="button" className={`studio-rail-link${usageActive ? " is-active" : ""}`} aria-current={usageActive ? "page" : undefined} onClick={() => onNavChange("usage")}>
             <IconSettings />
             요금
           </button>
@@ -172,12 +172,10 @@ export function StudioShell({
         </div>
       </aside>
       <div className="studio-shell-main">
-        {bodyMode !== "editor" ? (
-          <header className="studio-shell-title">
-            <span>{title}</span>
-            {titleAside ? <div className="studio-shell-title-aside">{titleAside}</div> : null}
-          </header>
-        ) : null}
+        <header className="studio-shell-title">
+          <span>{title}</span>
+          {titleAside ? <div className="studio-shell-title-aside">{titleAside}</div> : null}
+        </header>
         <div className={`studio-shell-body is-${bodyMode}`}>{children}</div>
       </div>
     </div>

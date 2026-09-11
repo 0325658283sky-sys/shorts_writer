@@ -261,6 +261,7 @@ export function MediaPanel({
 
       {tab === "screen" ? (
         <div className="media-tab-body">
+          <p className="media-scope-label">이 장면</p>
           <p className="muted">다운로드된 이미지로 선택 장면을 교체합니다.</p>
           <div className="media-grid">
             {uniqueImages.map((item) => (
@@ -311,6 +312,7 @@ export function MediaPanel({
           </section>
 
           <p className="muted media-upload-note">로컬 업로드 — 곧 제공</p>
+          <p className="media-scope-label">영상 전체</p>
           <VisualStylePanel
             blogClipId={blogClipId}
             appliedStyle={appliedVisualStyle}
@@ -335,9 +337,7 @@ export function MediaPanel({
 
       {tab === "voice" ? (
         <div className="media-tab-body">
-          <p className="muted">
-            장면별로 보이스를 지정하거나, <strong>모든 장면에 적용</strong>으로 일괄 설정하세요. 재생 속도는 클립 전체에 적용됩니다.
-          </p>
+          <p className="media-scope-label">영상 전체</p>
           <label className="voice-speed">
             재생 속도
             <input
@@ -351,6 +351,11 @@ export function MediaPanel({
             />
             <span className="muted">0.25–4.0 (기본 1.0 · 전체 장면)</span>
           </label>
+
+          <p className="media-scope-label">이 장면</p>
+          <p className="muted">
+            장면별로 보이스를 지정하거나, <strong>모든 장면에 적용</strong>으로 일괄 설정하세요.
+          </p>
           {selectedBoard ? (
             <p className="muted">
               선택 장면: {selectedBoard.speaker ? `보이스 ${selectedBoard.speaker}` : "기본 보이스 (환경설정)"}
@@ -412,6 +417,7 @@ export function MediaPanel({
 
       {tab === "motion" ? (
         <div className="media-tab-body">
+          <p className="media-scope-label">이 장면</p>
           {selectedBoard ? (
             <div className="duration-controls">
               <label className="duration-auto">
@@ -428,6 +434,8 @@ export function MediaPanel({
           ) : (
             <p className="muted">장면을 선택한 뒤 길이를 조절하세요.</p>
           )}
+
+          <p className="media-scope-label">영상 전체</p>
           <VisualStylePanel
             blogClipId={blogClipId}
             appliedStyle={appliedVisualStyle}

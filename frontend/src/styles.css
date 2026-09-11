@@ -5496,3 +5496,19 @@ button.flow-stepper-item.is-clickable:hover {
 .progress-notify input {
   accent-color: var(--accent);
 }
+
+/* --- Media panel: scope labels (step 9, 저위험 라벨링) --- */
+
+.media-scope-label {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  margin: 4px 0 2px;
+  padding: 0 7px;
+  border-radius: 5px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}

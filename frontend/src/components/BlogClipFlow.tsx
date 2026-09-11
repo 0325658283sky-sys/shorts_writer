@@ -121,19 +121,7 @@ export function BlogClipFlow({
         {flowMessage ? <p className="error-text flow-inline-error">{flowMessage}</p> : null}
 
         {isProgress ? (
-          <section className="flow-card flow-progress-card" aria-live="polite">
-            <p className="create-kicker">{isFinalRender ? "렌더 중" : "준비 중"}</p>
-            <h1>{isFinalRender ? "영상을 만들고 있어요" : "쇼츠를 준비하고 있어요"}</h1>
-            <p className="flow-lead">
-              {isFinalRender
-                ? "음성·BGM을 섞은 뒤 세로 영상을 합성하는 중입니다."
-                : "글을 읽고 이미지 후보와 대본을 준비하는 중입니다. 프로젝트 탭으로 나가도 생성이 이어집니다."}
-            </p>
-            <div className="flow-progress">
-              <AliveProgressBar className="blog-progress" percent={blogClip.progress_percent} active={isProgress} label={stageLabel} />
-            </div>
-            <p className="create-note flow-url">{blogClip.source_url}</p>
-          </section>
+          <ProgressLog blogClip={blogClip} isFinalRender={isFinalRender} stageLabel={stageLabel} />
         ) : null}
 
         {isAwaitingImages ? (
@@ -261,6 +249,107 @@ export function BlogClipFlow({
         ) : null}
       </main>
     </div>
+  );
+}
+
+const PREPARE_TASKS = [
+  { key: "read", label: "글 읽는 중", done: "글 본문 읽음", at: 18 },
+  { key: "images", label: "사진 모으는 중", done: "사진 찾음", at: 34 },
+  { key: "script", label: "대본 쓰는 중", done: "대본 3안 완성", at: 42 },
+];
+const RENDER_TASKS = [
+  { key: "voice", label: "음성 만드는 중", done: "음성 합성 완료", at: 72 },
+  { key: "video", label: "영상 합치는 중", done: "영상 합성 완료", at: 88 },
+  { key: "subs", label: "자막 넣는 중", done: "자막 입힘", at: 99 },
+];
+
+function ProgressLog({
+  blogClip,
+  isFinalRender,
+  stageLabel,
+}: {
+  blogClip: BlogClip;
+  isFinalRender: boolean;
+  stageLabel: string;
+}) {
+  const percent = blogClip.progress_percent ?? 0;
+  const tasks = isFinalRender ? RENDER_TASKS : PREPARE_TASKS;
+  const currentIndex = tasks.findIndex((task) => percent < task.at);
+
+  // 프론트 경과 타이머로 대략적인 ETA (정확하지 않음)
+  const etaRef = useRef<{ id: number; startMs: number; startPct: number } | null>(null);
+  if (!etaRef.current || etaRef.current.id !== blogClip.id) {
+    etaRef.current = { id: blogClip.id, startMs: Date.now(), startPct: percent };
+  }
+  const elapsedSec = (Date.now() - etaRef.current.startMs) / 1000;
+  const gained = percent - etaRef.current.startPct;
+  let eta: string | null = null;
+  if (percent >= 96) {
+    eta = "곧 끝나요";
+  } else if (gained > 1 && elapsedSec > 2) {
+    const rate = gained / elapsedSec;
+    const remain = Math.round((100 - percent) / rate);
+    if (remain >= 3 && remain <= 1800) {
+      eta = remain >= 60 ? `약 ${Math.round(remain / 60)}분 남음` : `약 ${remain}초 남음`;
+    }
+  }
+
+  const notifyAvailable = typeof Notification !== "undefined";
+  const [notify, setNotify] = useState(() => {
+    try {
+      return localStorage.getItem("nc_notify_on_done") === "1";
+    } catch {
+      return false;
+    }
+  });
+  function toggleNotify() {
+    const next = !notify;
+    setNotify(next);
+    try {
+      localStorage.setItem("nc_notify_on_done", next ? "1" : "0");
+    } catch {
+      /* private mode */
+    }
+    if (next && notifyAvailable && Notification.permission === "default") {
+      void Notification.requestPermission();
+    }
+  }
+
+  return (
+    <section className="flow-card flow-progress-card" aria-live="polite">
+      <div className="progress-head">
+        <div>
+          <p className="create-kicker">{isFinalRender ? "만드는 중" : "준비 중"}</p>
+          <h1>{isFinalRender ? "영상을 합치고 있어요" : "글을 읽고 장면을 짜는 중이에요"}</h1>
+        </div>
+        {eta ? <span className="progress-eta">{eta}</span> : null}
+      </div>
+
+      <AliveProgressBar className="blog-progress" percent={percent} active label={stageLabel} />
+
+      <ul className="progress-tasklog">
+        {tasks.map((task, index) => {
+          const state = percent >= task.at ? "done" : index === currentIndex ? "current" : "pending";
+          return (
+            <li key={task.key} className={`progress-task is-${state}`}>
+              <span className="progress-task-mark" aria-hidden="true">
+                {state === "done" ? "✓" : null}
+              </span>
+              <span className="progress-task-label">{state === "done" ? task.done : task.label}</span>
+            </li>
+          );
+        })}
+      </ul>
+
+      {notifyAvailable ? (
+        <label className="progress-notify">
+          <input type="checkbox" checked={notify} onChange={toggleNotify} />
+          <span>다 되면 알림 드릴게요 — 창을 닫아도 됩니다</span>
+        </label>
+      ) : null}
+
+      <p className="create-note flow-url">{blogClip.source_url}</p>
+    </section>
   );
 }
 

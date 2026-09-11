@@ -414,6 +414,21 @@ export function App() {
             ? current.map((item) => (item.id === updated.id ? updated : item))
             : [updated, ...current];
         });
+        if (updated.status === "completed") {
+          try {
+            if (
+              localStorage.getItem("nc_notify_on_done") === "1" &&
+              typeof Notification !== "undefined" &&
+              Notification.permission === "granted"
+            ) {
+              new Notification("쇼츠가 완성됐어요", {
+                body: updated.blog_title || "결과를 확인해 보세요",
+              });
+            }
+          } catch {
+            /* notifications unavailable */
+          }
+        }
         if (
           updated.status === "completed" ||
           updated.status === "failed" ||

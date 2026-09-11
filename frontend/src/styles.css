@@ -5208,3 +5208,111 @@ button.flow-stepper-item.is-clickable:hover {
   color: var(--muted);
   line-height: 1.4;
 }
+
+/* --- Progress screen: task log + ETA + notify (step 6, A안) --- */
+
+.progress-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.progress-head h1 {
+  margin: 0;
+}
+
+.progress-eta {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.progress-tasklog {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.progress-task {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 12.5px;
+}
+
+.progress-task-mark {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 800;
+  box-sizing: border-box;
+}
+
+.progress-task.is-done .progress-task-mark {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.progress-task.is-done .progress-task-label {
+  color: var(--ink-soft);
+}
+
+.progress-task.is-current .progress-task-mark {
+  border: 2px solid var(--accent);
+  border-top-color: transparent;
+  animation: nc-spin 0.8s linear infinite;
+}
+
+.progress-task.is-current .progress-task-label {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.progress-task.is-pending .progress-task-mark {
+  border: 1.5px solid var(--line-strong);
+}
+
+.progress-task.is-pending .progress-task-label {
+  color: var(--muted);
+}
+
+@keyframes nc-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.progress-notify {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  background: var(--surface-2);
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.progress-notify input {
+  accent-color: var(--accent);
+}

@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { API_BASE_URL, authorizedRequest, request, uploadRequest } from "./api/client";
 import { AuthPanel } from "./components/AuthPanel";
 import { BlogClipFlow } from "./components/BlogClipFlow";
@@ -24,6 +24,7 @@ import {
   type StudioTab,
 } from "./lib/appRoute";
 import { clearHandoffFromUrl, readInboundDeeplink } from "./lib/inboundDeeplink";
+import { buildProjectListItems } from "./lib/projectAdapters";
 import type {
   BlogClip,
   Board,
@@ -239,6 +240,22 @@ export function App() {
     skipHashSyncRef.current = true;
     writeAppRoute({ kind: "studio", tab }, "push");
   }
+
+  function handleGoToProjectsBucket(bucket: "in_progress" | "done") {
+    handleStudioNavChange("projects");
+    setProjectsTabRequest(bucket);
+  }
+
+  const projectBucketCounts = useMemo(() => {
+    const items = buildProjectListItems({ projects, blogClips, videos, clips });
+    let inProgress = 0;
+    let done = 0;
+    for (const item of items) {
+      if (item.bucket === "in_progress") inProgress += 1;
+      else done += 1;
+    }
+    return { inProgress, done };
+  }, [projects, blogClips, videos, clips]);
 
   useEffect(() => {
     const inbound = readInboundDeeplink();
@@ -1371,6 +1388,9 @@ export function App() {
         title={title}
         activeTab={studioNav}
         projectCount={projects.length || blogClips.length + videos.length}
+        inProgressCount={projectBucketCounts.inProgress}
+        doneCount={projectBucketCounts.done}
+        usage={usage}
         email={user.email}
         planLabel={usage?.plan_name ?? usage?.plan}
         bodyMode={bodyMode}
@@ -1394,6 +1414,7 @@ export function App() {
           ) : null
         }
         onNavChange={handleStudioNavChange}
+        onProjectsBucket={handleGoToProjectsBucket}
         onLogout={handleLogout}
       >
         {body}

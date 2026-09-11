@@ -240,7 +240,7 @@ export function CreateStudio({
 
             <ol className="create-steps">
               <li>{isProduct ? "상품 정보·이미지 수집" : "글 읽고 대본 3종 생성"}</li>
-              <li>이미지 · 톤 선택</li>
+              <li>이미지 · 말투 선택</li>
               <li>렌더 · 다운로드</li>
             </ol>
             {isProduct ? (

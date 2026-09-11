@@ -45,7 +45,7 @@ export function BoardListItem({
           {url && !error ? <img src={url} alt="" /> : <span className="board-thumb-fallback">{board.order_index + 1}</span>}
         </span>
         <span className="board-list-item-copy">
-          <strong>보드 {board.order_index + 1}</strong>
+          <strong>장면 {board.order_index + 1}</strong>
           {board.speaker ? <span className="board-speaker-badge">{board.speaker}</span> : null}
           <span className="muted">{previewText}</span>
         </span>

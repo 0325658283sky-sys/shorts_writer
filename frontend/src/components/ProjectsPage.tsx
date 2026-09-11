@@ -173,8 +173,8 @@ export function ProjectsPage({
       <div className="projects-panel">
         <header className="projects-header">
           <div>
-            <h1 className="projects-title">프로젝트</h1>
-            <p className="projects-lead">원본 하나가 카드 하나입니다. 유튜브·MP4는 그 안에서 쇼츠 여러 편을 엽니다.</p>
+            <h1 className="projects-title">내 쇼츠</h1>
+            <p className="projects-lead">만들다 만 작업은 이어서 하고, 완성본은 바로 내려받으세요.</p>
           </div>
           <button className="btn-primary" type="button" onClick={onCreateNew}>
             새 프로젝트
@@ -202,15 +202,6 @@ export function ProjectsPage({
             >
               완료
               <span className="projects-tab-count">{doneCount}</span>
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={view === "advanced"}
-              className={`projects-tab ${view === "advanced" ? "is-active" : ""}`}
-              onClick={() => setView("advanced")}
-            >
-              고급
             </button>
           </div>
           {view !== "advanced" ? (
@@ -378,6 +369,16 @@ export function ProjectsPage({
               );
             })}
           </ul>
+        )}
+
+        {view === "advanced" ? (
+          <button className="projects-labs-link" type="button" onClick={() => setView("in_progress")}>
+            ← 내 쇼츠로 돌아가기
+          </button>
+        ) : (
+          <button className="projects-labs-link" type="button" onClick={() => setView("advanced")}>
+            실험실(개발용) 열기
+          </button>
         )}
       </div>
     </section>

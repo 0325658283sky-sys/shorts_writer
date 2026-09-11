@@ -209,7 +209,7 @@ export const RemotionPreviewPane = forwardRef<
         }
       } catch (err) {
         if (!cancelled) {
-          setImagesError(err instanceof Error ? err.message : "보드 이미지를 불러오지 못했습니다.");
+          setImagesError(err instanceof Error ? err.message : "장면 이미지를 불러오지 못했습니다.");
           setImageUrls({});
         }
       } finally {
@@ -494,16 +494,16 @@ export const RemotionPreviewPane = forwardRef<
 
   if (boards.length === 0) {
     return (
-      <section className="preview-pane" aria-label="Remotion 미리보기">
+      <section className="preview-pane" aria-label="영상 미리보기">
         <div className="preview-empty">
-          <p>보드가 없습니다. 보드를 추가하세요.</p>
+          <p>장면이 없습니다. 장면을 추가하세요.</p>
         </div>
       </section>
     );
   }
 
   return (
-    <section className="preview-pane preview-pane-remotion" aria-label="Remotion 미리보기">
+    <section className="preview-pane preview-pane-remotion" aria-label="영상 미리보기">
       <div className="preview-edit-bar">
         <button
           type="button"
@@ -628,7 +628,7 @@ export const RemotionPreviewPane = forwardRef<
       ) : null}
 
       <p className="muted preview-remotion-note">
-        타임라인 길이는 TTS 보드 길이와 같고, 오디오는 최종 Remotion 렌더와 같은 믹스(사이드체인 덕킹)를 씁니다.
+        타임라인 길이는 나레이션 길이에 맞춰지고, 오디오는 최종 영상과 같은 믹스(배경음 자동 볼륨 조절)를 씁니다.
       </p>
       {!editMode ? (
         <label className="preview-text-editor">

@@ -7,16 +7,16 @@ import { useCandidateImageUrl } from "./useCandidateImageUrl";
 function CandidateThumb({
   blogClipId,
   candidate,
-  selected,
+  order,
   onToggle,
 }: {
   blogClipId: number;
   candidate: BlogClipImageCandidate;
-  selected: boolean;
+  order: number | null;
   onToggle: () => void;
 }) {
   const { url, error } = useCandidateImageUrl(blogClipId, candidate.id);
-
+  const selected = order != null;
   return (
     <button
       type="button"
@@ -25,9 +25,7 @@ function CandidateThumb({
       aria-pressed={selected}
     >
       {url ? <img src={url} alt="" /> : <span className="image-candidate-fallback">{error ? "!" : "…"}</span>}
-      <span className="image-candidate-check" aria-hidden="true">
-        {selected ? "✓" : ""}
-      </span>
+      {selected ? <span className="image-candidate-order">{order}</span> : null}
     </button>
   );
 }
@@ -55,14 +53,11 @@ export function ImageSelectStep({
         if (cancelled) return;
         setCandidates(loaded);
         const preselected = loaded.filter((item) => item.selected).map((item) => item.id);
-        const fallback = loaded.map((item) => item.id);
-        const initial = (preselected.length > 0 ? preselected : fallback).slice(0, BLOG_IMAGE_MAX_COUNT);
+        const initial = (preselected.length > 0 ? preselected : loaded.map((i) => i.id)).slice(0, BLOG_IMAGE_MAX_COUNT);
         setSelectedIds(initial);
       })
       .catch((error) => {
-        if (!cancelled) {
-          onMessage(error instanceof Error ? error.message : "이미지를 불러오지 못했습니다.");
-        }
+        if (!cancelled) onMessage(error instanceof Error ? error.message : "이미지를 불러오지 못했습니다.");
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -74,79 +69,64 @@ export function ImageSelectStep({
 
   function toggle(imageId: number) {
     setSelectedIds((current) => {
-      if (current.includes(imageId)) {
-        return current.filter((id) => id !== imageId);
-      }
+      if (current.includes(imageId)) return current.filter((id) => id !== imageId);
       if (current.length >= BLOG_IMAGE_MAX_COUNT) {
-        onMessage(`이미지는 최대 ${BLOG_IMAGE_MAX_COUNT}장까지 선택할 수 있습니다.`);
+        onMessage(`사진은 최대 ${BLOG_IMAGE_MAX_COUNT}장까지 넣을 수 있어요.`);
         return current;
       }
       return [...current, imageId];
     });
   }
 
-  const selected = candidates
-    .filter((item) => selectedIds.includes(item.id))
-    .sort((a, b) => selectedIds.indexOf(a.id) - selectedIds.indexOf(b.id));
-  const canContinue =
-    selectedIds.length >= BLOG_IMAGE_MIN_COUNT && selectedIds.length <= BLOG_IMAGE_MAX_COUNT && !confirming;
+  const count = selectedIds.length;
+  const canContinue = count >= BLOG_IMAGE_MIN_COUNT && count <= BLOG_IMAGE_MAX_COUNT && !confirming;
 
   return (
     <section className="flow-card flow-images-card">
-      <p className="create-kicker">이미지</p>
-      <h1>{blogClip.blog_title ?? "이미지를 고르세요"}</h1>
-      <p className="flow-lead">
-        {BLOG_IMAGE_MIN_COUNT}–{BLOG_IMAGE_MAX_COUNT}장을 고르면 대본 톤을 선택합니다. 선택 {selectedIds.length}장.
-      </p>
-
-      {loading ? <p className="create-note">이미지 불러오는 중…</p> : null}
-
-      {!loading && selected.length > 0 ? (
-        <div className="image-selected-block">
-          <h2 className="image-section-title">선택됨</h2>
-          <div className="image-candidate-grid">
-            {selected.map((candidate) => (
-              <CandidateThumb
-                key={`sel-${candidate.id}`}
-                blogClipId={blogClip.id}
-                candidate={candidate}
-                selected
-                onToggle={() => toggle(candidate.id)}
-              />
-            ))}
-          </div>
+      <div className="image-step-head">
+        <div>
+          <h1>쇼츠에 넣을 사진 고르기</h1>
+          <p className="flow-lead">고른 순서대로 장면이 됩니다. 최소 {BLOG_IMAGE_MIN_COUNT}장.</p>
         </div>
-      ) : null}
+        <div className="image-step-counter">
+          <strong>{count}</strong>
+          <span> / 최대 {BLOG_IMAGE_MAX_COUNT}</span>
+          <span className="image-step-gauge">
+            <span style={{ width: `${Math.min(100, (count / BLOG_IMAGE_MAX_COUNT) * 100)}%` }} />
+          </span>
+        </div>
+      </div>
+
+      {loading ? <p className="create-note">사진 불러오는 중…</p> : null}
 
       {!loading ? (
-        <div className="image-filmstrip-block">
-          <h2 className="image-section-title">후보</h2>
-          <div className="image-candidate-strip">
-            {candidates.map((candidate) => (
+        <div className="image-candidate-grid">
+          {candidates.map((candidate) => {
+            const index = selectedIds.indexOf(candidate.id);
+            return (
               <CandidateThumb
                 key={candidate.id}
                 blogClipId={blogClip.id}
                 candidate={candidate}
-                selected={selectedIds.includes(candidate.id)}
+                order={index === -1 ? null : index + 1}
                 onToggle={() => toggle(candidate.id)}
               />
-            ))}
-            <div className="image-candidate-add" aria-hidden="true">
-              <span>+</span>
-              <span>추가 (곧)</span>
-            </div>
-          </div>
+            );
+          })}
         </div>
       ) : null}
 
-      <button
-        className="cta-button flow-primary-cta"
-        type="button"
-        disabled={!canContinue}
-        onClick={() => onConfirm(selectedIds, blogClip.visual_style || "impact_full")}
-      >
-        {confirming ? "확인 중…" : "다음 · 대본 선택"}
-      </button>
+      <div className="image-step-foot">
+        <span className="create-note">사진이 {BLOG_IMAGE_MIN_COUNT}장보다 적으면 다음으로 넘어갈 수 없어요.</span>
+        <button
+          className="btn-primary btn-lg"
+          type="button"
+          disabled={!canContinue}
+          onClick={() => onConfirm(selectedIds, blogClip.visual_style || "impact_full")}
+        >
+          {confirming ? "확인 중…" : "다음 · 말투 고르기"}
+        </button>
+      </div>
     </section>
   );
 }

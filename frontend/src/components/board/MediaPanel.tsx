@@ -261,7 +261,7 @@ export function MediaPanel({
 
       {tab === "screen" ? (
         <div className="media-tab-body">
-          <p className="muted">다운로드된 이미지로 선택 보드를 교체합니다.</p>
+          <p className="muted">다운로드된 이미지로 선택 장면을 교체합니다.</p>
           <div className="media-grid">
             {uniqueImages.map((item) => (
               <MediaThumb
@@ -306,8 +306,8 @@ export function MediaPanel({
                 ))}
               </div>
             ) : null}
-            {!selectedBoard ? <p className="muted">보드를 선택한 뒤 스톡 이미지를 적용하세요.</p> : null}
-            {applyingStock ? <p className="muted">이미지를 보드에 적용하는 중…</p> : null}
+            {!selectedBoard ? <p className="muted">장면을 선택한 뒤 스톡 이미지를 적용하세요.</p> : null}
+            {applyingStock ? <p className="muted">이미지를 장면에 적용하는 중…</p> : null}
           </section>
 
           <p className="muted media-upload-note">로컬 업로드 — 곧 제공</p>
@@ -336,7 +336,7 @@ export function MediaPanel({
       {tab === "voice" ? (
         <div className="media-tab-body">
           <p className="muted">
-            보드별로 보이스를 지정하거나, <strong>모든 보드에 적용</strong>으로 일괄 설정하세요. 재생 속도는 클립 전체에 적용됩니다.
+            장면별로 보이스를 지정하거나, <strong>모든 장면에 적용</strong>으로 일괄 설정하세요. 재생 속도는 클립 전체에 적용됩니다.
           </p>
           <label className="voice-speed">
             재생 속도
@@ -349,14 +349,14 @@ export function MediaPanel({
               onChange={(event) => setSpeedDraft(event.target.value)}
               onBlur={handleSpeedBlur}
             />
-            <span className="muted">0.25–4.0 (기본 1.0 · 전체 보드)</span>
+            <span className="muted">0.25–4.0 (기본 1.0 · 전체 장면)</span>
           </label>
           {selectedBoard ? (
             <p className="muted">
-              선택 보드: {selectedBoard.speaker ? `보이스 ${selectedBoard.speaker}` : "기본 보이스 (환경설정)"}
+              선택 장면: {selectedBoard.speaker ? `보이스 ${selectedBoard.speaker}` : "기본 보이스 (환경설정)"}
             </p>
           ) : (
-            <p className="muted">보드를 선택한 뒤 보이스를 지정하세요.</p>
+            <p className="muted">장면을 선택한 뒤 보이스를 지정하세요.</p>
           )}
           {voiceError ? <p className="form-message">{voiceError}</p> : null}
           {voicesLoading ? <p className="muted">보이스 목록 불러오는 중…</p> : null}
@@ -379,7 +379,7 @@ export function MediaPanel({
                       disabled={!selectedBoard || assigningSpeaker || active}
                       onClick={() => void handleAssign(voice.id)}
                     >
-                      {active ? "적용됨" : "이 보드에"}
+                      {active ? "적용됨" : "이 장면에"}
                     </button>
                     <button
                       className="small-button"
@@ -387,7 +387,7 @@ export function MediaPanel({
                       disabled={assigningSpeaker}
                       onClick={() => void onApplyVoiceToAll(voice.id)}
                     >
-                      모든 보드에
+                      모든 장면에
                     </button>
                   </div>
                 </li>
@@ -396,7 +396,7 @@ export function MediaPanel({
           </ul>
           {selectedBoard?.speaker ? (
             <button className="ghost-button" type="button" disabled={assigningSpeaker} onClick={() => void handleAssign(null)}>
-              이 보드만 기본 보이스로
+              이 장면만 기본 보이스로
             </button>
           ) : null}
           <BgmPanel
@@ -426,7 +426,7 @@ export function MediaPanel({
               ) : null}
             </div>
           ) : (
-            <p className="muted">보드를 선택한 뒤 길이를 조절하세요.</p>
+            <p className="muted">장면을 선택한 뒤 길이를 조절하세요.</p>
           )}
           <VisualStylePanel
             blogClipId={blogClipId}

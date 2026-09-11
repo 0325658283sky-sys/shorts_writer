@@ -146,40 +146,13 @@ export function BlogClipFlow({
         ) : null}
 
         {isAwaitingScript ? (
-          <section className="flow-card">
-            <p className="create-kicker">대본 선택</p>
-            <h1>{blogClip.blog_title ?? "나레이션 톤을 고르세요"}</h1>
-            <p className="flow-lead">톤을 고르면 바로 영상을 만듭니다. 보드를 손보고 싶으면 보조 버튼을 쓰세요.</p>
-            <div className="script-tone-list">
-              {availableTones.map((tone) => (
-                <div className="script-tone-option" key={tone}>
-                  <div className="script-tone-header">
-                    <strong>{SCRIPT_TONE_LABELS[tone]}</strong>
-                    <span className="muted">{SCRIPT_TONE_HINTS[tone]}</span>
-                  </div>
-                  <p className="narration-script">{blogClip.script_candidates[tone]}</p>
-                  <div className="flow-step-actions">
-                    <button
-                      className="cta-button"
-                      type="button"
-                      onClick={() => onSelectScript(blogClip, tone)}
-                      disabled={selectingBlogScriptId === blogClip.id}
-                    >
-                      {selectingBlogScriptId === blogClip.id ? "선택 중…" : "이 대본으로 만들기"}
-                    </button>
-                    <button
-                      className="ghost-button"
-                      type="button"
-                      onClick={() => onSelectScript(blogClip, tone, { openEditor: true })}
-                      disabled={selectingBlogScriptId === blogClip.id}
-                    >
-                      보드 직접 편집
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
+          <ScriptToneStep
+            blogClip={blogClip}
+            tones={availableTones}
+            busy={selectingBlogScriptId === blogClip.id}
+            onSelect={(tone) => onSelectScript(blogClip, tone)}
+            onEdit={(tone) => onSelectScript(blogClip, tone, { openEditor: true })}
+          />
         ) : null}
 
         {isAwaitingBoards ? (
@@ -189,10 +162,10 @@ export function BlogClipFlow({
             <p className="flow-lead">템플릿과 보이스는 완료 화면에서 바꿀 수 있습니다.</p>
             <div className="flow-step-actions">
               <button className="ghost-button" type="button" onClick={() => onOpenBoardEditor(blogClip)}>
-                보드 직접 편집
+                장면 직접 편집
               </button>
-              <button className="cta-button flow-primary-cta" type="button" disabled={renderingFromFlow} onClick={() => onRender(blogClip)}>
-                {renderingFromFlow ? "시작 중…" : "렌더링"}
+              <button className="btn-primary btn-lg flow-primary-cta" type="button" disabled={renderingFromFlow} onClick={() => onRender(blogClip)}>
+                {renderingFromFlow ? "시작 중…" : "이대로 영상 만들기"}
               </button>
             </div>
           </section>
@@ -203,8 +176,8 @@ export function BlogClipFlow({
             <p className="create-kicker">실패</p>
             <h1>생성에 실패했습니다</h1>
             <p className="error-text">{blogClip.error_message ?? "알 수 없는 오류가 발생했습니다."}</p>
-            <button className="cta-button" type="button" onClick={onBackToStudio}>
-              작업실로 돌아가기
+            <button className="btn-primary" type="button" onClick={onBackToStudio}>
+              내 쇼츠로 돌아가기
             </button>
           </section>
         ) : null}
@@ -215,12 +188,15 @@ export function BlogClipFlow({
               <p className="create-kicker">결과</p>
               <h1>{blogClip.blog_title ?? "쇼츠가 완성되었습니다"}</h1>
               {blogClip.render_spec?.fallback_used || blogClip.render_spec?.engine === "ffmpeg" ? (
-                <p className="error-text flow-inline-error">
-                  템플릿이 적용되지 않은 FFmpeg 결과입니다
-                  {blogClip.render_spec?.fallback_used ? " (Remotion 서버 연결 실패 → 폴백)." : "."}{" "}
-                  Remotion(3100)을 켠 뒤 스타일을 다시 입혀 보세요.
-                  {blogClip.render_spec?.fallback_reason ? ` 사유: ${blogClip.render_spec.fallback_reason}` : ""}
-                </p>
+                <div className="flow-notice flow-notice-warning" role="status">
+                  <p className="flow-notice-title">간단 버전으로 만들어졌어요</p>
+                  <p className="flow-notice-body">
+                    템플릿·폰트가 빠진 기본 화면으로 렌더됐습니다. 다시 만들면 선택한 스타일이 적용됩니다.
+                  </p>
+                  <button className="btn-outline" type="button" onClick={() => onRender(blogClip)}>
+                    스타일 적용해서 다시 만들기
+                  </button>
+                </div>
               ) : null}
               <CompletedShortPlayer
                 blogClipId={blogClip.id}
@@ -229,15 +205,15 @@ export function BlogClipFlow({
               />
               <div className="flow-result-actions">
                 <button
-                  className="cta-button"
+                  className="btn-primary btn-lg"
                   type="button"
                   disabled={!blogClip.subtitled_video_path && !blogClip.video_path}
                   onClick={() => onDownloadBlogClip(blogClip)}
                 >
-                  {downloadingBlogClipId === blogClip.id ? "다운로드 중…" : "다운로드"}
+                  {downloadingBlogClipId === blogClip.id ? "다운로드 중…" : "MP4 다운로드"}
                 </button>
                 <button
-                  className="small-button metadata-button"
+                  className="btn-outline metadata-button"
                   type="button"
                   disabled={generatingBlogMetadataId === blogClip.id || (blogClip.title_candidates?.length ?? 0) > 0}
                   onClick={() => onGenerateMetadata(blogClip)}
@@ -245,13 +221,14 @@ export function BlogClipFlow({
                   {generatingBlogMetadataId === blogClip.id
                     ? "작성 중…"
                     : (blogClip.title_candidates?.length ?? 0) > 0
-                      ? "메타데이터 준비됨"
-                      : "메타데이터"}
+                      ? "문구 준비됨"
+                      : "업로드용 문구 만들기"}
                 </button>
-                <button className="ghost-button" type="button" onClick={onBackToStudio}>
-                  작업실로
+                <button className="btn-ghost" type="button" onClick={onBackToStudio}>
+                  내 쇼츠로
                 </button>
               </div>
+              <p className="create-note">스타일만 바꾸는 재생성은 크레딧이 들지 않습니다.</p>
               {(blogClip.title_candidates?.length ?? 0) > 0 || blogClip.description || (blogClip.hashtags?.length ?? 0) > 0 ? (
                 <MetadataBox
                   copiedKey={copiedKey}
@@ -284,5 +261,69 @@ export function BlogClipFlow({
         ) : null}
       </main>
     </div>
+  );
+}
+
+function ScriptToneStep({
+  blogClip,
+  tones,
+  busy,
+  onSelect,
+  onEdit,
+}: {
+  blogClip: BlogClip;
+  tones: ScriptTone[];
+  busy: boolean;
+  onSelect: (tone: ScriptTone) => void;
+  onEdit: (tone: ScriptTone) => void;
+}) {
+  const [active, setActive] = useState<ScriptTone>(tones[0]);
+  const script = blogClip.script_candidates[active] ?? "";
+  const chars = script.replace(/\s/g, "").length;
+  const seconds = Math.max(1, Math.round(chars / 4.5)); // 한국어 TTS 대략 4.5자/초
+
+  return (
+    <section className="flow-card">
+      <h1>어떤 말투로 읽어줄까요?</h1>
+      <p className="flow-lead">말투만 고르면 나머지는 자동입니다. 나중에 바꿀 수 있어요.</p>
+
+      <div className="tone-switch" role="tablist" aria-label="말투">
+        {tones.map((tone) => (
+          <button
+            key={tone}
+            type="button"
+            role="tab"
+            aria-selected={active === tone}
+            className={`tone-switch-item ${active === tone ? "is-active" : ""}`}
+            onClick={() => setActive(tone)}
+          >
+            {SCRIPT_TONE_LABELS[tone]}
+          </button>
+        ))}
+      </div>
+
+      <div className="tone-preview">
+        <div className="tone-preview-meta">
+          <span>
+            읽는 시간 <strong>{seconds}초</strong>
+          </span>
+          <span>·</span>
+          <span>
+            글자 <strong>{chars}자</strong>
+          </span>
+          <span className="tone-preview-hint">{SCRIPT_TONE_HINTS[active]}</span>
+        </div>
+        <p className="narration-script">{script}</p>
+      </div>
+
+      <div className="tone-actions">
+        <button className="btn-outline" type="button" disabled={busy} onClick={() => onEdit(active)}>
+          장면 다듬기
+        </button>
+        <button className="btn-primary btn-lg" type="button" disabled={busy} onClick={() => onSelect(active)}>
+          {busy ? "준비 중…" : "이 말투로 영상 만들기"}
+        </button>
+      </div>
+    </section>
   );
 }

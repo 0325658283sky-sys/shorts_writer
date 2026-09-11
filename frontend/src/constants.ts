@@ -44,8 +44,8 @@ export const CLIP_STATUS_LABELS: Record<ClipStatus, string> = {
 export const BLOG_CLIP_STATUS_LABELS: Record<BlogClipStatus, string> = {
   ...CLIP_STATUS_LABELS,
   awaiting_images: "이미지 선택 대기",
-  awaiting_script: "대본 선택 대기",
-  awaiting_boards: "보드 편집 대기",
+  awaiting_script: "말투 선택 대기",
+  awaiting_boards: "장면 편집 대기",
 };
 
 /** Mirrors backend BLOG_IMAGE_MIN/MAX_COUNT defaults. */
@@ -54,14 +54,14 @@ export const BLOG_IMAGE_MAX_COUNT = 8;
 
 export const SCRIPT_TONES: ScriptTone[] = ["summary", "hook", "detailed"];
 export const SCRIPT_TONE_LABELS: Record<ScriptTone, string> = {
-  summary: "요약형",
-  hook: "후킹형",
-  detailed: "상세형",
+  summary: "핵심만",
+  hook: "임팩트 있게",
+  detailed: "친근하게",
 };
 export const SCRIPT_TONE_HINTS: Record<ScriptTone, string> = {
-  summary: "핵심만 짧게",
-  hook: "홍보형 쇼츠 · 앞 3초 훅",
-  detailed: "조금 더 자세히",
+  summary: "짧고 담백하게 정리",
+  hook: "앞 3초에 시선을 끄는 홍보형",
+  detailed: "말 걸듯 자세히 설명",
 };
 
 export const SUBTITLE_STYLE_LABELS: Record<SubtitleStyle, string> = {
@@ -98,8 +98,8 @@ export const BLOG_PROGRESS_STAGE_LABELS: Record<string, string> = {
   downloading_images: "이미지 다운로드 중",
   generating_script: "나레이션 대본 작성 중",
   awaiting_images: "이미지 선택 대기",
-  awaiting_script: "대본 톤 선택 대기",
-  awaiting_boards: "보드 편집 대기",
+  awaiting_script: "대본 말투 선택 대기",
+  awaiting_boards: "장면 편집 대기",
   synthesizing_audio: "음성 합성 중",
   rendering_video: "영상 합성 중",
   burning_subtitles: "자막 입히는 중",

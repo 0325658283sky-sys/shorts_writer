@@ -165,7 +165,7 @@ export function VideoStyleStep({
       <div className="flow-step-actions">
         {onOpenBoardEditor ? (
           <button className="ghost-button" type="button" disabled={saving} onClick={onOpenBoardEditor}>
-            보드 직접 편집
+            장면 직접 편집
           </button>
         ) : null}
         <button className="cta-button flow-primary-cta" type="button" disabled={saving || loading} onClick={() => void handleContinue()}>

@@ -209,7 +209,7 @@ export function QuickSettingsStep({
           />
           <span>
             <strong>자동 SFX</strong>
-            <span className="muted"> 보드 전환 시 짧은 효과음</span>
+            <span className="muted"> 장면 전환 시 짧은 효과음</span>
           </span>
         </label>
       </div>
@@ -278,7 +278,7 @@ export function QuickSettingsStep({
         </button>
         {onOpenBoardEditor ? (
           <button className="ghost-button" type="button" onClick={onOpenBoardEditor} disabled={blocked}>
-            보드 직접 편집
+            장면 직접 편집
           </button>
         ) : null}
         <button className="cta-button flow-primary-cta" type="button" disabled={blocked} onClick={() => void handleRender()}>

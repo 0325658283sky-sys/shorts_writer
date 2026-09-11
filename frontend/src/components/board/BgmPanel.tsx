@@ -144,7 +144,7 @@ export function BgmPanel({
 
   return (
     <div className="media-tab-body">
-      <p className="muted">BGM은 TTS보다 작게 깔립니다. 보드별로 효과음을 넣을 수 있습니다.</p>
+      <p className="muted">BGM은 TTS보다 작게 깔립니다. 장면별로 효과음을 넣을 수 있습니다.</p>
       {error ? <p className="form-message">{error}</p> : null}
       {loading ? <p className="muted">오디오 목록 불러오는 중…</p> : null}
 
@@ -219,11 +219,11 @@ export function BgmPanel({
       </section>
 
       <section className="stock-search" aria-label="효과음">
-        <h3 className="stock-search-title">효과음 (선택 보드)</h3>
-        {!selectedBoard ? <p className="muted">보드를 선택한 뒤 효과음을 지정하세요.</p> : null}
+        <h3 className="stock-search-title">효과음 (선택 장면)</h3>
+        {!selectedBoard ? <p className="muted">장면을 선택한 뒤 효과음을 지정하세요.</p> : null}
         {selectedBoard ? (
           <p className="muted">
-            현재: {selectedBoard.sfx_asset_id ? `SFX #${selectedBoard.sfx_asset_id}` : "없음"} — 보드 시작 시 재생
+            현재: {selectedBoard.sfx_asset_id ? `SFX #${selectedBoard.sfx_asset_id}` : "없음"} — 장면 시작 시 재생
           </p>
         ) : null}
         <ul className="template-list">
@@ -245,7 +245,7 @@ export function BgmPanel({
                     disabled={!selectedBoard || saving || active}
                     onClick={() => void onSfxChange(asset.id)}
                   >
-                    {active ? "적용됨" : "이 보드에"}
+                    {active ? "적용됨" : "이 장면에"}
                   </button>
                 </div>
               </li>

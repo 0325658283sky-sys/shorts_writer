@@ -143,9 +143,7 @@ export function YoutubeConfirmStep({
             </button>
           ))}
         </div>
-        <p className="create-note">
-          선택한 템플릿은 쇼츠 생성·렌더 시 Remotion으로 MP4에 합성됩니다. Remotion(3100) 서버가 켜져 있어야 합니다.
-        </p>
+        <p className="create-note">선택한 템플릿이 최종 영상에 그대로 적용됩니다.</p>
       </div>
     </section>
   );

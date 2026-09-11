@@ -218,7 +218,7 @@ export function VisualStylePanel({
 
       {variant !== "screen" ? (
       <div className="motion-settings">
-        <p className="muted">보드 전환</p>
+        <p className="muted">장면 전환</p>
         <div className="motion-settings-row">
           {TRANSITION_OPTIONS.map((option) => (
             <button

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { authorizedRequest } from "../../api/client";
-import { SCRIPT_TONE_LABELS } from "../../constants";
 import type { BlogClip, Board } from "../../types";
 import { BoardList } from "./BoardList";
 import { MediaPanel } from "./MediaPanel";
@@ -69,7 +68,7 @@ export function BoardEditor({
       setAutoDuration(selected?.duration_seconds == null);
       setDurationInput(selected?.duration_seconds != null ? String(selected.duration_seconds) : "");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "보드를 불러오지 못했습니다.");
+      setError(err instanceof Error ? err.message : "장면을 불러오지 못했습니다.");
     } finally {
       setLoading(false);
     }
@@ -184,7 +183,7 @@ export function BoardEditor({
       rememberImagePaths(loaded);
       setSelectedBoardId(created.id);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "보드 추가에 실패했습니다.");
+      setError(err instanceof Error ? err.message : "장면 추가에 실패했습니다.");
     } finally {
       setAdding(false);
     }
@@ -213,9 +212,9 @@ export function BoardEditor({
       setBoards(loaded);
       rememberImagePaths(loaded);
       setSelectedBoardId(created.id);
-      onMessage("맨 앞에 인트로 보드를 추가했습니다.");
+      onMessage("맨 앞에 인트로 장면을 추가했습니다.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "인트로 보드 추가에 실패했습니다.");
+      setError(err instanceof Error ? err.message : "인트로 장면 추가에 실패했습니다.");
     } finally {
       setAdding(false);
     }
@@ -231,7 +230,7 @@ export function BoardEditor({
         setSelectedBoardId(loaded[0]?.id ?? null);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "보드 삭제에 실패했습니다.");
+      setError(err instanceof Error ? err.message : "장면 삭제에 실패했습니다.");
       await loadBoards();
     }
   }
@@ -265,7 +264,7 @@ export function BoardEditor({
       );
       setBoards((current) => current.map((board) => (board.id === updated.id ? updated : board)));
       rememberImagePaths([updated]);
-      onMessage("스톡 이미지를 보드에 적용했습니다.");
+      onMessage("스톡 이미지를 장면에 적용했습니다.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "스톡 이미지 적용에 실패했습니다.");
       throw err;
@@ -284,7 +283,7 @@ export function BoardEditor({
         body: JSON.stringify({ speaker: voiceId }),
       });
       setBoards((current) => current.map((board) => (board.id === updated.id ? updated : board)));
-      onMessage(voiceId ? `보드에 보이스 ${voiceId}를 적용했습니다.` : "보드 보이스를 기본값으로 되돌렸습니다.");
+      onMessage(voiceId ? `장면에 보이스 ${voiceId}를 적용했습니다.` : "장면 보이스를 기본값으로 되돌렸습니다.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "보이스 지정에 실패했습니다.");
       throw err;
@@ -311,7 +310,7 @@ export function BoardEditor({
       onClipUpdated?.(updated);
       const loaded = await authorizedRequest<Board[]>(`/blog-clips/${blogClip.id}/boards`);
       setBoards(loaded);
-      onMessage(`보이스 ${voiceId}를 모든 보드에 적용했습니다.`);
+      onMessage(`보이스 ${voiceId}를 모든 장면에 적용했습니다.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "일괄 보이스 적용에 실패했습니다.");
       throw err;
@@ -429,7 +428,7 @@ export function BoardEditor({
         body: JSON.stringify({ sfx_asset_id: sfxAssetId }),
       });
       setBoards((current) => current.map((board) => (board.id === updated.id ? updated : board)));
-      onMessage(sfxAssetId == null ? "보드 효과음을 제거했습니다." : "보드에 효과음을 적용했습니다.");
+      onMessage(sfxAssetId == null ? "장면 효과음을 제거했습니다." : "장면에 효과음을 적용했습니다.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "효과음 설정에 실패했습니다.");
       throw err;
@@ -479,7 +478,7 @@ export function BoardEditor({
     if (boards.length === 0) return;
     const hasText = boards.some((board) => (board.id === selectedBoardId ? draftText : board.text).trim());
     if (!hasText) {
-      setError("하나 이상의 보드에 나레이션 문구가 필요합니다.");
+      setError("하나 이상의 장면에 나레이션 문구가 필요합니다.");
       return;
     }
     setRendering(true);
@@ -490,7 +489,7 @@ export function BoardEditor({
       await previewPaneRef.current?.flushPendingEdits();
       const updated = await authorizedRequest<BlogClip>(`/blog-clips/${blogClip.id}/render`, { method: "POST" });
       onRendered(updated);
-      onMessage("보드 구성을 확정했습니다. 영상 렌더링을 시작합니다.");
+      onMessage("장면 구성을 확정했습니다. 영상 렌더링을 시작합니다.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "렌더링 시작에 실패했습니다.");
     } finally {
@@ -499,21 +498,24 @@ export function BoardEditor({
   }
 
   const canRender = boards.length > 0 && !rendering && !loading;
+  const totalSeconds = boards.reduce((sum, b) => sum + (b.duration_seconds ?? 0), 0);
 
   return (
-    <div className="board-editor" role="dialog" aria-modal="true" aria-label="보드 편집기">
+    <div className="board-editor" role="dialog" aria-modal="true" aria-label="장면 편집기">
       <header className="board-editor-header">
-        <div>
-          <p className="eyebrow">보드 편집</p>
+        <div className="board-editor-headline">
+          <button className="btn-ghost board-editor-back" type="button" onClick={onClose}>
+            ← 돌아가기
+          </button>
           <h2>{blogClip.blog_title ?? "블로그 쇼츠"}</h2>
-          {blogClip.script_tone ? <span className="muted">톤: {SCRIPT_TONE_LABELS[blogClip.script_tone]}</span> : null}
+          <span className="badge-success">자동 저장됨</span>
         </div>
         <div className="board-editor-actions">
-          <button className="ghost-button" type="button" onClick={handleRender} disabled={!canRender}>
-            {rendering ? "렌더링 시작 중" : "렌더"}
-          </button>
-          <button className="primary-button" type="button" onClick={onClose}>
-            완료
+          <span className="board-editor-summary">
+            {boards.length}장면 · {totalSeconds.toFixed(0)}초
+          </span>
+          <button className="btn-primary btn-lg" type="button" onClick={handleRender} disabled={!canRender}>
+            {rendering ? "시작 중…" : "이 구성으로 영상 만들기"}
           </button>
         </div>
       </header>
@@ -528,7 +530,7 @@ export function BoardEditor({
           ) : null}
         </div>
       ) : null}
-      {loading ? <p className="muted">보드를 불러오는 중…</p> : null}
+      {loading ? <p className="muted">장면을 불러오는 중…</p> : null}
 
       {!loading && (boards.length > 0 || !error) ? (
         <div className="board-editor-layout">

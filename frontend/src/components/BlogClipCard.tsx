@@ -115,7 +115,7 @@ export function BlogClipCard({
         return Array.from(byId.values()).sort((a, b) => a.id - b.id);
       });
       setVersionPollToken((token) => token + 1);
-      onMessage?.(mode === "all_tones" ? "다른 톤 버전 생성을 시작했습니다." : "보드 재생성 버전을 시작했습니다.");
+      onMessage?.(mode === "all_tones" ? "다른 톤 버전 생성을 시작했습니다." : "장면 재생성 버전을 시작했습니다.");
     } catch (error) {
       onMessage?.(error instanceof Error ? error.message : "버전 생성에 실패했습니다.");
     } finally {
@@ -202,14 +202,14 @@ export function BlogClipCard({
       <div className="highlight-meta">
         <span className={`status-badge status-${blogClip.status}`}>{BLOG_CLIP_STATUS_LABELS[blogClip.status]}</span>
         <span>자막: {SUBTITLE_STYLE_LABELS[blogClip.subtitle_style as SubtitleStyle] ?? blogClip.subtitle_style}</span>
-        {blogClip.script_tone ? <span>톤: {SCRIPT_TONE_LABELS[blogClip.script_tone]}</span> : null}
+        {blogClip.script_tone ? <span>말투: {SCRIPT_TONE_LABELS[blogClip.script_tone]}</span> : null}
       </div>
       {isInProgress ? (
         <AliveProgressBar percent={blogClip.progress_percent} active={isInProgress} label={stageLabel} />
       ) : null}
       {isAwaitingScript ? (
-        <div className="script-tone-picker" aria-label="나레이션 대본 톤 선택">
-          <p className="script-tone-intro">나레이션 톤을 선택하면 이미지별 보드가 자동 생성됩니다.</p>
+        <div className="script-tone-picker" aria-label="나레이션 말투 선택">
+          <p className="script-tone-intro">말투를 선택하면 이미지별 장면이 자동 생성됩니다.</p>
           <div className="script-tone-list">
             {availableTones.map((tone) => (
               <div className="script-tone-option" key={tone}>
@@ -232,12 +232,12 @@ export function BlogClipCard({
         </div>
       ) : null}
       {isAwaitingBoards ? (
-        <div className="board-render-shim" aria-label="보드 편집">
+        <div className="board-render-shim" aria-label="장면 편집">
           <p className="script-tone-intro">
-            {boardCount ? `보드 ${boardCount}개 준비됨` : "보드가 준비되었습니다"} — 편집 후 렌더링을 시작하세요.
+            {boardCount ? `장면 ${boardCount}개 준비됨` : "장면이 준비되었습니다"} — 다듬은 뒤 영상 만들기를 눌러 주세요.
           </p>
           <button className="small-button" type="button" onClick={() => onOpenBoardEditor(blogClip)}>
-            보드 편집
+            장면 편집
           </button>
         </div>
       ) : null}
@@ -287,21 +287,21 @@ export function BlogClipCard({
         />
       ) : null}
 
-      {isCompleted && blogClip.render_spec?.fallback_used ? (
-        <p className="form-message render-fallback-warning" role="alert">
-          <strong>템플릿·폰트가 적용되지 않았을 수 있습니다.</strong>
-          {" "}
-          Remotion 실패로 FFmpeg 폴백 렌더입니다(스타일 헤더·오버레이·커스텀 폰트 미적용).
-          Remotion 서비스(:3100)를 켠 뒤 다시 렌더하세요.
-          {blogClip.render_spec.fallback_reason
-            ? ` 사유: ${blogClip.render_spec.fallback_reason}`
-            : ""}
-        </p>
-      ) : null}
-      {isCompleted && blogClip.render_spec?.engine === "ffmpeg" && !blogClip.render_spec?.fallback_used ? (
-        <p className="form-message render-fallback-warning" role="status">
-          FFmpeg 엔진으로 렌더되었습니다. 비주얼 템플릿·온스크린 폰트는 Remotion 경로에서만 적용됩니다.
-        </p>
+      {isCompleted && (blogClip.render_spec?.fallback_used || blogClip.render_spec?.engine === "ffmpeg") ? (
+        <div className="flow-notice flow-notice-warning" role="status">
+          <p className="flow-notice-title">간단 버전으로 만들어졌어요</p>
+          <p className="flow-notice-body">
+            템플릿·폰트가 빠진 기본 화면으로 렌더됐습니다. 다시 만들면 선택한 스타일이 적용됩니다.
+          </p>
+          <button
+            className="btn-outline"
+            type="button"
+            onClick={() => void handleCreateVersions("boards")}
+            disabled={creatingVersions}
+          >
+            {creatingVersions ? "만드는 중…" : "스타일 적용해서 다시 만들기"}
+          </button>
+        </div>
       ) : null}
 
       {isCompleted ? (
@@ -315,7 +315,7 @@ export function BlogClipCard({
                 onClick={() => void handleCreateVersions("all_tones")}
                 disabled={creatingVersions}
               >
-                {creatingVersions ? "생성 중" : "다른 톤 만들기"}
+                {creatingVersions ? "생성 중" : "다른 말투로 만들기"}
               </button>
               <button
                 className="small-button ghost-small"
@@ -323,7 +323,7 @@ export function BlogClipCard({
                 onClick={() => void handleCreateVersions("boards")}
                 disabled={creatingVersions}
               >
-                보드 재생성
+                장면 재생성
               </button>
             </div>
           </div>

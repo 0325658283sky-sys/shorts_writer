@@ -109,7 +109,7 @@ export function MembershipPage({ usage }: { usage: Usage | null }) {
         </ul>
         <h3>차감되지 않는 작업</h3>
         <ul>
-          <li>블로그 스크랩, 이미지·대본 선택, 보드 편집, 프리뷰, 최종 렌더</li>
+          <li>블로그 스크랩, 이미지·대본 선택, 장면 편집, 프리뷰, 최종 렌더</li>
           <li>이미 분석된 영상의 전사·하이라이트·클립 자르기·자막</li>
         </ul>
         <p className="membership-footnote">

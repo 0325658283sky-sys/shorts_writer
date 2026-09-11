@@ -106,7 +106,7 @@ export function VoiceStep({
     <section className="flow-card">
       <p className="create-kicker">보이스</p>
       <h1>AI 나레이션 보이스를 고르세요</h1>
-      <p className="flow-lead">선택한 보이스와 속도가 모든 보드에 적용됩니다. 보드 편집기에서 보드별로도 바꿀 수 있어요.</p>
+      <p className="flow-lead">선택한 보이스와 속도가 모든 장면에 적용됩니다. 장면 편집기에서 장면별로도 바꿀 수 있어요.</p>
 
       <label className="create-field inline-field">
         <span>재생 속도</span>
@@ -131,7 +131,7 @@ export function VoiceStep({
 
       <div className="flow-step-actions">
         <button className="ghost-button" type="button" onClick={onBack}>
-          ← 보드로
+          ← 장면으로
         </button>
         <button className="cta-button" type="button" disabled={saving || loading} onClick={() => void handleContinue()}>
           {saving ? "저장 중…" : "다음 · 스타일/오디오"}

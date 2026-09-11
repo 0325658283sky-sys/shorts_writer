@@ -1158,7 +1158,7 @@ export function App() {
     const title = isYoutubeEditor
       ? "쇼츠 세부 편집"
       : isBoardEditor
-        ? "보드 편집"
+        ? "장면 편집"
         : focusBlogClip
           ? focusBlogClip.blog_title || "쇼츠"
           : focusYoutubeVideo
@@ -1395,7 +1395,7 @@ export function App() {
         <p className="landing-tagline">블로그·유튜브·MP4로 쇼츠를 만들고, 대본부터 자막까지 한 흐름으로.</p>
         <ul className="landing-points">
           <li>소스 선택 → 생성 → 편집</li>
-          <li>톤별 대본 · 보드 에디터</li>
+          <li>말투별 대본 · 장면 에디터</li>
           <li>버전 다운로드 · 메타데이터</li>
         </ul>
       </section>

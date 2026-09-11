@@ -28,12 +28,12 @@ export function BoardList({
   const dragIdRef = useRef<number | null>(null);
 
   return (
-    <aside className="board-list" aria-label="보드 목록">
+    <aside className="board-list" aria-label="장면 목록">
       <div className="board-list-header">
-        <h3>보드</h3>
+        <h3>장면</h3>
         <span className="muted">{boards.length}개</span>
       </div>
-      {boards.length === 0 ? <p className="muted">보드가 없습니다. 보드를 추가하세요.</p> : null}
+      {boards.length === 0 ? <p className="muted">장면이 없습니다. 장면을 추가하세요.</p> : null}
       <ul className="board-list-ul">
         {boards.map((board, index) => (
           <BoardListItem
@@ -64,7 +64,7 @@ export function BoardList({
           {adding ? "추가 중" : "+ 인트로"}
         </button>
         <button className="small-button" type="button" onClick={onAdd} disabled={adding}>
-          {adding ? "추가 중" : "+ 보드 추가"}
+          {adding ? "추가 중" : "+ 장면 추가"}
         </button>
       </div>
     </aside>

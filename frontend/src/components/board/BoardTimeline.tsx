@@ -99,7 +99,7 @@ export function BoardTimeline({
   if (boards.length === 0 || durationInFrames <= 0) return null;
 
   return (
-    <div className="board-timeline" aria-label="보드 타임라인">
+    <div className="board-timeline" aria-label="장면 타임라인">
       <div className="board-timeline-meta">
         <strong>타임라인</strong>
         <span className="muted">
@@ -130,7 +130,7 @@ export function BoardTimeline({
                 key={board.id}
                 className={`board-timeline-clip${selected ? " selected" : ""}`}
                 style={{ left: `${leftPct}%`, width: `${widthPct}%` }}
-                title={`보드 ${index + 1} · ${durationSec.toFixed(1)}s`}
+                title={`장면 ${index + 1} · ${durationSec.toFixed(1)}s`}
                 onClick={(event) => {
                   event.stopPropagation();
                   onSelectBoard(board.id);
@@ -144,7 +144,7 @@ export function BoardTimeline({
                   type="button"
                   className="board-timeline-resize"
                   data-resize-handle
-                  aria-label={`보드 ${index + 1} 길이 조절`}
+                  aria-label={`장면 ${index + 1} 길이 조절`}
                   onPointerDown={(event) => handleResizePointerDown(event, board.id, durationSec)}
                 />
               </div>

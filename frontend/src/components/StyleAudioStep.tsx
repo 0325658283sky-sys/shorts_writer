@@ -69,7 +69,7 @@ export function StyleAudioStep({
       <div>
         <h2 className="image-section-title">자막 템플릿</h2>
         <p className="option-help">
-          영상에 올라가는 자막의 글꼴·크기·위치를 정합니다. Remotion 최종 렌더와 FFmpeg 폴백 모두 이 선택을 참고합니다.
+          영상에 올라가는 자막의 글꼴·크기·위치를 정합니다. 최종 영상에 그대로 반영됩니다.
         </p>
         <div className="template-scroller">
           {templates.map((template) => (
@@ -113,11 +113,11 @@ export function StyleAudioStep({
           />
           <span>
             <strong>자동 BGM</strong>
-            <span className="muted"> 길이·톤에 맞는 시스템 배경음악을 자동 배정</span>
+            <span className="muted"> 길이·말투에 맞는 시스템 배경음악을 자동 배정</span>
           </span>
         </label>
         <p className="option-help option-help-indent">
-          대본 톤(요약/훅/상세)과 길이에 맞춰 시스템 BGM을 고릅니다. 아래에서 BGM을 직접 고르면 이 옵션은 꺼집니다.
+          대본 말투와 길이에 맞춰 시스템 BGM을 고릅니다. 아래에서 BGM을 직접 고르면 이 옵션은 꺼집니다.
         </p>
         <label className="toggle-row">
           <input
@@ -128,11 +128,11 @@ export function StyleAudioStep({
           />
           <span>
             <strong>자동 SFX</strong>
-            <span className="muted"> 보드 전환 시점에 짧은 효과음</span>
+            <span className="muted"> 장면 전환 시점에 짧은 효과음</span>
           </span>
         </label>
         <p className="option-help option-help-indent">
-          첫 보드를 제외한 전환 구간에 시스템 효과음을 붙입니다. 나레이션보다 작게 섞입니다.
+          첫 장면을 제외한 전환 구간에 시스템 효과음을 붙입니다. 나레이션보다 작게 섞입니다.
         </p>
       </div>
 

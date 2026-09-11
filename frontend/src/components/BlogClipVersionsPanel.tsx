@@ -81,7 +81,7 @@ export function BlogClipVersionsPanel({
         return Array.from(byId.values()).sort((a, b) => a.id - b.id);
       });
       setVersionPollToken((token) => token + 1);
-      onMessage?.(mode === "all_tones" ? "다른 톤 버전 생성을 시작했습니다." : "보드 재생성 버전을 시작했습니다.");
+      onMessage?.(mode === "all_tones" ? "다른 톤 버전 생성을 시작했습니다." : "장면 재생성 버전을 시작했습니다.");
     } catch (error) {
       onMessage?.(error instanceof Error ? error.message : "버전 생성에 실패했습니다.");
     } finally {
@@ -163,7 +163,7 @@ export function BlogClipVersionsPanel({
 
   return (
     <details className="blog-version-panel flow-versions">
-      <summary>다른 톤·버전</summary>
+      <summary>다른 말투·버전</summary>
       <div className="blog-version-header">
         <strong>버전</strong>
         <div className="blog-version-actions">
@@ -173,7 +173,7 @@ export function BlogClipVersionsPanel({
             onClick={() => void handleCreateVersions("all_tones")}
             disabled={creatingVersions}
           >
-            {creatingVersions ? "생성 중" : "다른 톤 만들기"}
+            {creatingVersions ? "생성 중" : "다른 말투로 만들기"}
           </button>
           <button
             className="small-button ghost-small"
@@ -181,7 +181,7 @@ export function BlogClipVersionsPanel({
             onClick={() => void handleCreateVersions("boards")}
             disabled={creatingVersions}
           >
-            보드 재생성
+            장면 재생성
           </button>
         </div>
       </div>

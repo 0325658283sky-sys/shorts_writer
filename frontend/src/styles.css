@@ -200,11 +200,13 @@ p {
   background: var(--page-bg);
 }
 
-.btn-lg {
+.btn-lg,
+.cta-button.flow-primary-cta {
   min-height: 42px;
-  padding: 0 18px;
+  padding: 0 20px;
   border-radius: 10px;
   font-size: 13.5px;
+  font-weight: 700;
 }
 
 .app-root {
@@ -2793,41 +2795,62 @@ button.flow-stepper-item.is-clickable:hover {
   letter-spacing: 0.02em;
 }
 
-.image-candidate-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
-  gap: 10px;
+.image-step-head {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  flex-wrap: wrap;
 }
 
-.image-candidate-strip {
+.image-step-head h1 {
+  margin: 0 0 4px;
+}
+
+.image-step-counter {
+  margin-left: auto;
   display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.image-step-counter strong {
+  font-size: 14px;
+  color: var(--accent);
+}
+
+.image-step-gauge {
+  width: 72px;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--line);
+  overflow: hidden;
+}
+
+.image-step-gauge > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 160ms ease;
+}
+
+.image-candidate-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
   gap: 10px;
-  overflow-x: auto;
-  padding-bottom: 6px;
 }
 
 .image-candidate {
   position: relative;
-  width: 96px;
-  height: 128px;
-  flex: 0 0 auto;
+  aspect-ratio: 9 / 16; /* 세로 쇼츠 구도를 미리 보여준다 */
   padding: 0;
-  border: 2px solid transparent;
-  border-radius: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
   overflow: hidden;
   background: var(--surface-2);
   cursor: pointer;
-}
-
-.image-candidate-grid .image-candidate {
-  width: 100%;
-  aspect-ratio: 3 / 4;
-  height: auto;
-}
-
-.image-candidate.is-selected {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
 }
 
 .image-candidate img {
@@ -2835,6 +2858,15 @@ button.flow-stepper-item.is-clickable:hover {
   height: 100%;
   object-fit: cover;
   display: block;
+}
+
+.image-candidate.is-selected {
+  border: 2px solid var(--accent);
+}
+
+.image-candidate:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 
 .image-candidate-fallback {
@@ -2846,34 +2878,34 @@ button.flow-stepper-item.is-clickable:hover {
   font-size: 18px;
 }
 
-.image-candidate-check {
+.image-candidate-order {
   position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 22px;
-  height: 22px;
-  border-radius: 999px;
-  background: rgba(20, 40, 30, 0.72);
+  top: 5px;
+  left: 5px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent);
   color: #fff;
-  font-size: 12px;
-  font-weight: 700;
-  display: grid;
-  place-items: center;
+  font-size: 11px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.image-candidate-add {
-  flex: 0 0 auto;
-  width: 96px;
-  height: 128px;
-  border: 1px dashed var(--line);
-  border-radius: 12px;
-  display: grid;
-  place-content: center;
-  gap: 4px;
-  color: var(--ink-soft);
-  font-size: 12px;
-  font-weight: 600;
-  background: transparent;
+.image-step-foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+
+.image-step-foot .btn-primary {
+  margin-left: auto;
+  white-space: nowrap;
 }
 
 .script-tone-picker,
@@ -3126,13 +3158,41 @@ button.flow-stepper-item.is-clickable:hover {
 }
 
 .board-editor-header h2 {
-  margin-bottom: 4px;
+  margin-bottom: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.board-editor-headline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .board-editor-actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 10px;
+}
+
+.board-editor-summary {
+  font-size: 12px;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.badge-success {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 5px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 10.5px;
+  font-weight: 700;
 }
 
 .board-editor-error {
@@ -4706,3 +4766,130 @@ button.flow-stepper-item.is-clickable:hover {
   }
 }
 
+
+/* --- Productization UX (handoff steps 1–5) --- */
+
+.flow-notice {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+}
+
+.flow-notice-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.flow-notice-body {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--ink-soft);
+}
+
+.flow-notice-warning {
+  border-color: var(--warm);
+}
+
+.flow-notice-warning .flow-notice-title {
+  color: var(--warm);
+}
+
+.projects-labs-link {
+  align-self: center;
+  margin-top: 18px;
+  padding: 4px 8px;
+  border: 0;
+  background: none;
+  font-size: 11.5px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.projects-labs-link:hover {
+  color: var(--ink-soft);
+}
+
+.tone-switch {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  background: var(--page-bg);
+  border-radius: 9px;
+}
+
+.tone-switch-item {
+  flex: 1;
+  min-height: 30px;
+  border: 0;
+  background: transparent;
+  border-radius: 7px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.tone-switch-item.is-active {
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 700;
+  box-shadow: var(--shadow);
+}
+
+.tone-switch-item:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.tone-preview {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  padding: 16px;
+}
+
+.tone-preview-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.tone-preview-meta strong {
+  color: var(--ink-soft);
+}
+
+.tone-preview-hint {
+  margin-left: auto;
+}
+
+.tone-preview .narration-script {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--ink);
+}
+
+.tone-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+
+.tone-actions .btn-primary {
+  margin-left: auto;
+  white-space: nowrap;
+}

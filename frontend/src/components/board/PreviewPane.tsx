@@ -20,7 +20,7 @@ export function PreviewPane({
     return (
       <section className="preview-pane" aria-label="미리보기">
         <div className="preview-empty">
-          <p>보드가 없습니다. 보드를 추가하세요.</p>
+          <p>장면이 없습니다. 장면을 추가하세요.</p>
         </div>
       </section>
     );
@@ -29,7 +29,7 @@ export function PreviewPane({
   return (
     <section className="preview-pane" aria-label="미리보기">
       <div className="preview-frame" key={board.id}>
-        {url && !error ? <img className="preview-image" src={url} alt={`보드 ${board.order_index + 1}`} /> : <div className="preview-placeholder">보드 {board.order_index + 1}</div>}
+        {url && !error ? <img className="preview-image" src={url} alt={`장면 ${board.order_index + 1}`} /> : <div className="preview-placeholder">장면 {board.order_index + 1}</div>}
         <div className="preview-caption">{draftText.trim() || "나레이션 문구를 입력하세요"}</div>
       </div>
       <label className="preview-text-editor">

@@ -5519,6 +5519,45 @@ button.flow-stepper-item.is-clickable:hover {
   max-width: 1040px;
 }
 
+.gallery-step-combined {
+  max-width: 1180px;
+}
+
+.gallery-shell {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 960px) {
+  .gallery-shell {
+    grid-template-columns: 1fr;
+  }
+}
+
+.gallery-options-col {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  position: sticky;
+  top: 0;
+}
+
+@media (max-width: 960px) {
+  .gallery-options-col {
+    position: static;
+  }
+}
+
+.gallery-main-col {
+  min-width: 0;
+}
+
 .gallery-layout {
   display: grid;
   grid-template-columns: 1fr 300px;

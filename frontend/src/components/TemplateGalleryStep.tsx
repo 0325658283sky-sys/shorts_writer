@@ -73,6 +73,7 @@ export function TemplateGalleryStep({
   onContinue,
   onSkip,
   onMessage,
+  optionsPanel,
 }: {
   /** 블로그 쇼츠 모드(clipKind === "blog", 기본값)에서 필수. */
   blogClip?: BlogClip;
@@ -82,6 +83,8 @@ export function TemplateGalleryStep({
   onContinue: (updated: BlogClip | Clip) => void;
   onSkip: () => void;
   onMessage?: (message: string) => void;
+  /** Pikaclip식 통합 화면용: 좌측에 렌더링할 옵션 패널(보이스/언어). 생략 시 기존 단독 단계 레이아웃. */
+  optionsPanel?: React.ReactNode;
 }) {
   const entityId = clipKind === "youtube" ? clip?.id : blogClip?.id;
   const initialTemplateId = clipKind === "youtube" ? clip?.subtitle_template_id : blogClip?.subtitle_template_id;
@@ -216,8 +219,8 @@ export function TemplateGalleryStep({
     }
   }
 
-  return (
-    <section className="flow-card gallery-step">
+  const body = (
+    <>
       <p className="create-kicker">템플릿</p>
       <h1>자막 템플릿을 골라주세요</h1>
       <p className="flow-lead">건너뛰어도 기존 스타일의 자막이 그대로 적용됩니다.</p>
@@ -312,6 +315,19 @@ export function TemplateGalleryStep({
           ) : null}
         </div>
       </div>
-    </section>
+    </>
   );
+
+  if (optionsPanel) {
+    return (
+      <section className="flow-card gallery-step gallery-step-combined">
+        <div className="gallery-shell">
+          <div className="gallery-options-col">{optionsPanel}</div>
+          <div className="gallery-main-col">{body}</div>
+        </div>
+      </section>
+    );
+  }
+
+  return <section className="flow-card gallery-step">{body}</section>;
 }

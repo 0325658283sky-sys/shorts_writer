@@ -7,6 +7,7 @@ import { BlogClipVersionsPanel } from "./BlogClipVersionsPanel";
 import { CompletedShortPlayer } from "./CompletedShortPlayer";
 import { ImageSelectStep } from "./ImageSelectStep";
 import { MetadataBox } from "./MetadataBox";
+import { GenerationOptionsPanel } from "./GenerationOptionsPanel";
 import { TemplateGalleryStep } from "./TemplateGalleryStep";
 
 const FLOW_STEPS = [
@@ -157,6 +158,9 @@ export function BlogClipFlow({
             }}
             onSkip={() => setGalleryHandledId(blogClip.id)}
             onMessage={onMessage}
+            optionsPanel={
+              <GenerationOptionsPanel clipKind="blog" blogClip={blogClip} onBlogClipUpdated={onBlogClipUpdated} onMessage={onMessage} />
+            }
           />
         ) : null}
 

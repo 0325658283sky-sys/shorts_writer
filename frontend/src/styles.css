@@ -5558,6 +5558,63 @@ button.flow-stepper-item.is-clickable:hover {
   min-width: 0;
 }
 
+/* --- Pikaclip식 통합 화면 좌측 옵션 패널 --- */
+
+.options-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.options-panel-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 0 0 2px;
+}
+
+.options-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12.5px;
+}
+
+.options-field-label {
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.options-field-value {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.options-select,
+.options-input {
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 12.5px;
+}
+
+.options-preview-btn {
+  align-self: flex-start;
+  height: 30px;
+  padding: 0 12px;
+  font-size: 12px;
+}
+
+.options-panel-hint {
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  margin: 4px 0 0;
+  line-height: 1.4;
+}
+
 .gallery-layout {
   display: grid;
   grid-template-columns: 1fr 300px;

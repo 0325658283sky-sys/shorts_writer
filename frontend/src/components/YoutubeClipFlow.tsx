@@ -4,6 +4,7 @@ import { friendlyProgressFromVideoStatus } from "../constants";
 import type { YoutubeLengthBand } from "../constants";
 import type { Clip, ClipMetadata, Highlight, SubtitleStyle, Transcript, TtsMode, Video, VideoStatusResponse } from "../types";
 import { AliveProgressBar } from "./AliveProgressBar";
+import { GenerationOptionsPanel } from "./GenerationOptionsPanel";
 import { TemplateGalleryStep } from "./TemplateGalleryStep";
 
 const FLOW_STEPS = [
@@ -374,6 +375,7 @@ export function YoutubeClipFlow({
               onContinue={(updated) => void handleTemplateApplied(updated as Clip)}
               onSkip={() => setShowTemplateGallery(false)}
               onMessage={onMessage}
+              optionsPanel={workspaceClips[0] ? <GenerationOptionsPanel clipKind="youtube" clip={workspaceClips[0]} /> : undefined}
             />
           ) : null}
 

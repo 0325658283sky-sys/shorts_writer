@@ -11,6 +11,13 @@ RUN cd frontend && npm ci
 COPY frontend frontend
 COPY remotion/src remotion/src
 
+# remotion/src/*.tsx are type-checked as their own files (frontend/tsconfig.json
+# includes them directly), so Node/TS module resolution walks up from
+# remotion/src/ looking for node_modules to find the "react"/"remotion" type
+# declarations. We only copied remotion/src (no remotion/node_modules), so
+# without this symlink every file in there fails with "Cannot find module".
+RUN ln -s /repo/frontend/node_modules /repo/remotion/node_modules
+
 WORKDIR /repo/frontend
 ARG VITE_API_BASE_URL
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL

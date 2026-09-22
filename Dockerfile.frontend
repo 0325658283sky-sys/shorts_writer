@@ -1,0 +1,25 @@
+# Builds frontend/ for production. Needs the repo root as build context because
+# frontend/src imports remotion/src directly via the "@new-cut/remotion" alias
+# (see frontend/vite.config.ts) — Railway's per-service "Root Directory" would
+# otherwise scope the build to frontend/ alone and that import would fail.
+FROM node:20-slim AS build
+WORKDIR /repo
+
+COPY frontend/package.json frontend/package-lock.json frontend/
+RUN cd frontend && npm ci
+
+COPY frontend frontend
+COPY remotion/src remotion/src
+
+WORKDIR /repo/frontend
+ARG VITE_API_BASE_URL
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+RUN npm run build
+
+FROM node:20-slim
+WORKDIR /app
+COPY --from=build /repo/frontend/dist ./dist
+COPY --from=build /repo/frontend/node_modules/serve ./node_modules/serve
+
+EXPOSE 3000
+CMD ["sh", "-c", "node node_modules/serve/build/main.js -s dist -l ${PORT:-3000}"]

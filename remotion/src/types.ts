@@ -66,6 +66,25 @@ export type ShortsFontId =
 
 export type CaptionAnimation = "none" | "highlight";
 
+/** ④ 템플릿 갤러리 (design_handoff_newcut_v2) — subtitle_templates의 새 필드.
+ * 있으면 캡션 위치/모양/강조색/폰트를 이 값으로 덮어쓰고, 없으면 기존
+ * visualStyle의 caption 변형(center_stroke 등)을 그대로 쓴다. */
+export type CaptionTemplatePosition = "top" | "bottom";
+export type CaptionTemplateBoxStyle =
+  | "none"
+  | "box"
+  | "pill"
+  | "side_bar"
+  | "gradient"
+  | "outline";
+
+export type CaptionTemplateProps = {
+  position: CaptionTemplatePosition;
+  boxStyle: CaptionTemplateBoxStyle;
+  accentColor?: string | null;
+  fontFamily?: ShortsFontId | string | null;
+};
+
 export type StyleOverlayProps = {
   titleFont?: ShortsFontId | string | null;
   captionFont?: ShortsFontId | string | null;
@@ -105,6 +124,8 @@ export type BlogShortsProps = {
   visualStyle?: VisualStyleSlug | string | null;
   style?: BlogShortsStyleProps | null;
   overlay?: StyleOverlayProps | null;
+  /** ④ 템플릿 갤러리에서 고른 subtitle_template의 캡션 표현. 없으면 style.caption 그대로 사용. */
+  captionTemplate?: CaptionTemplateProps | null;
   /** Hide text layers (preview HTML editor draws them instead). */
   suppressText?: boolean;
   /** YouTube / channel branding footer (yt_profile). */

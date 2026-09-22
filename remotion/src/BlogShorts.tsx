@@ -18,6 +18,8 @@ import type {
   BlogShortsProps,
   BlogShortsStyleProps,
   CaptionAnimation,
+  CaptionTemplateBoxStyle,
+  CaptionTemplateProps,
   CaptionWordTiming,
   StyleOverlayLayer,
   StyleOverlayProps,
@@ -396,6 +398,17 @@ function TitleLayers({
   );
 }
 
+/** 밝은 배경 위에 검정, 어두운 배경 위에 흰색 — box/pill/gradient 텍스트 대비용. */
+function readableTextColor(hexColor: string): string {
+  const hex = hexColor.replace("#", "");
+  if (hex.length !== 6) return "#ffffff";
+  const r = parseInt(hex.slice(0, 2), 16);
+  const g = parseInt(hex.slice(2, 4), 16);
+  const b = parseInt(hex.slice(4, 6), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.6 ? "#16161A" : "#ffffff";
+}
+
 function CaptionBlock({
   children,
   caption,
@@ -403,13 +416,16 @@ function CaptionBlock({
   captionFontId,
   captionY,
   captionOpacity,
+  accentColor,
 }: {
   children: React.ReactNode;
-  caption: BlogShortsStyleProps["caption"];
+  caption: BlogShortsStyleProps["caption"] | CaptionTemplateBoxStyle;
   layer: StyleOverlayLayer;
   captionFontId: string;
   captionY: number;
   captionOpacity: number;
+  /** ④ 템플릿 갤러리 강조색 — box/pill/gradient/outline/side_bar 렌더에 쓰인다. */
+  accentColor?: string | null;
 }) {
   if (!layer.visible) return null;
   const captionFont = shortsFontCss(captionFontId, "caption");
@@ -496,7 +512,135 @@ function CaptionBlock({
     );
   }
 
-  // white_pill
+  // ④ 템플릿 갤러리 box_style — subtitle_templates.box_style가 그대로 caption 값으로 들어온다.
+  if (caption === "box" || caption === "pill") {
+    const bg = accentColor || "#000000";
+    return (
+      <div style={box}>
+        <div
+          style={{
+            display: "inline-block",
+            maxWidth: "100%",
+            padding: "12px 20px",
+            borderRadius: caption === "pill" ? 999 : 8,
+            backgroundColor: bg,
+            color: readableTextColor(bg),
+            fontSize: layer.fontSize,
+            fontWeight: captionFont.fontWeight,
+            fontFamily: captionFont.fontFamily,
+            lineHeight: 1.35,
+            letterSpacing: "-0.02em",
+            textAlign: textAlign(layer),
+            whiteSpace: "pre-wrap",
+          }}
+        >
+          {children}
+        </div>
+      </div>
+    );
+  }
+
+  if (caption === "side_bar") {
+    return (
+      <div style={box}>
+        <div
+          style={{
+            display: "inline-block",
+            maxWidth: "100%",
+            padding: "4px 14px",
+            borderLeft: `4px solid ${accentColor || "#FFE500"}`,
+            color: "#ffffff",
+            fontSize: layer.fontSize,
+            fontWeight: captionFont.fontWeight,
+            fontFamily: captionFont.fontFamily,
+            lineHeight: 1.35,
+            letterSpacing: "-0.02em",
+            textAlign: "left",
+            whiteSpace: "pre-wrap",
+            textShadow: "0 2px 8px rgba(0,0,0,0.5)",
+          }}
+        >
+          {children}
+        </div>
+      </div>
+    );
+  }
+
+  if (caption === "gradient") {
+    const from = accentColor || "#4B3BFF";
+    return (
+      <div style={box}>
+        <div
+          style={{
+            display: "inline-block",
+            maxWidth: "100%",
+            padding: "12px 20px",
+            borderRadius: 8,
+            backgroundImage: `linear-gradient(90deg, ${from}, #C1338D)`,
+            color: "#ffffff",
+            fontSize: layer.fontSize,
+            fontWeight: captionFont.fontWeight,
+            fontFamily: captionFont.fontFamily,
+            lineHeight: 1.35,
+            letterSpacing: "-0.02em",
+            textAlign: textAlign(layer),
+            whiteSpace: "pre-wrap",
+          }}
+        >
+          {children}
+        </div>
+      </div>
+    );
+  }
+
+  if (caption === "outline") {
+    return (
+      <div style={box}>
+        <div
+          style={{
+            color: "#ffffff",
+            fontSize: layer.fontSize,
+            fontWeight: captionFont.fontWeight,
+            fontFamily: captionFont.fontFamily,
+            lineHeight: 1.3,
+            letterSpacing: "-0.02em",
+            textAlign: textAlign(layer),
+            whiteSpace: "pre-wrap",
+            width: "100%",
+            WebkitTextStroke: `3px ${accentColor || "#4B3BFF"}`,
+            paintOrder: "stroke fill",
+          }}
+        >
+          {children}
+        </div>
+      </div>
+    );
+  }
+
+  if (caption === "none") {
+    return (
+      <div style={box}>
+        <div
+          style={{
+            color: accentColor || "#ffffff",
+            fontSize: layer.fontSize,
+            fontWeight: captionFont.fontWeight,
+            fontFamily: captionFont.fontFamily,
+            lineHeight: 1.3,
+            letterSpacing: "-0.02em",
+            textAlign: textAlign(layer),
+            whiteSpace: "pre-wrap",
+            width: "100%",
+            textShadow: "0 2px 10px rgba(0,0,0,0.55), 0 0 2px rgba(0,0,0,0.4)",
+          }}
+        >
+          {children}
+        </div>
+      </div>
+    );
+  }
+
+  // white_pill (기존 visualStyle 캡션 변형)
   return (
     <div style={box}>
       <div
@@ -542,15 +686,17 @@ function KineticCaptionBlock({
   captionY,
   captionOpacity,
   captionAnimation,
+  accentColor,
 }: {
   text: string;
   words?: CaptionWordTiming[] | null;
-  caption: BlogShortsStyleProps["caption"];
+  caption: BlogShortsStyleProps["caption"] | CaptionTemplateBoxStyle;
   layer: StyleOverlayLayer;
   captionFontId: string;
   captionY: number;
   captionOpacity: number;
   captionAnimation: CaptionAnimation;
+  accentColor?: string | null;
 }) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -568,6 +714,7 @@ function KineticCaptionBlock({
         captionFontId={captionFontId}
         captionY={captionY}
         captionOpacity={captionOpacity}
+        accentColor={accentColor}
       >
         {text}
       </CaptionBlock>
@@ -584,6 +731,7 @@ function KineticCaptionBlock({
       layer={layer}
       captionFontId={captionFontId}
       captionY={captionY}
+      accentColor={accentColor}
       captionOpacity={captionOpacity}
     >
       {timed.map((word, index) => {
@@ -931,27 +1079,56 @@ function StableChrome({
   );
 }
 
+/** captionTemplate(④ 갤러리)이 있으면 위치/모양/강조색/폰트를 덮어쓰고,
+ * 없으면 overlay.caption/style.caption을 그대로 쓴다(기존 5개 비주얼 스타일 결과물 유지). */
+function resolveCaptionFromTemplate(
+  overlay: ReturnType<typeof mergeOverlay>,
+  style: BlogShortsStyleProps,
+  captionTemplate?: CaptionTemplateProps | null,
+): {
+  caption: BlogShortsStyleProps["caption"] | CaptionTemplateBoxStyle;
+  layer: StyleOverlayLayer;
+  captionFontId: string;
+  accentColor?: string | null;
+} {
+  if (!captionTemplate) {
+    return { caption: style.caption, layer: overlay.caption, captionFontId: overlay.captionFont, accentColor: null };
+  }
+  const y = captionTemplate.position === "top" ? 0.15 : (overlay.caption.y ?? 0.7);
+  return {
+    caption: captionTemplate.boxStyle,
+    layer: { ...overlay.caption, y },
+    captionFontId: captionTemplate.fontFamily || overlay.captionFont,
+    accentColor: captionTemplate.accentColor,
+  };
+}
+
 function BoardCaption({
   board,
   style,
   overlay,
   suppressText = false,
+  captionTemplate,
 }: {
   board: BlogBoardProps;
   style: BlogShortsStyleProps;
   overlay: ReturnType<typeof mergeOverlay>;
   suppressText?: boolean;
+  captionTemplate?: CaptionTemplateProps | null;
 }) {
   if (suppressText || !(board.text || "").trim()) return null;
+
+  const resolved = resolveCaptionFromTemplate(overlay, style, captionTemplate);
 
   // Hard-cut captions — never share fade/slide with media transitions.
   return (
     <KineticCaptionBlock
       text={board.text}
       words={board.words}
-      caption={style.caption}
-      layer={overlay.caption}
-      captionFontId={overlay.captionFont}
+      caption={resolved.caption}
+      layer={resolved.layer}
+      captionFontId={resolved.captionFontId}
+      accentColor={resolved.accentColor}
       captionY={0}
       captionOpacity={1}
       captionAnimation={overlay.captionAnimation ?? style.captionAnimation ?? "highlight"}
@@ -1046,6 +1223,7 @@ export const BlogShorts: React.FC<BlogShortsProps> = (props) => {
             style={style}
             overlay={overlay}
             suppressText={suppressText}
+            captionTemplate={props.captionTemplate}
           />
         </Sequence>
       ))}

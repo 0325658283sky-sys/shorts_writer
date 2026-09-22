@@ -326,6 +326,13 @@ export type SubtitleTemplate = {
   margin_r: number;
   margin_v: number;
   border_style: number;
+  category: "legacy" | "gallery" | string;
+  position: "top" | "bottom" | null;
+  box_style: "none" | "box" | "pill" | "side_bar" | "gradient" | "outline" | null;
+  accent_color: string | null;
+  animation: "none" | "highlight" | null;
+  font_family: string | null;
+  preview_url: string | null;
   created_at: string;
   updated_at: string;
 };

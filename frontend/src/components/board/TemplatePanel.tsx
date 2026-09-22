@@ -176,6 +176,11 @@ export function TemplatePanel({
                   {template.is_system ? "시스템" : "내 템플릿"} · {template.font_size}px · {template.primary_color}
                   {template.border_style === 3 ? " · 배경박스" : ""}
                 </span>
+                {template.category === "gallery" ? (
+                  <span className="muted">
+                    갤러리 · {template.position ?? "bottom"} · {template.box_style ?? "none"}
+                  </span>
+                ) : null}
                 <span
                   className="template-swatch"
                   style={{

@@ -7,6 +7,7 @@ import { BlogClipVersionsPanel } from "./BlogClipVersionsPanel";
 import { CompletedShortPlayer } from "./CompletedShortPlayer";
 import { ImageSelectStep } from "./ImageSelectStep";
 import { MetadataBox } from "./MetadataBox";
+import { TemplateGalleryStep } from "./TemplateGalleryStep";
 
 const FLOW_STEPS = [
   { id: "progress", label: "준비" },
@@ -64,11 +65,14 @@ export function BlogClipFlow({
 }) {
   const autoRenderKey = useRef<number | null>(null);
   const [versionRefresh, setVersionRefresh] = useState(0);
+  // ④ 템플릿 갤러리: awaiting_boards 진입 시 한 번 보여주고, 적용/건너뛰기 후엔 숨긴다.
+  const [galleryHandledId, setGalleryHandledId] = useState<number | null>(null);
   const isProgress = blogClip.status === "pending" || blogClip.status === "processing";
   const isFinalRender = isPhase2Render(blogClip);
   const isAwaitingImages = blogClip.status === "awaiting_images";
   const isAwaitingScript = blogClip.status === "awaiting_script";
   const isAwaitingBoards = blogClip.status === "awaiting_boards";
+  const showTemplateGallery = isAwaitingBoards && galleryHandledId !== blogClip.id;
   const isCompleted = blogClip.status === "completed";
   const isFailed = blogClip.status === "failed";
   const stageLabel = userFacingProgressLabel(blogClip.progress_stage);
@@ -92,11 +96,12 @@ export function BlogClipFlow({
   });
 
   useEffect(() => {
-    if (!isAwaitingBoards || renderingFromFlow) return;
+    // ④ 템플릿 갤러리를 아직 보여주는 중이면(선택/건너뛰기 전) 기본 렌더를 자동 시작하지 않는다.
+    if (!isAwaitingBoards || renderingFromFlow || showTemplateGallery) return;
     if (autoRenderKey.current === blogClip.id) return;
     autoRenderKey.current = blogClip.id;
     onRender(blogClip);
-  }, [isAwaitingBoards, blogClip.id, renderingFromFlow, onRender]);
+  }, [isAwaitingBoards, blogClip.id, renderingFromFlow, onRender, showTemplateGallery]);
 
   return (
     <div className="flow-shell">
@@ -143,7 +148,19 @@ export function BlogClipFlow({
           />
         ) : null}
 
-        {isAwaitingBoards ? (
+        {isAwaitingBoards && showTemplateGallery ? (
+          <TemplateGalleryStep
+            blogClip={blogClip}
+            onContinue={(updated) => {
+              onBlogClipUpdated(updated);
+              setGalleryHandledId(blogClip.id);
+            }}
+            onSkip={() => setGalleryHandledId(blogClip.id)}
+            onMessage={onMessage}
+          />
+        ) : null}
+
+        {isAwaitingBoards && !showTemplateGallery ? (
           <section className="flow-card">
             <p className="create-kicker">렌더</p>
             <h1>기본 설정으로 영상을 만들고 있어요</h1>

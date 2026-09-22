@@ -10,12 +10,14 @@ from app.db.schemas import (
     ClipCreateRequest,
     ClipMetadataResponse,
     ClipResponse,
+    ClipTemplateApplyRequest,
     ClipTemplateRenderRequest,
     NarrationRequest,
     SubtitleCreateRequest,
 )
 from app.services.clip_service import (
     apply_clip_narration,
+    apply_clip_template,
     clip_download_path,
     create_clip_from_highlight,
     create_subtitled_clip,
@@ -45,6 +47,7 @@ def _to_clip_response(clip) -> ClipResponse:
         style_title=clip.style_title,
         style_subtitle=clip.style_subtitle,
         templated_output_path=clip.templated_output_path,
+        subtitle_template_id=clip.subtitle_template_id,
         status=clip.status,
         error_message=clip.error_message,
         created_at=clip.created_at,
@@ -121,6 +124,17 @@ def render_clip_template(
     )
     return _to_clip_response(clip)
 
+
+
+@router.patch("/{clip_id}/template", response_model=ClipResponse)
+def apply_clip_template_endpoint(
+    clip_id: int,
+    request: ClipTemplateApplyRequest,
+    current_user: User = Depends(get_current_user),
+    conn: sqlite3.Connection = Depends(get_connection),
+) -> ClipResponse:
+    clip = apply_clip_template(conn, current_user.id, clip_id, request.template_id)
+    return _to_clip_response(clip)
 
 
 @router.post("/{clip_id}/narration", response_model=ClipResponse)

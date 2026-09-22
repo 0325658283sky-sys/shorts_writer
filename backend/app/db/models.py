@@ -71,6 +71,7 @@ class Clip:
     style_title: str | None
     style_subtitle: str | None
     templated_output_path: str | None
+    subtitle_template_id: int | None
     status: str
     error_message: str | None
     created_at: str

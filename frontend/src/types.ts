@@ -142,6 +142,7 @@ export type Clip = {
   style_title?: string | null;
   style_subtitle?: string | null;
   templated_output_path?: string | null;
+  subtitle_template_id?: number | null;
   status: ClipStatus;
   error_message: string | null;
   created_at: string;

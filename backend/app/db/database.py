@@ -190,6 +190,11 @@ def _create_clips_table(conn: sqlite3.Connection) -> None:
             narration_script TEXT,
             narration_audio_path TEXT,
             narrated_output_path TEXT,
+            visual_style TEXT NOT NULL DEFAULT 'yt_profile',
+            style_title TEXT,
+            style_subtitle TEXT,
+            templated_output_path TEXT,
+            subtitle_template_id INTEGER,
             status TEXT NOT NULL CHECK (status IN ({CLIP_STATUSES})),
             error_message TEXT,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -223,6 +228,8 @@ def _create_clips_table(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE clips ADD COLUMN style_subtitle TEXT")
     if "templated_output_path" not in columns:
         conn.execute("ALTER TABLE clips ADD COLUMN templated_output_path TEXT")
+    if "subtitle_template_id" not in columns:
+        conn.execute("ALTER TABLE clips ADD COLUMN subtitle_template_id INTEGER")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_clips_user_id ON clips (user_id)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_clips_highlight_id ON clips (highlight_id)")
 

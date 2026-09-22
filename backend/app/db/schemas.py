@@ -166,10 +166,15 @@ class ClipResponse(BaseModel):
     style_title: str | None = None
     style_subtitle: str | None = None
     templated_output_path: str | None = None
+    subtitle_template_id: int | None = None
     status: str
     error_message: str | None = None
     created_at: str
     updated_at: str
+
+
+class ClipTemplateApplyRequest(BaseModel):
+    template_id: int
 
 
 class ClipMetadataResponse(BaseModel):

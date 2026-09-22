@@ -49,6 +49,7 @@ def _row_to_clip(row: sqlite3.Row) -> Clip:
         style_title=row["style_title"] if "style_title" in keys else None,
         style_subtitle=row["style_subtitle"] if "style_subtitle" in keys else None,
         templated_output_path=row["templated_output_path"] if "templated_output_path" in keys else None,
+        subtitle_template_id=row["subtitle_template_id"] if "subtitle_template_id" in keys else None,
         status=row["status"],
         error_message=row["error_message"],
         created_at=row["created_at"],
@@ -60,7 +61,8 @@ _CLIP_COLUMNS = """
     id, user_id, video_id, highlight_id, output_path, subtitle_style,
     subtitle_path, subtitled_output_path, tts_mode, narration_script,
     narration_audio_path, narrated_output_path, visual_style, style_title,
-    style_subtitle, templated_output_path, status, error_message, created_at, updated_at
+    style_subtitle, templated_output_path, subtitle_template_id, status,
+    error_message, created_at, updated_at
 """
 
 
@@ -271,6 +273,36 @@ def create_subtitled_clip(conn: sqlite3.Connection, user_id: int, clip_id: int, 
     return refreshed
 
 
+def apply_clip_template(conn: sqlite3.Connection, user_id: int, clip_id: int, template_id: int) -> Clip:
+    """④ 템플릿 갤러리에서 고른 subtitle_template을 유튜브 클립에 적용.
+
+    blog_service.apply_blog_clip_template과 동일한 검증(assert_template_usable)을 쓰되,
+    blog_clip의 "awaiting boards" 가드 대신 YouTube 클립 고유의 "completed" 상태 가드를 쓴다.
+    """
+    from app.services.template_service import assert_template_usable
+
+    clip = get_clip_for_user(conn, user_id, clip_id)
+    if clip is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Clip not found.")
+    if clip.status != "completed" or not clip.output_path:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Completed clip is required before a template can be applied.")
+
+    template = assert_template_usable(conn, user_id, template_id)
+    style = template.slug if template.slug in ALLOWED_SUBTITLE_STYLES else clip.subtitle_style
+    conn.execute(
+        """
+        UPDATE clips
+        SET subtitle_template_id = ?, subtitle_style = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+        """,
+        (template.id, style, clip_id),
+    )
+    conn.commit()
+    refreshed = get_clip_for_user(conn, user_id, clip_id)
+    if refreshed is None:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Template apply failed.")
+    return refreshed
+
 
 def _update_clip_narration(
     conn: sqlite3.Connection,
@@ -354,6 +386,39 @@ def apply_clip_narration(conn: sqlite3.Connection, user_id: int, clip_id: int, m
     return refreshed
 
 
+def apply_clip_template(
+    conn: sqlite3.Connection,
+    user_id: int,
+    clip_id: int,
+    template_id: int,
+) -> Clip:
+    from app.services.template_service import assert_template_usable
+
+    clip = get_clip_for_user(conn, user_id, clip_id)
+    if clip is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Clip not found.")
+    if clip.status != "completed" or not clip.output_path:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Completed clip is required before a subtitle template can be applied.",
+        )
+    template = assert_template_usable(conn, user_id, template_id)
+    style = template.slug if template.slug in ALLOWED_SUBTITLE_STYLES else clip.subtitle_style
+    conn.execute(
+        """
+        UPDATE clips
+        SET subtitle_template_id = ?, subtitle_style = COALESCE(?, subtitle_style), updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+        """,
+        (template.id, style, clip_id),
+    )
+    conn.commit()
+    refreshed = get_clip_for_user(conn, user_id, clip_id)
+    if refreshed is None:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Template apply failed.")
+    return refreshed
+
+
 def clip_download_path(clip: Clip) -> Path:
     if clip.templated_output_path:
         path = Path(clip.templated_output_path)
@@ -386,7 +451,7 @@ def render_clip_with_template(
     subtitle_style: str = "bold",
 ) -> Clip:
     """Wrap YouTube clip MP4 in Remotion BlogShorts chrome and save templated_output_path."""
-    from app.services.remotion_props_service import remotion_public_dir
+    from app.services.remotion_props_service import _caption_template_payload, remotion_public_dir
     from app.services.remotion_render_service import RemotionRenderError, render_blog_shorts_with_remotion
     from app.services.visual_style_catalog import (
         ALLOWED_VISUAL_STYLES,
@@ -465,6 +530,7 @@ def render_clip_with_template(
 
     style_payload = remotion_style_payload(style_slug)
     overlay = merge_style_overlay(style_slug, default_style_overlay(style_slug))
+    caption_template = _caption_template_payload(conn, working.subtitle_template_id)
     props = {
         "blogClipId": working.id,
         "title": video_title or hook_title,
@@ -477,6 +543,7 @@ def render_clip_with_template(
         "visualStyle": style_slug,
         "style": style_payload,
         "overlay": overlay,
+        "captionTemplate": caption_template,
         "channelName": (channel_name or "").strip() or None,
         "channelAvatarUrl": avatar_rel,
         "videoTitle": (video_title or "").strip() or None,

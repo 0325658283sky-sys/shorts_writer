@@ -152,7 +152,7 @@ export function BlogClipFlow({
           <TemplateGalleryStep
             blogClip={blogClip}
             onContinue={(updated) => {
-              onBlogClipUpdated(updated);
+              onBlogClipUpdated(updated as BlogClip);
               setGalleryHandledId(blogClip.id);
             }}
             onSkip={() => setGalleryHandledId(blogClip.id)}

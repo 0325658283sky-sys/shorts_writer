@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { BlogShorts, BLOG_SHORTS_HEIGHT, BLOG_SHORTS_WIDTH, totalBlogShortsFrames } from "@new-cut/remotion/BlogShorts";
 import { authorizedBlob, authorizedRequest } from "../api/client";
 import { buildBlogShortsProps } from "../lib/blogShortsProps";
-import type { BlogClip, Board, SubtitleTemplate } from "../types";
+import type { BlogClip, Board, Clip, SubtitleTemplate } from "../types";
 
 const FPS = 30;
 
@@ -68,20 +68,30 @@ function TemplateCardVisual({ template }: { template: SubtitleTemplate }) {
 
 export function TemplateGalleryStep({
   blogClip,
+  clip,
+  clipKind = "blog",
   onContinue,
   onSkip,
   onMessage,
 }: {
-  blogClip: BlogClip;
-  onContinue: (updated: BlogClip) => void;
+  /** 블로그 쇼츠 모드(clipKind === "blog", 기본값)에서 필수. */
+  blogClip?: BlogClip;
+  /** 유튜브 쇼츠 모드(clipKind === "youtube")에서 필수. */
+  clip?: Clip;
+  clipKind?: "blog" | "youtube";
+  onContinue: (updated: BlogClip | Clip) => void;
   onSkip: () => void;
   onMessage?: (message: string) => void;
 }) {
+  const entityId = clipKind === "youtube" ? clip?.id : blogClip?.id;
+  const initialTemplateId = clipKind === "youtube" ? clip?.subtitle_template_id : blogClip?.subtitle_template_id;
+  const applyPath = clipKind === "youtube" ? `/clips/${entityId}/template` : `/blog-clips/${entityId}/template`;
+
   const [templates, setTemplates] = useState<SubtitleTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [activeChip, setActiveChip] = useState<CategoryChip>("전체");
-  const [selectedId, setSelectedId] = useState<number | null>(blogClip.subtitle_template_id ?? null);
+  const [selectedId, setSelectedId] = useState<number | null>(initialTemplateId ?? null);
   const [applying, setApplying] = useState(false);
 
   const [firstBoard, setFirstBoard] = useState<Board | null>(null);
@@ -107,6 +117,8 @@ export function TemplateGalleryStep({
   }, []);
 
   useEffect(() => {
+    // 보드 기반 실시간 미리보기는 블로그 쇼츠 전용(유튜브 클립은 보드가 없음).
+    if (clipKind !== "blog" || !blogClip) return;
     let cancelled = false;
     let objectUrl: string | null = null;
     authorizedRequest<Board[]>(`/blog-clips/${blogClip.id}/boards`)
@@ -129,7 +141,7 @@ export function TemplateGalleryStep({
       cancelled = true;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [blogClip.id]);
+  }, [clipKind, blogClip]);
 
   const filtered = useMemo(() => {
     if (activeChip === "전체") return templates;
@@ -143,6 +155,7 @@ export function TemplateGalleryStep({
   );
 
   const previewProps = useMemo(() => {
+    if (clipKind !== "blog" || !blogClip) return null;
     const boardsForPreview: Board[] = firstBoard
       ? [firstBoard]
       : [
@@ -177,9 +190,9 @@ export function TemplateGalleryStep({
           }
         : null,
     };
-  }, [blogClip, firstBoard, previewImageUrl, selectedTemplate]);
+  }, [clipKind, blogClip, firstBoard, previewImageUrl, selectedTemplate]);
 
-  const durationInFrames = useMemo(() => Math.max(1, totalBlogShortsFrames(previewProps)), [previewProps]);
+  const durationInFrames = useMemo(() => (previewProps ? Math.max(1, totalBlogShortsFrames(previewProps)) : 1), [previewProps]);
 
   async function handleContinue() {
     if (!selectedId) {
@@ -189,7 +202,7 @@ export function TemplateGalleryStep({
     setApplying(true);
     setError("");
     try {
-      const updated = await authorizedRequest<BlogClip>(`/blog-clips/${blogClip.id}/template`, {
+      const updated = await authorizedRequest<BlogClip | Clip>(applyPath, {
         method: "PATCH",
         body: JSON.stringify({ template_id: selectedId }),
       });
@@ -263,20 +276,31 @@ export function TemplateGalleryStep({
             미리보기 · {selectedTemplate ? selectedTemplate.name : "기본 스타일"}
           </p>
           <div className="gallery-preview-frame">
-            <Player
-              component={BlogShorts}
-              inputProps={previewProps}
-              durationInFrames={durationInFrames}
-              compositionWidth={BLOG_SHORTS_WIDTH}
-              compositionHeight={BLOG_SHORTS_HEIGHT}
-              fps={FPS}
-              style={{ width: "100%", aspectRatio: "9 / 16" }}
-              controls={false}
-              loop
-              clickToPlay={false}
-              autoPlay
-              acknowledgeRemotionLicense
-            />
+            {previewProps ? (
+              <Player
+                component={BlogShorts}
+                inputProps={previewProps}
+                durationInFrames={durationInFrames}
+                compositionWidth={BLOG_SHORTS_WIDTH}
+                compositionHeight={BLOG_SHORTS_HEIGHT}
+                fps={FPS}
+                style={{ width: "100%", aspectRatio: "9 / 16" }}
+                controls={false}
+                loop
+                clickToPlay={false}
+                autoPlay
+                acknowledgeRemotionLicense
+              />
+            ) : (
+              <div className="gallery-card-visual" style={{ justifyContent: selectedTemplate?.position === "top" ? "flex-start" : "flex-end" }}>
+                <span
+                  className="gallery-card-visual-caption"
+                  style={selectedTemplate ? boxStylePreviewStyle(selectedTemplate) : undefined}
+                >
+                  {selectedTemplate ? "자막 미리보기" : "쇼츠 렌더 후 확인할 수 있어요"}
+                </span>
+              </div>
+            )}
           </div>
           <button className="btn-primary btn-lg gallery-cta" type="button" disabled={applying} onClick={() => void handleContinue()}>
             {applying ? "적용 중…" : selectedTemplate ? "이 템플릿으로 계속" : "건너뛰기"}

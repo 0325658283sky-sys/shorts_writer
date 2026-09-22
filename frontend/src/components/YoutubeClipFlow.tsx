@@ -4,10 +4,12 @@ import { friendlyProgressFromVideoStatus } from "../constants";
 import type { YoutubeLengthBand } from "../constants";
 import type { Clip, ClipMetadata, Highlight, SubtitleStyle, Transcript, TtsMode, Video, VideoStatusResponse } from "../types";
 import { AliveProgressBar } from "./AliveProgressBar";
+import { TemplateGalleryStep } from "./TemplateGalleryStep";
 
 const FLOW_STEPS = [
   { id: "progress", label: "분석" },
   { id: "generating", label: "생성" },
+  { id: "template", label: "템플릿" },
   { id: "hub", label: "완료" },
 ] as const;
 
@@ -87,6 +89,8 @@ export function YoutubeClipFlow({
   const [hubThumb, setHubThumb] = useState<string | null>(projectThumbnailUrl ?? null);
   const [generatedCount, setGeneratedCount] = useState(0);
   const [localClips, setLocalClips] = useState<Clip[]>([]);
+  // ④ 템플릿 갤러리: 쇼츠 생성 완료 후 한 번 보여주고, 적용/건너뛰기 후엔 숨긴다(블로그 흐름과 동일 패턴).
+  const [showTemplateGallery, setShowTemplateGallery] = useState(true);
   const autoGenRef = useRef(false);
   const hubUrlRef = useRef<string | null>(null);
 
@@ -265,8 +269,33 @@ export function YoutubeClipFlow({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [video.id, retryNonce]);
 
-  const stepIndex = step === "progress" ? 0 : step === "generating" ? 1 : 2;
   const workspaceClips = localClips.length > 0 ? localClips : videoClips;
+  const isTemplateStep = step === "hub" && showTemplateGallery && workspaceClips.length > 0;
+  const stepIndex = step === "progress" ? 0 : step === "generating" ? 1 : isTemplateStep ? 2 : 3;
+
+  async function handleTemplateApplied(updated: Clip) {
+    const templateId = updated.subtitle_template_id ?? null;
+    const rest = workspaceClips.filter((item) => item.id !== updated.id);
+    const appliedRest: Clip[] = [];
+    if (templateId) {
+      for (const item of rest) {
+        try {
+          const applied = await authorizedRequest<Clip>(`/clips/${item.id}/template`, {
+            method: "PATCH",
+            body: JSON.stringify({ template_id: templateId }),
+          });
+          appliedRest.push(applied);
+        } catch {
+          appliedRest.push(item);
+        }
+      }
+    } else {
+      appliedRest.push(...rest);
+    }
+    const merged = [updated, ...appliedRest].sort((a, b) => a.highlight_id - b.highlight_id);
+    setLocalClips(merged);
+    setShowTemplateGallery(false);
+  }
 
   function handleOpenWorkspace() {
     const first = workspaceClips[0];
@@ -338,7 +367,17 @@ export function YoutubeClipFlow({
             </section>
           ) : null}
 
-          {step === "hub" ? (
+          {isTemplateStep ? (
+            <TemplateGalleryStep
+              clip={workspaceClips[0]}
+              clipKind="youtube"
+              onContinue={(updated) => void handleTemplateApplied(updated as Clip)}
+              onSkip={() => setShowTemplateGallery(false)}
+              onMessage={onMessage}
+            />
+          ) : null}
+
+          {step === "hub" && !isTemplateStep ? (
             <section className="flow-card yt-hub-section">
               <p className="create-kicker">프로젝트</p>
               <h1>{displayTitle}</h1>

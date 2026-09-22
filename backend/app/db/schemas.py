@@ -441,8 +441,21 @@ class SubtitleTemplateResponse(BaseModel):
     margin_r: int = 80
     margin_v: int = 150
     border_style: int = 1
+    category: str = "minimal"
+    position: str = "bottom"
+    box_style: str = "none"
+    accent_color: str | None = None
+    animation: str = "none"
+    font_family: str | None = None
+    preview_url: str | None = None
     created_at: str
     updated_at: str
+
+
+TemplateCategory = Literal["impact", "news", "minimal", "commerce", "brand", "legacy"]
+TemplatePosition = Literal["top", "bottom"]
+TemplateBoxStyle = Literal["none", "box", "pill", "side_bar", "gradient", "outline"]
+TemplateAnimation = Literal["none", "fade", "pop"]
 
 
 class SubtitleTemplateCreateRequest(BaseModel):
@@ -463,6 +476,12 @@ class SubtitleTemplateCreateRequest(BaseModel):
     margin_r: int = Field(default=70, ge=0, le=600)
     margin_v: int = Field(default=180, ge=0, le=600)
     border_style: int = Field(default=1, ge=1, le=3)
+    category: TemplateCategory = "minimal"
+    position: TemplatePosition = "bottom"
+    box_style: TemplateBoxStyle = "none"
+    accent_color: str | None = None
+    animation: TemplateAnimation = "none"
+    font_family: str | None = None
 
 
 class SubtitleTemplateUpdateRequest(BaseModel):
@@ -483,6 +502,12 @@ class SubtitleTemplateUpdateRequest(BaseModel):
     margin_r: int | None = Field(default=None, ge=0, le=600)
     margin_v: int | None = Field(default=None, ge=0, le=600)
     border_style: int | None = Field(default=None, ge=1, le=3)
+    category: TemplateCategory | None = None
+    position: TemplatePosition | None = None
+    box_style: TemplateBoxStyle | None = None
+    accent_color: str | None = None
+    animation: TemplateAnimation | None = None
+    font_family: str | None = None
 
 
 class SubtitleTemplateCloneRequest(BaseModel):

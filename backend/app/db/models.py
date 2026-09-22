@@ -150,6 +150,13 @@ class SubtitleTemplate:
     margin_r: int
     margin_v: int
     border_style: int
+    category: str
+    position: str
+    box_style: str
+    accent_color: str | None
+    animation: str
+    font_family: str | None
+    preview_url: str | None
     created_at: str
     updated_at: str
 

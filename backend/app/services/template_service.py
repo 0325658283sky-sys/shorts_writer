@@ -17,8 +17,16 @@ from app.services.subtitle_utils import (
 _TEMPLATE_COLUMNS = """
     id, user_id, name, slug, font_name, font_size, primary_color, outline_color, back_color,
     primary_alpha, outline_alpha, back_alpha, bold, outline, shadow, alignment,
-    margin_l, margin_r, margin_v, border_style, created_at, updated_at
+    margin_l, margin_r, margin_v, border_style,
+    category, position, box_style, accent_color, animation, font_family, preview_url,
+    created_at, updated_at
 """
+
+# ④ 템플릿 갤러리(v2 핸드오프) — 허용값. Remotion(BlogShorts.tsx)과 프론트 갤러리가 이 값을 그대로 씀.
+ALLOWED_TEMPLATE_CATEGORIES = frozenset({"impact", "news", "minimal", "commerce", "brand", "legacy"})
+ALLOWED_TEMPLATE_POSITIONS = frozenset({"top", "bottom"})
+ALLOWED_TEMPLATE_BOX_STYLES = frozenset({"none", "box", "pill", "side_bar", "gradient", "outline"})
+ALLOWED_TEMPLATE_ANIMATIONS = frozenset({"none", "fade", "pop"})
 
 
 def _seed_from_params(params: AssStyleParams) -> dict[str, Any]:
@@ -42,10 +50,117 @@ def _seed_from_params(params: AssStyleParams) -> dict[str, Any]:
     }
 
 
+_LEGACY_GALLERY_FIELDS = {
+    "category": "legacy",
+    "position": "bottom",
+    "box_style": "box",
+    "accent_color": None,
+    "animation": "none",
+    "font_family": None,
+    "preview_url": None,
+}
+
 SYSTEM_TEMPLATE_SEEDS: list[dict[str, Any]] = [
-    {"name": "기본", "slug": "basic", **_seed_from_params(builtin_style_params("basic"))},
-    {"name": "볼드", "slug": "bold", **_seed_from_params(builtin_style_params("bold"))},
-    {"name": "쇼츠", "slug": "shorts", **_seed_from_params(builtin_style_params("shorts"))},
+    {"name": "기본", "slug": "basic", **_seed_from_params(builtin_style_params("basic")), **_LEGACY_GALLERY_FIELDS},
+    {"name": "볼드", "slug": "bold", **_seed_from_params(builtin_style_params("bold")), **_LEGACY_GALLERY_FIELDS},
+    {"name": "쇼츠", "slug": "shorts", **_seed_from_params(builtin_style_params("shorts")), **_LEGACY_GALLERY_FIELDS},
+]
+
+
+def _gallery_ass_fallback(accent_color: str) -> dict[str, Any]:
+    """새 갤러리 템플릿 12종의 ASS(FFmpeg 폴백) 파라미터. Remotion이 주 렌더 경로라
+    화려하게 만들 필요는 없고, accent_color를 primary로 써서 최소한 색만 맞춘다."""
+    return _seed_from_params(
+        AssStyleParams(
+            font_size=72,
+            primary_color=accent_color,
+            outline_color="#000000",
+            back_color="#000000",
+            outline_alpha=0,
+            back_alpha=0xCC,
+            bold=True,
+            outline=5,
+            shadow=2,
+            margin_v=210,
+            border_style=1,
+        )
+    )
+
+
+# ④ 템플릿 갤러리 12종 — design_handoff_newcut_v2 목업 그대로 매핑.
+GALLERY_TEMPLATE_SEEDS: list[dict[str, Any]] = [
+    {
+        "name": "임팩트 옐로우", "slug": "impact_yellow", "category": "impact",
+        "position": "bottom", "box_style": "box", "accent_color": "#FFE500",
+        "animation": "none", "font_family": "gmarket_sans", "preview_url": None,
+        **_gallery_ass_fallback("#FFE500"),
+    },
+    {
+        "name": "클린 미니멀", "slug": "clean_minimal", "category": "minimal",
+        "position": "bottom", "box_style": "box", "accent_color": "#4B3BFF",
+        "animation": "none", "font_family": "pretendard", "preview_url": None,
+        **_gallery_ass_fallback("#4B3BFF"),
+    },
+    {
+        "name": "뉴스 자막", "slug": "news_caption", "category": "news",
+        "position": "bottom", "box_style": "none", "accent_color": "#FFFFFF",
+        "animation": "none", "font_family": "suit", "preview_url": None,
+        **_gallery_ass_fallback("#FFFFFF"),
+    },
+    {
+        "name": "화이트 박스", "slug": "white_box", "category": "minimal",
+        "position": "bottom", "box_style": "box", "accent_color": "#16161A",
+        "animation": "none", "font_family": "pretendard", "preview_url": None,
+        **_gallery_ass_fallback("#16161A"),
+    },
+    {
+        "name": "바이럴 레드", "slug": "viral_red", "category": "impact",
+        "position": "bottom", "box_style": "none", "accent_color": "#FF5C5C",
+        "animation": "none", "font_family": "gmarket_sans", "preview_url": None,
+        **_gallery_ass_fallback("#FF5C5C"),
+    },
+    {
+        "name": "네온 그린", "slug": "neon_green", "category": "impact",
+        "position": "bottom", "box_style": "none", "accent_color": "#7CFF6B",
+        "animation": "none", "font_family": "gmarket_sans", "preview_url": None,
+        **_gallery_ass_fallback("#7CFF6B"),
+    },
+    {
+        "name": "캡션 필", "slug": "caption_pill", "category": "minimal",
+        "position": "bottom", "box_style": "pill", "accent_color": "#FFE500",
+        "animation": "none", "font_family": "suit", "preview_url": None,
+        **_gallery_ass_fallback("#FFE500"),
+    },
+    {
+        "name": "사이드 바", "slug": "side_bar", "category": "news",
+        "position": "bottom", "box_style": "side_bar", "accent_color": "#FFE500",
+        "animation": "none", "font_family": "pretendard", "preview_url": None,
+        **_gallery_ass_fallback("#FFE500"),
+    },
+    {
+        "name": "상단 헤드라인", "slug": "top_headline", "category": "news",
+        "position": "top", "box_style": "box", "accent_color": "#7CFF6B",
+        "animation": "none", "font_family": "gmarket_sans", "preview_url": None,
+        **_gallery_ass_fallback("#7CFF6B"),
+    },
+    {
+        "name": "아웃라인", "slug": "outline_pop", "category": "impact",
+        "position": "bottom", "box_style": "outline", "accent_color": "#4B3BFF",
+        "animation": "none", "font_family": "gmarket_sans", "preview_url": None,
+        **_gallery_ass_fallback("#4B3BFF"),
+    },
+    {
+        "name": "그라디언트 바", "slug": "gradient_bar", "category": "impact",
+        "position": "bottom", "box_style": "gradient", "accent_color": "#4B3BFF",
+        "animation": "none", "font_family": "gmarket_sans", "preview_url": None,
+        **_gallery_ass_fallback("#4B3BFF"),
+    },
+    {
+        "name": "커머스 가격형", "slug": "commerce_price", "category": "commerce",
+        "position": "bottom", "box_style": "box", "accent_color": "#FFE500",
+        "animation": "none", "font_family": "gmarket_sans", "preview_url": None,
+        **_gallery_ass_fallback("#FFE500"),
+    },
 ]
 
 
@@ -71,13 +186,20 @@ def _row_to_template(row: sqlite3.Row) -> SubtitleTemplate:
         margin_r=int(row["margin_r"]),
         margin_v=int(row["margin_v"]),
         border_style=int(row["border_style"]),
+        category=row["category"],
+        position=row["position"],
+        box_style=row["box_style"],
+        accent_color=row["accent_color"],
+        animation=row["animation"],
+        font_family=row["font_family"],
+        preview_url=row["preview_url"],
         created_at=row["created_at"],
         updated_at=row["updated_at"],
     )
 
 
 def seed_system_templates(conn: sqlite3.Connection) -> None:
-    for seed in SYSTEM_TEMPLATE_SEEDS:
+    for seed in [*SYSTEM_TEMPLATE_SEEDS, *GALLERY_TEMPLATE_SEEDS]:
         existing = conn.execute(
             "SELECT id FROM subtitle_templates WHERE user_id IS NULL AND slug = ?",
             (seed["slug"],),
@@ -89,8 +211,9 @@ def seed_system_templates(conn: sqlite3.Connection) -> None:
             INSERT INTO subtitle_templates (
                 user_id, name, slug, font_name, font_size, primary_color, outline_color, back_color,
                 primary_alpha, outline_alpha, back_alpha, bold, outline, shadow, alignment,
-                margin_l, margin_r, margin_v, border_style
-            ) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                margin_l, margin_r, margin_v, border_style,
+                category, position, box_style, accent_color, animation, font_family, preview_url
+            ) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 seed["name"],
@@ -111,6 +234,13 @@ def seed_system_templates(conn: sqlite3.Connection) -> None:
                 seed["margin_r"],
                 seed["margin_v"],
                 seed["border_style"],
+                seed["category"],
+                seed["position"],
+                seed["box_style"],
+                seed["accent_color"],
+                seed["animation"],
+                seed["font_family"],
+                seed["preview_url"],
             ),
         )
 
@@ -152,15 +282,31 @@ def get_system_template_by_slug(conn: sqlite3.Connection, slug: str) -> Subtitle
     return _row_to_template(row) if row else None
 
 
-def list_templates_for_user(conn: sqlite3.Connection, user_id: int) -> list[SubtitleTemplate]:
-    rows = conn.execute(
-        f"""
-        SELECT {_TEMPLATE_COLUMNS} FROM subtitle_templates
-        WHERE user_id IS NULL OR user_id = ?
-        ORDER BY CASE WHEN user_id IS NULL THEN 0 ELSE 1 END, id ASC
-        """,
-        (user_id,),
-    ).fetchall()
+def list_templates_for_user(
+    conn: sqlite3.Connection,
+    user_id: int,
+    *,
+    category: str | None = None,
+) -> list[SubtitleTemplate]:
+    """category가 주어지면 ④ 갤러리 필터로 좁힌다(legacy 3종은 갤러리 칩에 안 나오게 기본 제외)."""
+    if category is not None:
+        rows = conn.execute(
+            f"""
+            SELECT {_TEMPLATE_COLUMNS} FROM subtitle_templates
+            WHERE (user_id IS NULL OR user_id = ?) AND category = ?
+            ORDER BY CASE WHEN user_id IS NULL THEN 0 ELSE 1 END, id ASC
+            """,
+            (user_id, category),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            f"""
+            SELECT {_TEMPLATE_COLUMNS} FROM subtitle_templates
+            WHERE user_id IS NULL OR user_id = ?
+            ORDER BY CASE WHEN user_id IS NULL THEN 0 ELSE 1 END, id ASC
+            """,
+            (user_id,),
+        ).fetchall()
     return [_row_to_template(row) for row in rows]
 
 
@@ -182,6 +328,12 @@ def _validate_template_fields(
     margin_r: int,
     margin_v: int,
     border_style: int,
+    category: str,
+    position: str,
+    box_style: str,
+    accent_color: str | None,
+    animation: str,
+    font_family: str | None,
 ) -> dict[str, Any]:
     cleaned_name = name.strip()
     if not cleaned_name or len(cleaned_name) > 80:
@@ -215,6 +367,23 @@ def _validate_template_fields(
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"{margin_name} must be 0–600.")
     if border_style not in {1, 3}:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="border_style must be 1 (outline) or 3 (box).")
+    if category not in ALLOWED_TEMPLATE_CATEGORIES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"category must be one of {sorted(ALLOWED_TEMPLATE_CATEGORIES)}.")
+    if position not in ALLOWED_TEMPLATE_POSITIONS:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"position must be one of {sorted(ALLOWED_TEMPLATE_POSITIONS)}.")
+    if box_style not in ALLOWED_TEMPLATE_BOX_STYLES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"box_style must be one of {sorted(ALLOWED_TEMPLATE_BOX_STYLES)}.")
+    if animation not in ALLOWED_TEMPLATE_ANIMATIONS:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"animation must be one of {sorted(ALLOWED_TEMPLATE_ANIMATIONS)}.")
+    cleaned_accent = None
+    if accent_color:
+        try:
+            cleaned_accent = normalize_hex_color(accent_color, field_name="accent_color")
+        except ValueError as exc:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    cleaned_font_family = (font_family or "").strip() or None
+    if cleaned_font_family and len(cleaned_font_family) > 40:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="font_family is too long.")
     return {
         "name": cleaned_name,
         "font_name": cleaned_font,
@@ -232,6 +401,12 @@ def _validate_template_fields(
         "margin_r": margin_r,
         "margin_v": margin_v,
         "border_style": border_style,
+        "category": category,
+        "position": position,
+        "box_style": box_style,
+        "accent_color": cleaned_accent,
+        "animation": animation,
+        "font_family": cleaned_font_family,
     }
 
 
@@ -256,6 +431,12 @@ def create_template(
     margin_r: int = 70,
     margin_v: int = 180,
     border_style: int = 1,
+    category: str = "minimal",
+    position: str = "bottom",
+    box_style: str = "none",
+    accent_color: str | None = None,
+    animation: str = "none",
+    font_family: str | None = None,
 ) -> SubtitleTemplate:
     fields = _validate_template_fields(
         name=name,
@@ -274,14 +455,21 @@ def create_template(
         margin_r=margin_r,
         margin_v=margin_v,
         border_style=border_style,
+        category=category,
+        position=position,
+        box_style=box_style,
+        accent_color=accent_color,
+        animation=animation,
+        font_family=font_family,
     )
     cursor = conn.execute(
         """
         INSERT INTO subtitle_templates (
             user_id, name, slug, font_name, font_size, primary_color, outline_color, back_color,
             primary_alpha, outline_alpha, back_alpha, bold, outline, shadow, alignment,
-            margin_l, margin_r, margin_v, border_style
-        ) VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            margin_l, margin_r, margin_v, border_style,
+            category, position, box_style, accent_color, animation, font_family
+        ) VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             user_id,
@@ -302,6 +490,12 @@ def create_template(
             fields["margin_r"],
             fields["margin_v"],
             fields["border_style"],
+            fields["category"],
+            fields["position"],
+            fields["box_style"],
+            fields["accent_color"],
+            fields["animation"],
+            fields["font_family"],
         ),
     )
     conn.commit()
@@ -342,6 +536,12 @@ def update_template(
         "margin_r": updates.get("margin_r", template.margin_r),
         "margin_v": updates.get("margin_v", template.margin_v),
         "border_style": updates.get("border_style", template.border_style),
+        "category": updates.get("category", template.category),
+        "position": updates.get("position", template.position),
+        "box_style": updates.get("box_style", template.box_style),
+        "accent_color": updates.get("accent_color", template.accent_color),
+        "animation": updates.get("animation", template.animation),
+        "font_family": updates.get("font_family", template.font_family),
     }
     bold = updates.get("bold", template.bold)
     fields = _validate_template_fields(**merged)
@@ -351,6 +551,7 @@ def update_template(
             name = ?, font_name = ?, font_size = ?, primary_color = ?, outline_color = ?, back_color = ?,
             primary_alpha = ?, outline_alpha = ?, back_alpha = ?, bold = ?, outline = ?, shadow = ?,
             alignment = ?, margin_l = ?, margin_r = ?, margin_v = ?, border_style = ?,
+            category = ?, position = ?, box_style = ?, accent_color = ?, animation = ?, font_family = ?,
             updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
         """,
@@ -372,6 +573,12 @@ def update_template(
             fields["margin_r"],
             fields["margin_v"],
             fields["border_style"],
+            fields["category"],
+            fields["position"],
+            fields["box_style"],
+            fields["accent_color"],
+            fields["animation"],
+            fields["font_family"],
             template_id,
         ),
     )
@@ -425,6 +632,12 @@ def clone_template(conn: sqlite3.Connection, user_id: int, template_id: int, nam
         margin_r=source.margin_r,
         margin_v=source.margin_v,
         border_style=source.border_style,
+        category=source.category,
+        position=source.position,
+        box_style=source.box_style,
+        accent_color=source.accent_color,
+        animation=source.animation,
+        font_family=source.font_family,
     )
 
 

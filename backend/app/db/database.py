@@ -628,6 +628,34 @@ def _create_subtitle_templates_table(conn: sqlite3.Connection) -> None:
     conn.execute("CREATE INDEX IF NOT EXISTS idx_subtitle_templates_user_id ON subtitle_templates (user_id)")
 
 
+def _migrate_subtitle_templates_table(conn: sqlite3.Connection) -> None:
+    """v2 핸드오프 ④ 템플릿 갤러리 — position/box_style/accent_color/animation/font_family/category/preview_url.
+
+    is_system은 컬럼으로 두지 않는다: API가 이미 user_id IS NULL로 파생해서 내려주고 있어
+    (backend/app/api/templates.py _to_template_response), 컬럼을 따로 두면 둘이 어긋날 수 있다.
+    """
+    columns = _sqlite_columns(conn, "subtitle_templates")
+    if "category" not in columns:
+        conn.execute("ALTER TABLE subtitle_templates ADD COLUMN category TEXT NOT NULL DEFAULT 'minimal'")
+    if "position" not in columns:
+        conn.execute("ALTER TABLE subtitle_templates ADD COLUMN position TEXT NOT NULL DEFAULT 'bottom'")
+    if "box_style" not in columns:
+        conn.execute("ALTER TABLE subtitle_templates ADD COLUMN box_style TEXT NOT NULL DEFAULT 'none'")
+    if "accent_color" not in columns:
+        conn.execute("ALTER TABLE subtitle_templates ADD COLUMN accent_color TEXT")
+    if "animation" not in columns:
+        conn.execute("ALTER TABLE subtitle_templates ADD COLUMN animation TEXT NOT NULL DEFAULT 'none'")
+    if "font_family" not in columns:
+        conn.execute("ALTER TABLE subtitle_templates ADD COLUMN font_family TEXT")
+    if "preview_url" not in columns:
+        conn.execute("ALTER TABLE subtitle_templates ADD COLUMN preview_url TEXT")
+    # 기존 3개 시스템 템플릿(basic/bold/shorts, Stage 22)은 새 갤러리 카테고리 칩에 안 뜨게 legacy로 분류.
+    conn.execute(
+        "UPDATE subtitle_templates SET category = 'legacy' "
+        "WHERE user_id IS NULL AND slug IN ('basic', 'bold', 'shorts') AND category = 'minimal'"
+    )
+
+
 def _create_blog_clip_versions_table(conn: sqlite3.Connection) -> None:
     conn.execute(
         """
@@ -737,6 +765,7 @@ def init_db() -> None:
         _create_blog_clip_versions_table(conn)
         _migrate_blog_clip_versions_table(conn)
         _create_subtitle_templates_table(conn)
+        _migrate_subtitle_templates_table(conn)
         _create_audio_assets_table(conn)
         _create_projects_table(conn)
         from app.services.audio_service import seed_system_audio_assets

@@ -1,6 +1,6 @@
 import sqlite3
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Query, Response
 
 from app.api.users import get_current_user
 from app.db.database import get_connection
@@ -45,6 +45,13 @@ def _to_template_response(template: SubtitleTemplate) -> SubtitleTemplateRespons
         margin_r=template.margin_r,
         margin_v=template.margin_v,
         border_style=template.border_style,
+        category=template.category,
+        position=template.position,
+        box_style=template.box_style,
+        accent_color=template.accent_color,
+        animation=template.animation,
+        font_family=template.font_family,
+        preview_url=template.preview_url,
         created_at=template.created_at,
         updated_at=template.updated_at,
     )
@@ -52,10 +59,11 @@ def _to_template_response(template: SubtitleTemplate) -> SubtitleTemplateRespons
 
 @router.get("", response_model=list[SubtitleTemplateResponse])
 def list_subtitle_templates(
+    category: str | None = Query(default=None, description="④ 템플릿 갤러리 카테고리 필터"),
     current_user: User = Depends(get_current_user),
     conn: sqlite3.Connection = Depends(get_connection),
 ) -> list[SubtitleTemplateResponse]:
-    templates = list_templates_for_user(conn, current_user.id)
+    templates = list_templates_for_user(conn, current_user.id, category=category)
     return [_to_template_response(template) for template in templates]
 
 
@@ -85,6 +93,12 @@ def create_subtitle_template(
         margin_r=request.margin_r,
         margin_v=request.margin_v,
         border_style=request.border_style,
+        category=request.category,
+        position=request.position,
+        box_style=request.box_style,
+        accent_color=request.accent_color,
+        animation=request.animation,
+        font_family=request.font_family,
     )
     return _to_template_response(template)
 

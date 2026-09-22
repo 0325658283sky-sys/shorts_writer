@@ -283,6 +283,15 @@ class StyleOverlayProps(BaseModel):
     caption: StyleOverlayLayer | None = None
 
 
+class CaptionTemplateResponse(BaseModel):
+    """④ 템플릿 갤러리에서 고른 subtitle_template의 캡션 표현 (remotion/src/types.ts CaptionTemplateProps)."""
+
+    position: Literal["top", "bottom"] = "bottom"
+    boxStyle: Literal["none", "box", "pill", "side_bar", "gradient", "outline"] = "none"
+    accentColor: str | None = None
+    fontFamily: str | None = None
+
+
 class BlogShortsPropsResponse(BaseModel):
     """Remotion BlogShorts props exported from a blog clip."""
 
@@ -297,6 +306,7 @@ class BlogShortsPropsResponse(BaseModel):
     visualStyle: str = "impact_full"
     style: BlogShortsStyleProps | None = None
     overlay: StyleOverlayProps | None = None
+    captionTemplate: CaptionTemplateResponse | None = None
     boards: list[BlogShortsBoardProps]
 
 

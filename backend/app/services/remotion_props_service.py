@@ -227,6 +227,7 @@ def _props_from_boards(
         except (TypeError, json.JSONDecodeError):
             raw_overlay = None
     overlay = merge_style_overlay(visual_style, raw_overlay)
+    caption_template = _caption_template_payload(conn, getattr(blog_clip, "subtitle_template_id", None))
     return {
         "blogClipId": blog_clip.id,
         "title": title,
@@ -239,7 +240,30 @@ def _props_from_boards(
         "visualStyle": visual_style,
         "style": style,
         "overlay": overlay,
+        "captionTemplate": caption_template,
         "boards": board_props,
+    }
+
+
+def _caption_template_payload(conn: sqlite3.Connection, subtitle_template_id: int | None) -> dict | None:
+    """④ 템플릿 갤러리에서 고른 subtitle_template을 Remotion captionTemplate prop으로 변환.
+
+    갤러리 템플릿(category='gallery')만 캡션 표현을 오버라이드한다. 레거시
+    시스템 템플릿(category='legacy')은 FFmpeg 자막 번인 전용이라 여기서는 무시하고
+    기존 visualStyle의 caption 변형을 그대로 쓴다.
+    """
+    if not subtitle_template_id:
+        return None
+    from app.services.template_service import get_template_by_id
+
+    template = get_template_by_id(conn, subtitle_template_id)
+    if template is None or template.category != "gallery":
+        return None
+    return {
+        "position": template.position or "bottom",
+        "boxStyle": template.box_style or "none",
+        "accentColor": template.accent_color,
+        "fontFamily": template.font_family,
     }
 
 

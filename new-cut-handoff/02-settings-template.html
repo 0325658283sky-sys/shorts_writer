@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>New Cut — 옵션 · 템플릿</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/static/pretendard.css">
+<style>
+  :root{
+    --ink:#16161A; --ink-soft:#6B6B75; --muted:#9C9CA6;
+    --surface:#FFFFFF; --surface-2:#FBFBFC; --page-bg:#F3F3F5;
+    --line:#E8E8EC; --line-strong:#E0E0E6;
+    --accent:#4B3BFF; --accent-strong:#3B2CE0; --accent-soft:#EFEDFF;
+    --radius:11px; --radius-control:8px; --radius-pill:999px;
+    --font: 'Pretendard','Noto Sans KR',sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--page-bg);font-family:var(--font);color:var(--ink)}
+  button{font-family:inherit;cursor:pointer;border:none}
+  select,input{font-family:inherit}
+  .tcard{border-radius:var(--radius);overflow:hidden;position:relative;background:var(--surface);border:1px solid var(--line);cursor:pointer;padding:0}
+
+  .app{width:1440px;max-width:100%;height:900px;background:var(--page-bg);display:flex;flex-direction:column;overflow:hidden}
+
+  .topbar{display:flex;align-items:center;gap:14px;padding:22px 40px;border-bottom:1px solid var(--line);background:var(--surface)}
+  .topbar .back{background:none;border:none;padding:6px;display:flex}
+  .topbar .video-thumb{width:64px;height:44px;border-radius:6px;background:#20342E;flex-shrink:0}
+  .topbar .title{font-size:14px;font-weight:800}
+  .topbar .duration{font-size:12px;color:var(--muted);margin-top:2px}
+  .btn-primary{background:var(--ink);color:#fff;border-radius:var(--radius-control);padding:13px 26px;font-weight:800;font-size:13.5px;margin-left:auto}
+
+  .body-row{flex-grow:1;display:flex;overflow:hidden}
+
+  /* 좌측: 옵션 패널 */
+  .options{width:400px;flex-shrink:0;border-right:1px solid var(--line);background:var(--surface);padding:26px;overflow:auto;display:flex;flex-direction:column;gap:22px}
+  .mode-switch{display:flex;gap:6px;background:var(--surface-2);border-radius:var(--radius-control);padding:4px}
+  .mode-switch button{flex:1;text-align:center;padding:9px;border-radius:6px;font-weight:600;font-size:12.5px;color:var(--muted);background:none}
+  .mode-switch button.active{background:var(--surface);font-weight:700;color:var(--ink);box-shadow:0 1px 2px rgba(22,22,26,.08)}
+
+  .field-label{font-size:13px;font-weight:700;margin-bottom:10px}
+  .slider-row input[type="range"]{width:100%}
+  .slider-scale{display:flex;justify-content:space-between;margin-top:8px;font-size:11.5px;color:var(--muted)}
+  .slider-scale .now{color:var(--ink);font-weight:700}
+
+  .field-toggle{display:flex;align-items:center;justify-content:space-between;padding-top:18px;border-top:1px solid var(--line)}
+  .field-toggle .field-title{font-size:13px;font-weight:700}
+  .field-toggle .field-desc{font-size:11.5px;color:var(--muted);margin-top:3px}
+  .switch{width:38px;height:22px;border-radius:var(--radius-pill);background:var(--line);border:none;padding:2px;flex-shrink:0;position:relative}
+  .switch .knob{width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2);transition:transform .15s}
+  .switch[aria-checked="true"]{background:var(--accent)}
+  .switch[aria-checked="true"] .knob{transform:translateX(16px)}
+
+  .lang-row{display:flex;gap:8px}
+  .lang-row select{flex:1;padding:11px;border:1px solid var(--line);border-radius:var(--radius-control);font-size:13px;font-weight:600;background:#fff}
+
+  .select-box{padding:11px;border:1px solid var(--line);border-radius:var(--radius-control);font-size:13px;font-weight:600;display:flex;justify-content:space-between;align-items:center;background:#fff;width:100%;text-align:left}
+  .field-hint{font-size:11px;color:var(--muted);margin-top:6px}
+
+  /* 우측: 템플릿 그리드 */
+  .templates{flex-grow:1;padding:26px 30px;overflow:auto}
+  .templates-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+  .templates-header h2{font-size:14px;font-weight:800;margin:0}
+  .templates-header .tabs{display:flex;gap:8px}
+  .templates-header .tab{padding:8px 14px;border-radius:var(--radius-pill);background:var(--surface);border:1px solid var(--line);color:var(--ink-soft);font-size:12px;font-weight:600}
+  .templates-header .tab.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .template-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px}
+  .tcard[aria-selected="true"]{border:2px solid var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  .tcard .check{position:absolute;top:6px;right:6px;width:16px;height:16px;border-radius:50%;background:var(--accent);display:none;align-items:center;justify-content:center}
+  .tcard[aria-selected="true"] .check{display:flex}
+  .tcard .cap{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.55);color:#fff;font-size:9px;font-weight:700;padding:5px;text-align:center}
+  .tcard-new{aspect-ratio:9/16;border:1.5px dashed var(--line-strong);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px;color:var(--muted);background:none}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- 상단 바: 뒤로가기 + 원본 영상 정보 + 확정 CTA -->
+  <header class="topbar">
+    <button class="back" type="button" aria-label="이전으로">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M15 6 9 12l6 6" stroke="#16161A" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+    <div class="video-thumb" role="img" aria-label="원본 영상 썸네일"></div>
+    <div>
+      <div class="title">애들레이드 말차 맛집 투어 브이로그</div>
+      <div class="duration">0:14:18</div>
+    </div>
+    <!-- TODO(coding AI): 클릭 시 현재 선택된 옵션+템플릿으로 생성 작업 시작 → 03-progress.html 로 이동 -->
+    <button class="btn-primary" id="btn-generate" type="button">이 설정으로 만들기</button>
+  </header>
+
+  <div class="body-row">
+
+    <!-- 좌측 옵션 패널 -->
+    <aside class="options">
+
+      <!-- TODO(coding AI): 두 모드는 서로 다른 하위 옵션 UI를 가짐(자동 vs 수동 구간 지정).
+           현재 마크업은 'AI 클립생성' 모드 상태만 구현됨. -->
+      <div class="mode-switch" role="tablist" aria-label="클립 생성 방식">
+        <button role="tab" aria-selected="true" class="active" data-mode="ai">AI 클립생성</button>
+        <button role="tab" aria-selected="false" data-mode="manual">직접 구간 설정</button>
+      </div>
+
+      <div class="slider-row">
+        <div class="field-label">몇 개의 쇼츠를 만들까요?</div>
+        <!-- TODO(coding AI): 실제 range input으로 구현, 값 변경 시 아래 라벨(약 N개) 갱신 -->
+        <input type="range" id="slider-clip-count" min="1" max="10" value="5" step="1" aria-label="생성할 쇼츠 개수">
+        <div class="slider-scale">
+          <span>1개</span><span class="now" id="slider-clip-count-label">약 5개</span><span>10개</span>
+        </div>
+      </div>
+
+      <div class="field-toggle">
+        <div>
+          <div class="field-title">원본 자막 가리기</div>
+          <div class="field-desc">원본 영상의 자막을 흐리게 처리해요</div>
+        </div>
+        <button class="switch" id="toggle-hide-subtitles" role="switch" aria-checked="false" type="button">
+          <span class="knob"></span>
+        </button>
+      </div>
+
+      <div>
+        <div class="field-label">언어 설정</div>
+        <div class="lang-row">
+          <select id="select-source-lang" aria-label="원본 언어">
+            <option>🇰🇷 한국어</option>
+          </select>
+          <select id="select-target-lang" aria-label="번역 언어">
+            <option>🇰🇷 한국어</option>
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <div class="field-label">나레이션 (TTS)</div>
+        <!-- TODO(coding AI): 클릭 시 보이스 선택 드롭다운/모달 오픈 -->
+        <button class="select-box" id="btn-select-tts" type="button">
+          <span>밝은 여성 톤 · 1.0x</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m6 9 6 6 6-6" stroke="#9C9CA6" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </button>
+        <div class="field-hint">원본 음성 유지도 가능해요</div>
+      </div>
+
+      <div>
+        <div class="field-label">클립 길이</div>
+        <!-- TODO(coding AI): 클릭 시 길이 프리셋 선택 드롭다운 오픈 -->
+        <button class="select-box" id="btn-select-clip-length" type="button">자동 (0~1분)</button>
+      </div>
+    </aside>
+
+    <!-- 우측 템플릿 그리드. TODO(coding AI): 실제 템플릿 목록 API로 대체,
+         카드 클릭 시 aria-selected 토글(단일 선택), '내 브랜드 만들기'는 커스텀 템플릿 생성 플로우로 이동 -->
+    <section class="templates">
+      <div class="templates-header">
+        <h2>템플릿 선택</h2>
+        <div class="tabs">
+          <button class="tab active" data-template-tab="recommended">추천 템플릿</button>
+          <button class="tab" data-template-tab="mine">내 템플릿</button>
+        </div>
+      </div>
+
+      <div class="template-grid" role="listbox" aria-label="템플릿 목록">
+
+        <button class="tcard" role="option" aria-selected="true" data-template-id="impact-yellow" style="aspect-ratio:9/16">
+          <div style="position:absolute;inset:0;background:#1B1B22"></div>
+          <div style="position:absolute;top:62%;left:6px;right:6px;background:#FFD400;color:#16161A;font-weight:900;font-size:9.5px;padding:5px 4px;border-radius:3px;text-align:center">이름을 기억하세요</div>
+          <div class="check"><svg width="9" height="9" viewBox="0 0 24 24" fill="none"><path d="M20 6 9 17l-5-5" stroke="#fff" stroke-width="3.4" stroke-linecap="round"/></svg></div>
+          <div class="cap">임팩트 옐로우</div>
+        </button>
+
+        <button class="tcard" role="option" aria-selected="false" data-template-id="clean-minimal" style="aspect-ratio:9/16">
+          <div style="position:absolute;inset:0;background:#F4F1E8"></div>
+          <div style="position:absolute;bottom:20%;left:6px;right:6px;background:#fff;border-radius:8px;padding:6px;font-weight:700;font-size:8.5px;text-align:center;box-shadow:0 2px 6px rgba(0,0,0,.12)">깔끔 미니멀</div>
+        </button>
+
+        <button class="tcard" role="option" aria-selected="false" data-template-id="news-caption" style="aspect-ratio:9/16">
+          <div style="position:absolute;inset:0;background:#101418"></div>
+          <div style="position:absolute;top:0;left:0;right:0;background:#D0262C;color:#fff;font-weight:800;font-size:8px;padding:5px">BREAKING</div>
+          <div style="position:absolute;bottom:0;left:0;right:0;background:#101418;color:#fff;font-weight:700;font-size:8.5px;padding:6px">뉴스 자막</div>
+        </button>
+
+        <button class="tcard" role="option" aria-selected="false" data-template-id="white-box" style="aspect-ratio:9/16">
+          <div style="position:absolute;inset:0;background:#EDEDED"></div>
+          <div style="position:absolute;bottom:18%;left:14%;right:14%;background:#fff;border-radius:7px;padding:8px;font-weight:700;font-size:8px;text-align:center">화이트 박스</div>
+        </button>
+
+        <button class="tcard" role="option" aria-selected="false" data-template-id="viral-red" style="aspect-ratio:9/16">
+          <div style="position:absolute;inset:0;background:#2A0F12"></div>
+          <div style="position:absolute;bottom:18%;left:6px;right:6px;color:#FF3B3B;font-weight:900;font-size:11px;text-align:center;-webkit-text-stroke:1px #fff">바이럴 레드</div>
+        </button>
+
+        <button class="tcard" role="option" aria-selected="false" data-template-id="neon-green" style="aspect-ratio:9/16">
+          <div style="position:absolute;inset:0;background:#08140F"></div>
+          <div style="position:absolute;bottom:18%;left:6px;right:6px;color:#39FF8C;font-weight:900;font-size:10px;text-align:center">네온 그린</div>
+        </button>
+
+        <button class="tcard" role="option" aria-selected="false" data-template-id="caption-pill" style="aspect-ratio:9/16">
+          <div style="position:absolute;inset:0;background:#1A1A22"></div>
+          <div style="position:absolute;bottom:20%;left:14%;right:14%;background:rgba(255,255,255,.94);border-radius:100px;padding:6px;font-weight:700;font-size:8px;text-align:center">캡션 필</div>
+        </button>
+
+        <button class="tcard" role="option" aria-selected="false" data-template-id="side-bar" style="aspect-ratio:9/16">
+          <div style="position:absolute;inset:0;background:#1E1B16"></div>
+          <div style="position:absolute;top:10%;bottom:10%;left:0;width:4px;background:var(--accent)"></div>
+          <div style="position:absolute;top:45%;left:14px;right:6px;color:#fff;font-weight:800;font-size:9px">사이드 바</div>
+        </button>
+
+        <button class="tcard" role="option" aria-selected="false" data-template-id="top-headline" style="aspect-ratio:9/16">
+          <div style="position:absolute;inset:0;background:#12233B"></div>
+          <div style="position:absolute;top:0;left:0;right:0;background:rgba(0,0,0,.5);color:#fff;font-weight:800;font-size:8.5px;padding:8px;text-align:center">상단 헤드라인</div>
+        </button>
+
+        <button class="tcard" role="option" aria-selected="false" data-template-id="outline-pop" style="aspect-ratio:9/16">
+          <div style="position:absolute;inset:0;background:#F7F2E4"></div>
+          <div style="position:absolute;bottom:18%;left:6px;right:6px;color:#16161A;font-weight:900;font-size:11px;text-align:center;-webkit-text-stroke:1.3px #fff">아웃라인 팝</div>
+        </button>
+
+        <button class="tcard" role="option" aria-selected="false" data-template-id="gradient-bar" style="aspect-ratio:9/16">
+          <div style="position:absolute;inset:0;background:linear-gradient(135deg,var(--accent),#C1338D)"></div>
+          <div style="position:absolute;bottom:18%;left:6px;right:6px;color:#fff;font-weight:800;font-size:9px;text-align:center">그라디언트 바</div>
+        </button>
+
+        <button class="tcard-new" id="btn-create-brand-template" type="button">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="#9C9CA6" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <span style="font-size:9px;font-weight:700;text-align:center">내 브랜드<br>만들기</span>
+        </button>
+
+      </div>
+    </section>
+  </div>
+</div>
+</body>
+</html>

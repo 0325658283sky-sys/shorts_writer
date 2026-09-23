@@ -1,0 +1,140 @@
+/* === New Cut flow (new-cut-handoff) ===
+   Reuses existing :root design tokens from styles.css (--ink, --accent, --radius, ...).
+   Desktop-only for now; layout flows inside StudioShell's content area instead of a
+   fixed 1440x900 canvas (see new-cut-handoff/README.md note on responsive breakpoints). */
+
+.ncf { display: flex; flex-direction: column; gap: 0; color: var(--ink); font-family: var(--font); }
+
+.ncf-main-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 26px; }
+.ncf-main-header h1 { font-size: 20px; font-weight: 800; margin: 0; }
+
+.ncf-input-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 22px; box-shadow: 0 1px 2px rgba(22, 22, 26, 0.06); }
+.ncf-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+.ncf-tab { padding: 9px 16px; border-radius: var(--radius-pill); background: var(--surface-2); border: 1px solid var(--line); color: var(--ink-soft); font-size: 13px; font-weight: 600; cursor: pointer; }
+.ncf-tab.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+.ncf-input-row { display: flex; gap: 10px; }
+.ncf-input-field { flex-grow: 1; display: flex; align-items: center; gap: 10px; background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius-control); padding: 14px 16px; }
+.ncf-input-field input { border: none; outline: none; background: transparent; flex-grow: 1; font-size: 14.5px; color: var(--ink); width: 100%; }
+.ncf-btn-primary { background: var(--ink); color: #fff; border-radius: var(--radius-control); padding: 14px 26px; font-weight: 800; font-size: 14px; display: inline-flex; align-items: center; gap: 8px; border: none; cursor: pointer; margin-top: 12px; }
+.ncf-btn-primary:disabled { opacity: 0.6; cursor: default; }
+.ncf-credit-note { margin-top: 10px; font-size: 12px; color: var(--muted); }
+
+.ncf-dropzone { border: 1.5px dashed var(--line-strong); border-radius: var(--radius-control); background: var(--surface-2); padding: 28px; text-align: center; position: relative; }
+.ncf-dropzone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+.ncf-dropzone-label { font-size: 13px; color: var(--ink-soft); font-weight: 600; pointer-events: none; }
+
+.ncf-recent { margin-top: 30px; }
+.ncf-recent h2 { font-size: 14px; font-weight: 800; margin-bottom: 14px; }
+.ncf-recent-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; }
+.ncf-thumb { aspect-ratio: 9/16; border-radius: var(--radius); position: relative; color: #fff; text-decoration: none; overflow: hidden; border: none; cursor: pointer; padding: 0; }
+.ncf-thumb .cap { position: absolute; bottom: 10px; left: 10px; right: 10px; font-size: 11px; font-weight: 700; text-align: left; }
+.ncf-thumb-empty { aspect-ratio: 9/16; border-radius: var(--radius); background: var(--surface); border: 1.5px dashed var(--line-strong); display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 11.5px; font-weight: 600; text-align: center; padding: 10px; }
+.ncf-thumb-more { aspect-ratio: 9/16; border-radius: var(--radius); background: var(--surface-2); border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 12px; font-weight: 700; cursor: pointer; }
+
+/* --- options screen --- */
+.ncf-options-screen { height: 100%; }
+.ncf-topbar { display: flex; align-items: center; gap: 14px; padding: 0 0 22px; border-bottom: 1px solid var(--line); margin-bottom: 22px; }
+.ncf-back { background: none; border: none; padding: 6px; display: flex; font-size: 16px; cursor: pointer; }
+.ncf-video-thumb { width: 64px; height: 44px; border-radius: 6px; flex-shrink: 0; }
+.ncf-title { font-size: 14px; font-weight: 800; }
+.ncf-duration { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.ncf-btn-generate { margin-left: auto; margin-top: 0; }
+
+.ncf-body-row { display: flex; gap: 24px; align-items: flex-start; }
+.ncf-options-panel { width: 360px; flex-shrink: 0; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 26px; display: flex; flex-direction: column; gap: 22px; }
+.ncf-mode-switch { display: flex; gap: 6px; background: var(--surface-2); border-radius: var(--radius-control); padding: 4px; }
+.ncf-mode-switch button { flex: 1; text-align: center; padding: 9px; border-radius: 6px; font-weight: 600; font-size: 12.5px; color: var(--muted); background: none; border: none; cursor: pointer; }
+.ncf-mode-switch button.active { background: var(--surface); font-weight: 700; color: var(--ink); box-shadow: 0 1px 2px rgba(22, 22, 26, 0.08); }
+
+.ncf-field-label { font-size: 13px; font-weight: 700; margin-bottom: 10px; }
+.ncf-slider-row input[type="range"] { width: 100%; }
+.ncf-slider-scale { display: flex; justify-content: space-between; margin-top: 8px; font-size: 11.5px; color: var(--muted); }
+.ncf-slider-scale .now { color: var(--ink); font-weight: 700; }
+
+.ncf-field-toggle { display: flex; align-items: center; justify-content: space-between; padding-top: 18px; border-top: 1px solid var(--line); }
+.ncf-field-title { font-size: 13px; font-weight: 700; }
+.ncf-field-desc { font-size: 11.5px; color: var(--muted); margin-top: 3px; }
+.ncf-switch { width: 38px; height: 22px; border-radius: var(--radius-pill); background: var(--line); border: none; padding: 2px; flex-shrink: 0; position: relative; cursor: pointer; }
+.ncf-switch .knob { display: block; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2); transition: transform 0.15s; }
+.ncf-switch[aria-checked="true"] { background: var(--accent); }
+.ncf-switch[aria-checked="true"] .knob { transform: translateX(16px); }
+
+.ncf-lang-row { display: flex; gap: 8px; }
+.ncf-lang-row select { flex: 1; padding: 11px; border: 1px solid var(--line); border-radius: var(--radius-control); font-size: 13px; font-weight: 600; background: #fff; }
+.ncf-select-box { padding: 11px; border: 1px solid var(--line); border-radius: var(--radius-control); font-size: 13px; font-weight: 600; background: #fff; width: 100%; }
+.ncf-field-hint { font-size: 11px; color: var(--muted); margin-top: 6px; }
+
+.ncf-templates { flex-grow: 1; }
+.ncf-templates-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.ncf-templates-header h2 { font-size: 14px; font-weight: 800; margin: 0; }
+.ncf-template-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+.ncf-tcard { border-radius: var(--radius); overflow: hidden; position: relative; background: var(--surface); border: 1px solid var(--line); cursor: pointer; padding: 0; aspect-ratio: 9/16; }
+.ncf-tcard[aria-selected="true"] { border: 2px solid var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.ncf-tcard-bg { position: absolute; inset: 0; }
+.ncf-tcard-check { position: absolute; top: 6px; right: 6px; width: 16px; height: 16px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 10px; display: none; align-items: center; justify-content: center; }
+.ncf-tcard[aria-selected="true"] .ncf-tcard-check { display: flex; }
+.ncf-tcard-cap { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0, 0, 0, 0.55); color: #fff; font-size: 9px; font-weight: 700; padding: 5px; text-align: center; }
+.ncf-tcard-new { aspect-ratio: 9/16; border: 1.5px dashed var(--line-strong); display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 4px; color: var(--muted); background: none; cursor: pointer; border-radius: var(--radius); }
+
+/* --- progress screen --- */
+.ncf-progress-screen { min-height: 560px; display: flex; align-items: center; justify-content: center; background: var(--ink); border-radius: var(--radius); padding: 40px; }
+.ncf-panel { width: 520px; max-width: 100%; background: #1a1a21; border: 1px solid #26262f; border-radius: var(--radius); padding: 36px; display: flex; flex-direction: column; gap: 22px; color: #fff; }
+.ncf-kicker { font-size: 11px; font-weight: 700; letter-spacing: 0.09em; color: #8b8b98; text-transform: uppercase; }
+.ncf-headline { font-size: 20px; font-weight: 800; margin-top: 8px; }
+.ncf-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.ncf-step { display: flex; align-items: center; gap: 12px; }
+.ncf-step[data-status="pending"] { opacity: 0.45; }
+.ncf-step-icon { width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 11px; }
+.ncf-step[data-status="done"] .ncf-step-icon { background: #0f7b52; }
+.ncf-step[data-status="active"] .ncf-step-icon { background: var(--accent); }
+.ncf-step[data-status="pending"] .ncf-step-icon { background: none; border: 1.5px solid #3a3a45; }
+.ncf-step-label { font-size: 13.5px; flex-grow: 1; }
+.ncf-step[data-status="active"] .ncf-step-label { font-weight: 700; }
+.ncf-progress-track { width: 100%; height: 6px; border-radius: var(--radius-pill); background: #26262f; overflow: hidden; }
+.ncf-progress-fill { height: 100%; background: var(--accent); transition: width 0.3s ease; }
+.ncf-progress-caption { font-size: 11.5px; color: #8b8b98; margin-top: 8px; }
+.ncf-found-segment { background: #1f1f27; border: 1px solid #2b2b35; border-radius: var(--radius-control); padding: 14px; }
+.ncf-found-segment .label { font-size: 10.5px; font-weight: 700; color: var(--accent); letter-spacing: 0.03em; margin-bottom: 6px; }
+.ncf-found-segment .text { font-size: 12.5px; font-weight: 600; color: #e6e6ea; }
+.ncf-btn-ghost { background: transparent; border: 1px solid #34343f; border-radius: var(--radius-control); padding: 12px; font-size: 12.5px; font-weight: 600; color: #b8b8c2; width: 100%; cursor: pointer; }
+
+/* --- results screen --- */
+.ncf-results-screen { display: flex; gap: 0; min-height: 560px; background: var(--page-bg); border-radius: var(--radius); overflow: hidden; border: 1px solid var(--line); }
+.ncf-candidates { width: 280px; flex-shrink: 0; background: var(--surface); border-right: 1px solid var(--line); display: flex; flex-direction: column; }
+.ncf-candidates-header { padding: 18px 16px 12px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); }
+.ncf-candidates-header h2 { font-size: 13.5px; font-weight: 800; margin: 0; }
+.ncf-candidates-header .sort { font-size: 11.5px; color: var(--muted); font-weight: 600; }
+.ncf-candidate-list { overflow: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; list-style: none; margin: 0; }
+.ncf-candidate { display: flex; gap: 10px; padding: 9px; border-radius: var(--radius-control); width: 100%; background: none; border: none; text-align: left; cursor: pointer; }
+.ncf-candidate.selected { background: var(--accent-soft); border: 1.5px solid var(--accent); }
+.ncf-candidate .thumb { width: 40px; height: 70px; border-radius: 6px; flex-shrink: 0; }
+.ncf-candidate .meta { flex-grow: 1; min-width: 0; }
+.ncf-candidate .cap { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ink-soft); display: block; }
+.ncf-candidate.selected .cap { font-weight: 700; color: var(--ink); }
+.ncf-candidate .dur { font-size: 10.5px; color: var(--muted); margin-top: 2px; display: block; }
+.ncf-candidate .score { font-size: 12px; font-weight: 700; color: var(--muted); flex-shrink: 0; }
+.ncf-candidate.selected .score { font-weight: 800; color: var(--accent-strong); }
+
+.ncf-preview { flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; background: var(--surface-2); padding: 24px; }
+.ncf-preview-actions { display: flex; gap: 8px; }
+.ncf-preview-actions button { padding: 8px 16px; border-radius: var(--radius-pill); font-size: 12px; font-weight: 700; border: none; cursor: pointer; }
+.ncf-preview-actions .primary { background: var(--ink); color: #fff; }
+.ncf-preview-actions .secondary { background: var(--surface); border: 1px solid var(--line); font-weight: 600; }
+.ncf-phone { width: 220px; height: 391px; border-radius: 22px; background: #1b1b22; position: relative; overflow: hidden; box-shadow: 0 22px 44px rgba(22, 22, 26, 0.2); }
+.ncf-phone-video { width: 100%; height: 100%; object-fit: cover; }
+.ncf-phone-placeholder { width: 100%; height: 100%; background: #26262f; }
+.ncf-phone .badge-score { position: absolute; top: 14px; right: 14px; background: var(--accent); color: #fff; font-size: 11px; font-weight: 800; padding: 4px 8px; border-radius: 6px; }
+.ncf-phone .play { position: absolute; bottom: 16px; left: 16px; width: 44px; height: 44px; border-radius: 50%; background: rgba(255, 255, 255, 0.16); display: flex; align-items: center; justify-content: center; border: none; color: #fff; cursor: pointer; }
+.ncf-btn-download { background: var(--accent); color: #fff; border-radius: var(--radius-control); padding: 14px 32px; font-weight: 800; font-size: 14px; border: none; cursor: pointer; }
+.ncf-btn-download:disabled { opacity: 0.6; cursor: default; }
+
+.ncf-side-panel { width: 320px; flex-shrink: 0; background: var(--surface); border-left: 1px solid var(--line); padding: 22px; overflow: auto; display: flex; flex-direction: column; gap: 20px; }
+.ncf-guide-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.ncf-guide-header h3 { font-size: 13px; font-weight: 800; margin: 0; }
+.ncf-guide-text { font-size: 12.5px; line-height: 1.6; color: var(--ink-soft); background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius-control); padding: 12px; }
+.ncf-field h3 { font-size: 13px; font-weight: 800; margin: 0 0 8px; }
+.ncf-title-row { display: flex; gap: 8px; }
+.ncf-title-row input { flex-grow: 1; border: 1px solid var(--line); border-radius: var(--radius-control); padding: 11px 12px; font-size: 12.5px; }
+.ncf-btn-regen { border: 1px solid var(--line); border-radius: var(--radius-control); padding: 0 12px; font-size: 11.5px; font-weight: 700; color: var(--ink-soft); background: #fff; cursor: pointer; }
+.ncf-subtitles { flex-grow: 1; display: flex; flex-direction: column; min-height: 0; }
+.ncf-subtitles textarea { flex-grow: 1; min-height: 140px; overflow: auto; font-size: 12.5px; line-height: 1.7; color: var(--ink-soft); border: 1px solid var(--line); border-radius: var(--radius-control); padding: 12px; resize: none; background: #fff; font-family: var(--font); }

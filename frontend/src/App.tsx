@@ -4,6 +4,7 @@ import { AuthPanel } from "./components/AuthPanel";
 import { BlogClipFlow } from "./components/BlogClipFlow";
 import { BoardEditor } from "./components/board/BoardEditor";
 import { Dashboard } from "./components/Dashboard";
+import { NewCutFlow } from "./components/NewCutFlow";
 import { StudioShell } from "./components/StudioShell";
 import { type YoutubePreview } from "./components/YoutubeConfirmStep";
 import { YoutubeClipFlow } from "./components/YoutubeClipFlow";
@@ -1252,58 +1253,46 @@ export function App() {
         />
       );
     } else if (focusYoutubeVideo) {
+      // New Cut v2 4단계 플로우로 통일 (design handoff: new-cut-handoff/*.html).
+      // 기존 YoutubeClipFlow는 더 이상 create 진입점에서 사용하지 않지만 파일은 남겨둠.
       body = (
-        <YoutubeClipFlow
-          video={focusYoutubeVideo}
-          highlights={highlights[focusYoutubeVideo.id] ?? []}
-          clips={clips}
-          projectTitle={focusYoutubeMeta?.title}
-          projectChannel={focusYoutubeMeta?.channel}
-          projectThumbnailUrl={focusYoutubeMeta?.thumbnail_url}
-          downloadingClipId={downloadingClipId}
-          initialSubtitleStyle={subtitleStyleFromVisual(
-            focusYoutubeMeta?.visualStyle || preferredYoutubeVisualStyle || "yt_profile",
-          )}
-          shortsCount={youtubeShortsCount}
-          lengthBand={youtubeLengthBand}
-          onBackToStudio={handleBackToStudio}
-          onVideoUpdated={mergeVideoStatus}
-          onHighlightsReady={(videoId, items) => {
-            setHighlights((current) => ({ ...current, [videoId]: items }));
-          }}
-          onTranscriptReady={(videoId, transcript) => {
-            setTranscripts((current) => ({ ...current, [videoId]: transcript }));
-          }}
-          onCreateClip={handleCreateClip}
-          onBurnSubtitles={handleBurnSubtitles}
-          onStyleChange={(clipId, style) => setSubtitleStyles((current) => ({ ...current, [clipId]: style }))}
-          onOpenDetailedEditor={(clip) => setEditingYoutubeClipId(clip.id)}
+        <NewCutFlow
+          usage={usage}
+          plans={plans}
+          projects={projects}
+          resumeVideoId={focusYoutubeVideo.id}
+          onExit={handleBackToStudio}
           onMessage={setUploadMessage}
+          onRefreshProjects={() => {
+            void Promise.all([loadVideos(), loadUsage(), loadPlans(), loadProjects()]);
+          }}
         />
       );
     } else if (focusBlogClip) {
       body = (
-        <BlogClipFlow
-          blogClip={focusBlogClip}
-          copiedKey={copiedKey}
-          downloadingBlogClipId={downloadingBlogClipId}
-          generatingBlogMetadataId={generatingBlogMetadataId}
-          selectingBlogScriptId={selectingBlogScriptId}
-          confirmingImageSelection={confirmingImageSelectionId === focusBlogClip.id}
-          renderingFromFlow={renderingFromFlowId === focusBlogClip.id}
-          onBackToStudio={handleBackToStudio}
-          onCopyText={handleCopyText}
-          onDownloadBlogClip={handleDownloadBlogClip}
-          onGenerateMetadata={handleGenerateBlogMetadata}
-          onSelectScript={handleSelectBlogScript}
-          onConfirmImages={handleConfirmBlogImages}
-          onRender={handleRenderFromFlow}
-          onOpenBoardEditor={handleOpenBoardEditor}
-          onBlogClipUpdated={(updated) => {
-            setBlogClips((current) => current.map((item) => (item.id === updated.id ? updated : item)));
-          }}
+        <NewCutFlow
+          usage={usage}
+          plans={plans}
+          projects={projects}
+          resumeBlogClipId={focusBlogClip.id}
+          onExit={handleBackToStudio}
           onMessage={setUploadMessage}
-          flowMessage={uploadMessage}
+          onRefreshProjects={() => {
+            void Promise.all([loadVideos(), loadUsage(), loadPlans(), loadProjects()]);
+          }}
+        />
+      );
+    } else if (studioNav === "create") {
+      body = (
+        <NewCutFlow
+          usage={usage}
+          plans={plans}
+          projects={projects}
+          onExit={handleBackToStudio}
+          onMessage={setUploadMessage}
+          onRefreshProjects={() => {
+            void Promise.all([loadVideos(), loadUsage(), loadPlans(), loadProjects()]);
+          }}
         />
       );
     } else {

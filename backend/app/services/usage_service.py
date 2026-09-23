@@ -27,6 +27,15 @@ PLAN_POLICIES = {
         "max_video_minutes": 120,
         "description": "Ditodio 통합 — 쇼츠 80/월",
     },
+    # 내부 테스트/운영 계정 전용 — 일반 가입 플랜 목록(list_plan_policies로 노출되는 /plans)에는
+    # 포함하지 않고, DB에서 plan='admin'으로 직접 지정한 계정에만 적용된다.
+    "admin": {
+        "id": "admin",
+        "name": "Admin",
+        "monthly_video_limit": 1_000_000,
+        "max_video_minutes": 600,
+        "description": "내부 테스트 계정 — 사실상 무제한",
+    },
 }
 
 
@@ -40,7 +49,8 @@ def plan_policy(plan: str | None) -> dict:
 
 
 def list_plan_policies() -> list[dict]:
-    return list(PLAN_POLICIES.values())
+    # "admin"은 내부 전용이라 일반 사용자에게 노출되는 /plans 목록에서는 제외한다.
+    return [policy for key, policy in PLAN_POLICIES.items() if key != "admin"]
 
 
 def _fetch_user_usage_row(conn: sqlite3.Connection, user_id: int) -> sqlite3.Row:

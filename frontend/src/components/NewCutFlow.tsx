@@ -387,28 +387,38 @@ export function NewCutFlow({
       setProgressCaption("템플릿을 적용해서 자막을 붙이는 중…");
 
       const chosen = sorted.slice(0, Math.max(1, clipCount));
+      // 재방문(새로고침)/재시도 시 이미 만들어둔 클립을 다시 만들지 않도록,
+      // 이 영상의 하이라이트에 대해 기존에 생성된 클립이 있으면 재사용한다.
+      const existingClips = await authorizedRequest<Clip[]>("/clips").catch(() => [] as Clip[]);
+      const existingByHighlight = new Map(existingClips.map((c) => [c.highlight_id, c]));
       const madeClips: Clip[] = [];
       for (let i = 0; i < chosen.length; i += 1) {
         const highlight = chosen[i];
-        const created = await authorizedRequest<Clip>("/clips/create", {
-          method: "POST",
-          body: JSON.stringify({ highlight_id: highlight.id, visual_style: "yt_profile" }),
-        });
-        const rendered = await authorizedRequest<Clip>(`/clips/${created.id}/render-template`, {
-          method: "POST",
-          body: JSON.stringify({
-            visual_style: "yt_profile",
-            video_title: videoMeta?.title ?? currentVideo.original_filename,
-            burn_subtitles: !hideSubtitles,
-            subtitle_style: "shorts",
-          }),
-        }).catch(() => created);
-        let finalClip = rendered;
-        if (selectedTemplateId != null) {
-          finalClip = await authorizedRequest<Clip>(`/clips/${rendered.id}/template`, {
-            method: "PATCH",
-            body: JSON.stringify({ template_id: selectedTemplateId }),
-          }).catch(() => rendered);
+        const already = existingByHighlight.get(highlight.id);
+        let finalClip: Clip;
+        if (already) {
+          finalClip = already;
+        } else {
+          const created = await authorizedRequest<Clip>("/clips/create", {
+            method: "POST",
+            body: JSON.stringify({ highlight_id: highlight.id, visual_style: "yt_profile" }),
+          });
+          const rendered = await authorizedRequest<Clip>(`/clips/${created.id}/render-template`, {
+            method: "POST",
+            body: JSON.stringify({
+              visual_style: "yt_profile",
+              video_title: videoMeta?.title ?? currentVideo.original_filename,
+              burn_subtitles: !hideSubtitles,
+              subtitle_style: "shorts",
+            }),
+          }).catch(() => created);
+          finalClip = rendered;
+          if (selectedTemplateId != null) {
+            finalClip = await authorizedRequest<Clip>(`/clips/${rendered.id}/template`, {
+              method: "PATCH",
+              body: JSON.stringify({ template_id: selectedTemplateId }),
+            }).catch(() => rendered);
+          }
         }
         madeClips.push(finalClip);
         setProgressPercent(78 + Math.round(((i + 1) / chosen.length) * 20));

@@ -499,10 +499,12 @@ export function NewCutFlow({
             setStep("options");
             return;
           }
+          // 백엔드 최대 개수(기본 8장)도 넘으면 마찬가지로 항상 400 — 점수/순서 상위 8장만 보낸다.
+          const selectedIds = candidates.slice(0, 8).map((c) => c.id);
           try {
             await authorizedRequest<BlogClip>(`/blog-clips/${blogClipId}/images/selection`, {
               method: "PUT",
-              body: JSON.stringify({ image_ids: candidates.map((c) => c.id) }),
+              body: JSON.stringify({ image_ids: selectedIds }),
             });
           } catch (selectionError) {
             if (pollRef.current) window.clearInterval(pollRef.current);

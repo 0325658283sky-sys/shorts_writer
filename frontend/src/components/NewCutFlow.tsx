@@ -161,6 +161,7 @@ export function NewCutFlow({
   const startedAtRef = useRef<number>(0);
   const pollFailRef = useRef<number>(0);
   const renderFailRef = useRef<number>(0);
+  const scriptFailRef = useRef<number>(0);
 
   // Results (step 4)
   const [highlights, setHighlights] = useState<Highlight[]>([]);
@@ -441,6 +442,7 @@ export function NewCutFlow({
     if (!startedAtRef.current) startedAtRef.current = Date.now();
     pollFailRef.current = 0;
     renderFailRef.current = 0;
+    scriptFailRef.current = 0;
     // NOTE: 실제 웹소켓/서버 푸시가 없어 클라이언트 setInterval 폴링만 사용한다.
     // 즉 "닫아도 계속 만듭니다"는 서버 작업 자체는 계속 진행되지만, 이 화면(탭)을 벗어나면
     // 폴링이 멈추고, 다시 New Cut 화면으로 돌아왔을 때(재방문 시) 상태를 다시 조회해야 한다.
@@ -453,10 +455,20 @@ export function NewCutFlow({
 
         if (updated.status === "awaiting_script" && !updated.script_tone) {
           // 자동 파일럿: 훅형 대본을 기본으로 선택해 파이프라인을 계속 진행시킨다.
-          await authorizedRequest<BlogClip>(`/blog-clips/${blogClipId}/select-script`, {
-            method: "POST",
-            body: JSON.stringify({ tone: "hook" as ScriptTone }),
-          }).catch(() => null);
+          try {
+            await authorizedRequest<BlogClip>(`/blog-clips/${blogClipId}/select-script`, {
+              method: "POST",
+              body: JSON.stringify({ tone: "hook" as ScriptTone }),
+            });
+            scriptFailRef.current = 0;
+          } catch (scriptError) {
+            scriptFailRef.current += 1;
+            if (scriptFailRef.current >= 5) {
+              if (pollRef.current) window.clearInterval(pollRef.current);
+              onMessage(scriptError instanceof Error ? scriptError.message : "대본 생성에 실패했습니다.");
+              setStep("options");
+            }
+          }
           return;
         }
         if (updated.status === "awaiting_images") {

@@ -3,25 +3,19 @@ import { useEffect, useMemo, useState } from "react";
 import { BlogShorts, BLOG_SHORTS_HEIGHT, BLOG_SHORTS_WIDTH, totalBlogShortsFrames } from "@new-cut/remotion/BlogShorts";
 import { authorizedBlob, authorizedRequest } from "../api/client";
 import { buildBlogShortsProps } from "../lib/blogShortsProps";
+import { detectSource } from "./CreateStudio";
 import type { BlogClip, Board, Clip, SubtitleTemplate } from "../types";
 
 const FPS = 30;
 
-/** ④ 템플릿 갤러리 — 클라이언트에서만 쓰는 표시용 그룹핑. 백엔드 category는 'gallery' 단일 값이라
- *  README가 말하는 임팩트/뉴스형/미니멀 세분류는 슬러그 기반으로 여기서만 나눈다 (스키마 변경 없음). */
-const CLIENT_GROUP: Record<string, string> = {
-  impact_yellow: "임팩트",
-  viral_red: "임팩트",
-  neon_green: "임팩트",
-  gradient_bar: "임팩트",
-  news_caption: "뉴스형",
-  top_headline: "뉴스형",
-  outline_pop: "뉴스형",
-  clean_minimal: "미니멀",
-  white_box: "미니멀",
-  caption_pill: "미니멀",
-  side_bar: "미니멀",
-  commerce_price: "미니멀",
+/** ④ 템플릿 갤러리 — 백엔드 DB의 실제 category 값(impact/news/minimal/commerce/legacy) 기준으로 분류.
+ *  이전에는 "?category=gallery"로 조회했는데 그 값이 실제 DB에 존재하지 않아 항상 빈 배열이 왔다
+ *  (백엔드 시드는 impact/news/minimal/commerce로 저장됨). 전체 조회 후 legacy만 제외한다. */
+const CATEGORY_LABEL: Record<string, (typeof CATEGORY_CHIPS)[number]> = {
+  impact: "임팩트",
+  news: "뉴스형",
+  minimal: "미니멀",
+  commerce: "미니멀", // 별도 칩 없이 미니멀에 묶임(디자인 기준)
 };
 
 const CATEGORY_CHIPS = ["전체", "임팩트", "뉴스형", "미니멀", "브랜드 커스텀"] as const;
@@ -89,6 +83,7 @@ export function TemplateGalleryStep({
   const entityId = clipKind === "youtube" ? clip?.id : blogClip?.id;
   const initialTemplateId = clipKind === "youtube" ? clip?.subtitle_template_id : blogClip?.subtitle_template_id;
   const applyPath = clipKind === "youtube" ? `/clips/${entityId}/template` : `/blog-clips/${entityId}/template`;
+  const isProductSource = clipKind === "blog" && detectSource(blogClip?.source_url ?? "") === "product";
 
   const [templates, setTemplates] = useState<SubtitleTemplate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -104,9 +99,17 @@ export function TemplateGalleryStep({
     let cancelled = false;
     setLoading(true);
     setError("");
-    authorizedRequest<SubtitleTemplate[]>("/subtitle-templates?category=gallery")
+    authorizedRequest<SubtitleTemplate[]>("/subtitle-templates")
       .then((loaded) => {
-        if (!cancelled) setTemplates(loaded);
+        if (cancelled) return;
+        const gallery = loaded.filter((t) => t.category !== "legacy");
+        setTemplates(gallery);
+        // 아직 선택된 템플릿이 없으면(신규 진입) 소스에 맞는 기본값을 골라준다.
+        if (!initialTemplateId) {
+          const defaultSlug = isProductSource ? "commerce_price" : "impact_yellow";
+          const byDefault = gallery.find((t) => t.slug === defaultSlug);
+          setSelectedId((current) => current ?? byDefault?.id ?? gallery[0]?.id ?? null);
+        }
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : "템플릿을 불러오지 못했습니다.");
@@ -117,6 +120,7 @@ export function TemplateGalleryStep({
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -149,7 +153,7 @@ export function TemplateGalleryStep({
   const filtered = useMemo(() => {
     if (activeChip === "전체") return templates;
     if (activeChip === "브랜드 커스텀") return [];
-    return templates.filter((t) => CLIENT_GROUP[t.slug ?? ""] === activeChip);
+    return templates.filter((t) => CATEGORY_LABEL[t.category ?? ""] === activeChip);
   }, [templates, activeChip]);
 
   const selectedTemplate = useMemo(
@@ -223,7 +227,11 @@ export function TemplateGalleryStep({
     <>
       <p className="create-kicker">템플릿</p>
       <h1>자막 템플릿을 골라주세요</h1>
-      <p className="flow-lead">건너뛰어도 기존 스타일의 자막이 그대로 적용됩니다.</p>
+      <p className="flow-lead">
+        {clipKind === "youtube"
+          ? "선택한 구간에 한 번에 적용돼요. 편별로 다르게 하려면 편집기에서 바꾸세요."
+          : "건너뛰어도 기존 스타일의 자막이 그대로 적용됩니다."}
+      </p>
       {error ? <p className="form-message">{error}</p> : null}
 
       <div className="gallery-layout">
@@ -241,6 +249,7 @@ export function TemplateGalleryStep({
                 {chip}
               </button>
             ))}
+            <span className="gallery-sort-label">많이 쓰는 순</span>
           </div>
 
           {loading ? <p className="muted">템플릿 불러오는 중…</p> : null}
@@ -248,6 +257,7 @@ export function TemplateGalleryStep({
           <div className="gallery-grid">
             {filtered.map((template) => {
               const active = selectedId === template.id;
+              const isRecommended = isProductSource && template.slug === "commerce_price";
               return (
                 <button
                   key={template.id}
@@ -257,6 +267,7 @@ export function TemplateGalleryStep({
                 >
                   <TemplateCardVisual template={template} />
                   <span className="gallery-card-name">{template.name}</span>
+                  {isRecommended ? <span className="gallery-card-badge gallery-card-badge-accent">상품 추천</span> : null}
                   {active ? <span className="gallery-card-check" aria-hidden="true">✓</span> : null}
                 </button>
               );
@@ -313,6 +324,9 @@ export function TemplateGalleryStep({
               건너뛰기
             </button>
           ) : null}
+          <p className="gallery-apply-order-hint">
+            적용 순서: 템플릿 → 편집기 전체 스타일 → 장면별 값. 장면에서 바꾼 값은 언제든 되돌릴 수 있어요.
+          </p>
         </div>
       </div>
     </>

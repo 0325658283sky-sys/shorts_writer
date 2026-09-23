@@ -159,6 +159,7 @@ export function NewCutFlow({
   const [progressCaption, setProgressCaption] = useState("시작하는 중…");
   const pollRef = useRef<number | null>(null);
   const startedAtRef = useRef<number>(0);
+  const pollFailRef = useRef<number>(0);
 
   // Results (step 4)
   const [highlights, setHighlights] = useState<Highlight[]>([]);
@@ -188,6 +189,7 @@ export function NewCutFlow({
         .then((v) => {
           setVideo(v);
           setStep("progress");
+          startedAtRef.current = Date.now();
           runYoutubePipeline(v, { resumed: true });
         })
         .catch((error) => onMessage(error instanceof Error ? error.message : "영상을 불러오지 못했습니다."));
@@ -425,12 +427,15 @@ export function NewCutFlow({
 
   function pollBlogUntilDone(blogClipId: number) {
     if (pollRef.current) window.clearInterval(pollRef.current);
+    if (!startedAtRef.current) startedAtRef.current = Date.now();
+    pollFailRef.current = 0;
     // NOTE: 실제 웹소켓/서버 푸시가 없어 클라이언트 setInterval 폴링만 사용한다.
     // 즉 "닫아도 계속 만듭니다"는 서버 작업 자체는 계속 진행되지만, 이 화면(탭)을 벗어나면
     // 폴링이 멈추고, 다시 New Cut 화면으로 돌아왔을 때(재방문 시) 상태를 다시 조회해야 한다.
     pollRef.current = window.setInterval(async () => {
       try {
         const updated = await authorizedRequest<BlogClip>(`/blog-clips/${blogClipId}`);
+        pollFailRef.current = 0;
         setBlogClip(updated);
         applyBlogProgress(updated);
 
@@ -475,8 +480,14 @@ export function NewCutFlow({
           setStep("options");
         }
       } catch (error) {
-        // 폴링 중 일시적 오류는 무시하고 다음 tick 재시도.
-        void error;
+        // 일시적 오류는 무시하고 재시도하되, 연속 실패가 계속되면(약 20초) 멈춰서 사용자에게 알린다.
+        // 그렇지 않으면 요청이 계속 실패해도 화면이 "시작하는 중…" 상태로 영원히 멈춰 보인다.
+        pollFailRef.current += 1;
+        if (pollFailRef.current >= 10) {
+          if (pollRef.current) window.clearInterval(pollRef.current);
+          onMessage(error instanceof Error ? error.message : "진행 상태를 확인하지 못했습니다. 다시 시도해주세요.");
+          setStep("options");
+        }
       }
     }, 2000);
   }

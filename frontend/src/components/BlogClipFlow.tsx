@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { SCRIPT_TONE_HINTS, SCRIPT_TONE_LABELS, SCRIPT_TONES, userFacingProgressLabel } from "../constants";
 import type { BlogClip, ScriptTone, VisualStyleSlug } from "../types";
 import { AliveProgressBar } from "./AliveProgressBar";
@@ -65,7 +65,6 @@ export function BlogClipFlow({
   onMessage: (message: string) => void;
   flowMessage?: string;
 }) {
-  const autoRenderKey = useRef<number | null>(null);
   const [versionRefresh, setVersionRefresh] = useState(0);
   // ④ 템플릿 갤러리: awaiting_boards 진입 시 한 번 보여주고, 적용/건너뛰기 후엔 숨긴다.
   const [galleryHandledId, setGalleryHandledId] = useState<number | null>(null);
@@ -97,13 +96,10 @@ export function BlogClipFlow({
     return step;
   });
 
-  useEffect(() => {
-    // ④ 템플릿 갤러리를 아직 보여주는 중이면(선택/건너뛰기 전) 기본 렌더를 자동 시작하지 않는다.
-    if (!isAwaitingBoards || renderingFromFlow || showTemplateGallery) return;
-    if (autoRenderKey.current === blogClip.id) return;
-    autoRenderKey.current = blogClip.id;
-    onRender(blogClip);
-  }, [isAwaitingBoards, blogClip.id, renderingFromFlow, onRender, showTemplateGallery]);
+  // NOTE(Phase 2): 예전엔 여기서 템플릿 갤러리 이후 자동으로 onRender(blogClip)를 호출했다.
+  // 그런데 그 즉시 실행되는 바람에 "장면 직접 편집"/"이대로 영상 만들기" 두 버튼이 화면에 뜨는
+  // 순간 이미 렌더가 시작되어 있어 사실상 눌릴 기회가 없었다(BoardEditor 진입 불가 버그).
+  // 자동 시작을 없애고, 아래 두 버튼 중 사용자가 실제로 고르게 한다.
 
   return (
     <div className="flow-shell">

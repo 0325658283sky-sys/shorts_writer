@@ -5,7 +5,7 @@ import { BgmPanel } from "./BgmPanel";
 import { VisualStylePanel } from "../VisualStylePanel";
 import { useBoardImageUrl } from "./useBoardImageUrl";
 
-type MediaTab = "screen" | "voice" | "motion";
+type MediaTab = "text" | "narration" | "bgm" | "trim" | "style";
 
 function MediaThumb({
   blogClipId,
@@ -106,7 +106,7 @@ export function MediaPanel({
   autoDuration: boolean;
   onAutoDurationChange: (value: boolean) => void;
 }) {
-  const [tab, setTab] = useState<MediaTab>("screen");
+  const [tab, setTab] = useState<MediaTab>("text");
   const [stockQuery, setStockQuery] = useState("");
   const [stockResults, setStockResults] = useState<StockSearchResponse | null>(null);
   const [stockSearching, setStockSearching] = useState(false);
@@ -136,7 +136,7 @@ export function MediaPanel({
   }, [ttsSpeed]);
 
   useEffect(() => {
-    if (tab !== "voice" || voices.length > 0 || voicesLoading) return;
+    if (tab !== "narration" || voices.length > 0 || voicesLoading) return;
     setVoicesLoading(true);
     setVoiceError("");
     void authorizedRequest<Voice[]>("/voices")
@@ -248,9 +248,11 @@ export function MediaPanel({
       <div className="media-tabs" role="tablist">
         {(
           [
-            ["screen", "화면"],
-            ["voice", "음성"],
-            ["motion", "모션"],
+            ["text", "텍스트"],
+            ["narration", "나레이션"],
+            ["bgm", "배경음악"],
+            ["trim", "구간편집"],
+            ["style", "전체 스타일"],
           ] as const
         ).map(([id, label]) => (
           <button key={id} className={`media-tab ${tab === id ? "active" : ""}`} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}>
@@ -259,83 +261,17 @@ export function MediaPanel({
         ))}
       </div>
 
-      {tab === "screen" ? (
+      {tab === "text" ? (
         <div className="media-tab-body">
           <p className="media-scope-label">이 장면</p>
-          <p className="muted">다운로드된 이미지로 선택 장면을 교체합니다.</p>
-          <div className="media-grid">
-            {uniqueImages.map((item) => (
-              <MediaThumb
-                key={item.imagePath}
-                blogClipId={blogClipId}
-                boardId={item.boardId}
-                imagePath={item.imagePath}
-                active={selectedBoard?.image_path === item.imagePath}
-                onSelect={() => onSwapImage(item.imagePath)}
-              />
-            ))}
-          </div>
-
-          <section className="stock-search" aria-label="스톡 이미지 검색">
-            <h3 className="stock-search-title">스톡 검색 (Pexels)</h3>
-            <form className="stock-search-form" onSubmit={(event) => void handleStockSearch(event)}>
-              <input
-                type="search"
-                value={stockQuery}
-                onChange={(event) => setStockQuery(event.target.value)}
-                placeholder="예: cafe, travel, food"
-                disabled={stockSearching}
-              />
-              <button className="small-button" type="submit" disabled={stockSearching || !stockQuery.trim()}>
-                {stockSearching ? "검색 중" : "검색"}
-              </button>
-            </form>
-            {stockError ? <p className="form-message">{stockError}</p> : null}
-            {stockResults && stockResults.photos.length > 0 ? (
-              <div className="stock-grid">
-                {stockResults.photos.map((photo) => (
-                  <button
-                    key={`${photo.id ?? photo.download_url}`}
-                    className="stock-thumb"
-                    type="button"
-                    disabled={!selectedBoard || applyingStock}
-                    title={photo.photographer ? `${photo.alt} — ${photo.photographer}` : photo.alt}
-                    onClick={() => void handleApplyStock(photo.download_url)}
-                  >
-                    <img src={photo.preview_url} alt={photo.alt || "stock"} loading="lazy" />
-                  </button>
-                ))}
-              </div>
-            ) : null}
-            {!selectedBoard ? <p className="muted">장면을 선택한 뒤 스톡 이미지를 적용하세요.</p> : null}
-            {applyingStock ? <p className="muted">이미지를 장면에 적용하는 중…</p> : null}
-          </section>
-
-          <p className="muted media-upload-note">로컬 업로드 — 곧 제공</p>
-          <p className="media-scope-label">영상 전체</p>
-          <VisualStylePanel
-            blogClipId={blogClipId}
-            appliedStyle={appliedVisualStyle}
-            styleTitle={styleTitle}
-            styleSubtitle={styleSubtitle}
-            styleOverlay={styleOverlay}
-            transitionSec={transitionSec}
-            transitionType={transitionType}
-            onApply={onApplyVisualStyle}
-            onStyleCopyChange={onStyleCopyChange}
-            onMotionChange={onMotionChange}
-            onTitlesGenerated={onTitlesGenerated}
-            onOverlayUpdated={onOverlayUpdated}
-            applying={applyingVisualStyle}
-            savingCopy={savingStyleCopy}
-            savingMotion={savingMotion}
-            onMessage={onMessage}
-            variant="screen"
-          />
+          <p className="muted">
+            장면별 자막 문장·폰트·크기·강조색·등장 애니메이션은 준비 중입니다. 지금은 ④ 템플릿에서 고른 스타일이
+            모든 장면에 그대로 적용됩니다.
+          </p>
         </div>
       ) : null}
 
-      {tab === "voice" ? (
+      {tab === "narration" ? (
         <div className="media-tab-body">
           <p className="media-scope-label">영상 전체</p>
           <label className="voice-speed">
@@ -404,6 +340,12 @@ export function MediaPanel({
               이 장면만 기본 보이스로
             </button>
           ) : null}
+        </div>
+      ) : null}
+
+      {tab === "bgm" ? (
+        <div className="media-tab-body">
+          <p className="media-scope-label">영상 전체</p>
           <BgmPanel
             selectedBoard={selectedBoard}
             bgmAssetId={bgmAssetId}
@@ -415,7 +357,7 @@ export function MediaPanel({
         </div>
       ) : null}
 
-      {tab === "motion" ? (
+      {tab === "trim" ? (
         <div className="media-tab-body">
           <p className="media-scope-label">이 장면</p>
           {selectedBoard ? (
@@ -435,6 +377,60 @@ export function MediaPanel({
             <p className="muted">장면을 선택한 뒤 길이를 조절하세요.</p>
           )}
 
+          <p className="muted">다운로드된 이미지로 선택 장면을 교체합니다.</p>
+          <div className="media-grid">
+            {uniqueImages.map((item) => (
+              <MediaThumb
+                key={item.imagePath}
+                blogClipId={blogClipId}
+                boardId={item.boardId}
+                imagePath={item.imagePath}
+                active={selectedBoard?.image_path === item.imagePath}
+                onSelect={() => onSwapImage(item.imagePath)}
+              />
+            ))}
+          </div>
+
+          <section className="stock-search" aria-label="스톡 이미지 검색">
+            <h3 className="stock-search-title">스톡 검색 (Pexels)</h3>
+            <form className="stock-search-form" onSubmit={(event) => void handleStockSearch(event)}>
+              <input
+                type="search"
+                value={stockQuery}
+                onChange={(event) => setStockQuery(event.target.value)}
+                placeholder="예: cafe, travel, food"
+                disabled={stockSearching}
+              />
+              <button className="small-button" type="submit" disabled={stockSearching || !stockQuery.trim()}>
+                {stockSearching ? "검색 중" : "검색"}
+              </button>
+            </form>
+            {stockError ? <p className="form-message">{stockError}</p> : null}
+            {stockResults && stockResults.photos.length > 0 ? (
+              <div className="stock-grid">
+                {stockResults.photos.map((photo) => (
+                  <button
+                    key={`${photo.id ?? photo.download_url}`}
+                    className="stock-thumb"
+                    type="button"
+                    disabled={!selectedBoard || applyingStock}
+                    title={photo.photographer ? `${photo.alt} — ${photo.photographer}` : photo.alt}
+                    onClick={() => void handleApplyStock(photo.download_url)}
+                  >
+                    <img src={photo.preview_url} alt={photo.alt || "stock"} loading="lazy" />
+                  </button>
+                ))}
+              </div>
+            ) : null}
+            {!selectedBoard ? <p className="muted">장면을 선택한 뒤 스톡 이미지를 적용하세요.</p> : null}
+            {applyingStock ? <p className="muted">이미지를 장면에 적용하는 중…</p> : null}
+          </section>
+          <p className="muted media-upload-note">로컬 업로드 — 곧 제공</p>
+        </div>
+      ) : null}
+
+      {tab === "style" ? (
+        <div className="media-tab-body">
           <p className="media-scope-label">영상 전체</p>
           <VisualStylePanel
             blogClipId={blogClipId}

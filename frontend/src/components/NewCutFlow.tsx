@@ -128,6 +128,14 @@ export function NewCutFlow({
   resumeBlogClipId?: number | null;
 }) {
   const [step, setStep] = useState<Step>("home");
+  // NewCutFlow는 App.tsx의 uploadMessage 배너가 렌더되는 Dashboard 자리를 대체하므로,
+  // onMessage(setUploadMessage)만 호출하면 그 배너가 화면에 없어 사용자가 에러를 볼 수 없다.
+  // 이 화면 자체에 토스트를 띄우기 위해 로컬 notice 상태를 함께 둔다.
+  const [notice, setNotice] = useState<string | null>(null);
+  function showMessage(message: string) {
+    setNotice(message);
+    onMessage(message);
+  }
   const [sourceTab, setSourceTab] = useState<SourceKind>("youtube");
   const [sourceUrl, setSourceUrl] = useState("");
   const [uploadFile, setUploadFile] = useState<File | null>(null);
@@ -184,6 +192,12 @@ export function NewCutFlow({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => setNotice(null), 8000);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
+
   // Resume an in-flight/completed project directly into progress/results.
   useEffect(() => {
     if (resumeVideoId != null) {
@@ -194,7 +208,7 @@ export function NewCutFlow({
           startedAtRef.current = Date.now();
           runYoutubePipeline(v, { resumed: true });
         })
-        .catch((error) => onMessage(error instanceof Error ? error.message : "영상을 불러오지 못했습니다."));
+        .catch((error) => showMessage(error instanceof Error ? error.message : "영상을 불러오지 못했습니다."));
     } else if (resumeBlogClipId != null) {
       authorizedRequest<BlogClip>(`/blog-clips/${resumeBlogClipId}`)
         .then((bc) => {
@@ -206,7 +220,7 @@ export function NewCutFlow({
             pollBlogUntilDone(bc.id);
           }
         })
-        .catch((error) => onMessage(error instanceof Error ? error.message : "쇼츠를 불러오지 못했습니다."));
+        .catch((error) => showMessage(error instanceof Error ? error.message : "쇼츠를 불러오지 못했습니다."));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resumeVideoId, resumeBlogClipId]);
@@ -225,7 +239,7 @@ export function NewCutFlow({
   async function handleStartConvert() {
     if (sourceTab === "upload") {
       if (!uploadFile) {
-        onMessage("먼저 MP4 파일을 선택해주세요.");
+        showMessage("먼저 MP4 파일을 선택해주세요.");
         return;
       }
       setStarting(true);
@@ -238,7 +252,7 @@ export function NewCutFlow({
         setStep("options");
         await loadOptionsData();
       } catch (error) {
-        onMessage(error instanceof Error ? error.message : "업로드에 실패했습니다.");
+        showMessage(error instanceof Error ? error.message : "업로드에 실패했습니다.");
       } finally {
         setStarting(false);
       }
@@ -246,7 +260,7 @@ export function NewCutFlow({
     }
 
     if (!sourceUrl.trim() || !isValidUrl(sourceUrl)) {
-      onMessage("올바른 URL을 입력해주세요.");
+      showMessage("올바른 URL을 입력해주세요.");
       return;
     }
     setStarting(true);
@@ -272,7 +286,7 @@ export function NewCutFlow({
         await loadOptionsData();
       }
     } catch (error) {
-      onMessage(error instanceof Error ? error.message : "변환 시작에 실패했습니다.");
+      showMessage(error instanceof Error ? error.message : "변환 시작에 실패했습니다.");
     } finally {
       setStarting(false);
     }
@@ -292,7 +306,7 @@ export function NewCutFlow({
       setTemplates(templateList);
       if (templateList.length > 0) setSelectedTemplateId((current) => current ?? templateList[0].id);
     } catch (error) {
-      onMessage(error instanceof Error ? error.message : "옵션 정보를 불러오지 못했습니다.");
+      showMessage(error instanceof Error ? error.message : "옵션 정보를 불러오지 못했습니다.");
     } finally {
       setLoadingOptions(false);
     }
@@ -303,13 +317,13 @@ export function NewCutFlow({
     // POST /subtitle-templates 로 일반 템플릿 생성은 가능하지만, "내 브랜드" 전용 업로드/추출
     // 플로우는 미구현 상태라 지금은 안내만 하고 실제 이동은 하지 않는다.
     console.log("[NewCutFlow] TODO(api): brand template builder flow not implemented on backend yet");
-    onMessage("브랜드 템플릿 만들기는 준비 중이에요. (백엔드 전용 엔드포인트 필요)");
+    showMessage("브랜드 템플릿 만들기는 준비 중이에요. (백엔드 전용 엔드포인트 필요)");
   }
 
   async function handleGenerate() {
     if (mode === "manual") {
       // TODO(api): manual segment selection not yet supported by backend.
-      onMessage("직접 구간 설정은 아직 지원되지 않아요. AI 클립생성으로 진행해주세요.");
+      showMessage("직접 구간 설정은 아직 지원되지 않아요. AI 클립생성으로 진행해주세요.");
       return;
     }
     setStep("progress");
@@ -321,7 +335,7 @@ export function NewCutFlow({
 
     if (sourceTab === "youtube" || sourceTab === "upload") {
       if (!video) {
-        onMessage("원본 영상 정보를 찾을 수 없습니다.");
+        showMessage("원본 영상 정보를 찾을 수 없습니다.");
         setStep("options");
         return;
       }
@@ -342,7 +356,7 @@ export function NewCutFlow({
         onRefreshProjects();
         pollBlogUntilDone(created.id);
       } catch (error) {
-        onMessage(error instanceof Error ? error.message : "생성 시작에 실패했습니다.");
+        showMessage(error instanceof Error ? error.message : "생성 시작에 실패했습니다.");
         setStep("options");
       }
     }
@@ -432,7 +446,7 @@ export function NewCutFlow({
       onRefreshProjects();
       enterYoutubeResults(madeClips, sorted);
     } catch (error) {
-      onMessage(error instanceof Error ? error.message : "쇼츠 생성 중 오류가 발생했습니다.");
+      showMessage(error instanceof Error ? error.message : "쇼츠 생성 중 오류가 발생했습니다.");
       if (!opts.resumed) setStep("options");
     }
   }
@@ -465,7 +479,7 @@ export function NewCutFlow({
             scriptFailRef.current += 1;
             if (scriptFailRef.current >= 5) {
               if (pollRef.current) window.clearInterval(pollRef.current);
-              onMessage(scriptError instanceof Error ? scriptError.message : "대본 생성에 실패했습니다.");
+              showMessage(scriptError instanceof Error ? scriptError.message : "대본 생성에 실패했습니다.");
               setStep("options");
             }
           }
@@ -479,7 +493,7 @@ export function NewCutFlow({
           // 거부되어 재시도해도 영원히 같은 결과가 나온다 — 재시도 대신 바로 실패 처리한다.
           if (candidates.length < 3) {
             if (pollRef.current) window.clearInterval(pollRef.current);
-            onMessage(
+            showMessage(
               `이 소스에서 찾은 이미지가 ${candidates.length}장뿐이라 쇼츠를 만들 수 없어요(최소 3장 필요). 다른 글/상품 URL로 시도해주세요.`,
             );
             setStep("options");
@@ -492,7 +506,7 @@ export function NewCutFlow({
             });
           } catch (selectionError) {
             if (pollRef.current) window.clearInterval(pollRef.current);
-            onMessage(selectionError instanceof Error ? selectionError.message : "이미지 선택에 실패했습니다.");
+            showMessage(selectionError instanceof Error ? selectionError.message : "이미지 선택에 실패했습니다.");
             setStep("options");
           }
           return;
@@ -506,7 +520,7 @@ export function NewCutFlow({
             renderFailRef.current += 1;
             if (renderFailRef.current >= 5) {
               if (pollRef.current) window.clearInterval(pollRef.current);
-              onMessage(renderError instanceof Error ? renderError.message : "렌더 시작에 실패했습니다.");
+              showMessage(renderError instanceof Error ? renderError.message : "렌더 시작에 실패했습니다.");
               setStep("options");
             }
           }
@@ -524,7 +538,7 @@ export function NewCutFlow({
           enterBlogResults(updated);
         } else if (updated.status === "failed") {
           if (pollRef.current) window.clearInterval(pollRef.current);
-          onMessage(updated.error_message || "생성에 실패했습니다.");
+          showMessage(updated.error_message || "생성에 실패했습니다.");
           setStep("options");
         }
       } catch (error) {
@@ -533,7 +547,7 @@ export function NewCutFlow({
         pollFailRef.current += 1;
         if (pollFailRef.current >= 10) {
           if (pollRef.current) window.clearInterval(pollRef.current);
-          onMessage(error instanceof Error ? error.message : "진행 상태를 확인하지 못했습니다. 다시 시도해주세요.");
+          showMessage(error instanceof Error ? error.message : "진행 상태를 확인하지 못했습니다. 다시 시도해주세요.");
           setStep("options");
         }
       }
@@ -641,7 +655,7 @@ export function NewCutFlow({
         if (updated.title_candidates.length > 0) setTitleValue(updated.title_candidates[0]);
       }
     } catch (error) {
-      onMessage(error instanceof Error ? error.message : "제목 재생성에 실패했습니다.");
+      showMessage(error instanceof Error ? error.message : "제목 재생성에 실패했습니다.");
     } finally {
       setRegeneratingTitle(false);
     }
@@ -650,7 +664,7 @@ export function NewCutFlow({
   function handleSaveSubtitles() {
     // TODO(api): 자막은 ASS 파일(subtitle_path)로 굽혀 저장되며, 텍스트 트랙을 별도로 저장/동기화하는
     // 엔드포인트가 없다. 지금은 편집 내용을 로컬 상태로만 유지한다.
-    onMessage("자막 텍스트 저장 API가 아직 없어 화면에서만 반영됩니다. (TODO(api))");
+    showMessage("자막 텍스트 저장 API가 아직 없어 화면에서만 반영됩니다. (TODO(api))");
   }
 
   async function handleDownloadSelected() {
@@ -659,12 +673,12 @@ export function NewCutFlow({
     setDownloading(true);
     try {
       if (selected.clip) {
-        await downloadBlob(`/clips/${selected.clip.id}/download`, `new-cut-clip-${selected.clip.id}.mp4`, onMessage);
+        await downloadBlob(`/clips/${selected.clip.id}/download`, `new-cut-clip-${selected.clip.id}.mp4`, showMessage);
       } else if (selected.blogClip) {
         await downloadBlob(
           `/blog-clips/${selected.blogClip.id}/download`,
           `new-cut-blog-${selected.blogClip.id}.mp4`,
-          onMessage,
+          showMessage,
         );
       }
     } finally {
@@ -696,6 +710,11 @@ export function NewCutFlow({
   if (step === "home") {
     return (
       <div className="ncf">
+        {notice ? (
+          <div className="ncf-toast" role="alert" onClick={() => setNotice(null)}>
+            {notice}
+          </div>
+        ) : null}
         <header className="ncf-main-header">
           <h1>나만의 숏폼을 바로 제작해보세요</h1>
         </header>
@@ -804,6 +823,11 @@ export function NewCutFlow({
   if (step === "options") {
     return (
       <div className="ncf ncf-options-screen">
+        {notice ? (
+          <div className="ncf-toast" role="alert" onClick={() => setNotice(null)}>
+            {notice}
+          </div>
+        ) : null}
         <header className="ncf-topbar">
           <button className="ncf-back" type="button" aria-label="이전으로" onClick={() => setStep("home")}>
             ←
@@ -998,6 +1022,11 @@ export function NewCutFlow({
     const activeIndex = PROGRESS_STEP_DEFS.findIndex((s) => s.id === progressStepId);
     return (
       <div className="ncf ncf-progress-screen">
+        {notice ? (
+          <div className="ncf-toast" role="alert" onClick={() => setNotice(null)}>
+            {notice}
+          </div>
+        ) : null}
         <section className="ncf-panel" role="status" aria-live="polite">
           <div>
             <div className="ncf-kicker">쇼츠 만드는 중</div>
@@ -1046,6 +1075,11 @@ export function NewCutFlow({
   const selected = candidates.find((c) => c.key === selectedKey) ?? candidates[0] ?? null;
   return (
     <div className="ncf ncf-results-screen">
+      {notice ? (
+        <div className="ncf-toast" role="alert" onClick={() => setNotice(null)}>
+          {notice}
+        </div>
+      ) : null}
       <aside className="ncf-candidates">
         <div className="ncf-candidates-header">
           <h2 id="candidates-count">생성된 쇼츠 {candidates.length}개</h2>

@@ -3096,6 +3096,99 @@ button.flow-stepper-item.is-clickable:hover {
   white-space: nowrap;
 }
 
+.candidates-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.candidate-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  aspect-ratio: 9 / 14;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--ink);
+  color: #fff;
+  cursor: pointer;
+  text-align: left;
+  overflow: hidden;
+}
+
+.candidate-card.is-selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.candidate-card:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.candidate-score {
+  align-self: flex-start;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: #f0f0f3;
+  color: var(--ink-soft);
+  font-size: 10.5px;
+  font-weight: 700;
+}
+
+.candidate-score.is-top {
+  background: var(--accent);
+  color: #fff;
+}
+
+.candidate-check {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.candidate-duration {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  font-size: 10.5px;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.candidate-title {
+  margin-top: auto;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.candidate-reason {
+  font-size: 10.5px;
+  color: rgba(255, 255, 255, 0.65);
+  line-height: 1.4;
+}
+
+.candidates-credit {
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.candidates-credit.is-over {
+  color: #8a6410;
+}
+
 .script-tone-picker,
 .board-render-shim {
   display: grid;
@@ -5004,67 +5097,76 @@ button.flow-stepper-item.is-clickable:hover {
   color: var(--ink-soft);
 }
 
-.tone-switch {
+.tone-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.tone-card {
+  position: relative;
   display: flex;
-  gap: 4px;
-  padding: 3px;
-  background: var(--page-bg);
-  border-radius: 9px;
-}
-
-.tone-switch-item {
-  flex: 1;
-  min-height: 30px;
-  border: 0;
-  background: transparent;
-  border-radius: 7px;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--ink-soft);
-  cursor: pointer;
-}
-
-.tone-switch-item.is-active {
-  background: var(--surface);
-  color: var(--ink);
-  font-weight: 700;
-  box-shadow: var(--shadow);
-}
-
-.tone-switch-item:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
-
-.tone-preview {
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: var(--surface-2);
-  padding: 16px;
+  background: var(--surface);
+  cursor: pointer;
+  text-align: left;
 }
 
-.tone-preview-meta {
+.tone-card.is-selected {
+  border: 1.5px solid var(--accent);
+  background: #f5f8fe;
+}
+
+.tone-card-radio {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1.5px solid var(--line-strong);
+  background: var(--surface);
+}
+
+.tone-card.is-selected .tone-card-radio {
+  border: 5px solid var(--accent);
+}
+
+.tone-card-head {
   display: flex;
   align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-bottom: 10px;
-  font-size: 11.5px;
+  gap: 6px;
+  padding-right: 24px;
+  font-size: 13.5px;
+}
+
+.tone-card-badge {
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.tone-card-meta {
+  font-size: 11px;
   color: var(--muted);
 }
 
-.tone-preview-meta strong {
+.tone-card-hint {
+  font-size: 11.5px;
   color: var(--ink-soft);
 }
 
-.tone-preview-hint {
-  margin-left: auto;
-}
-
-.tone-preview .narration-script {
-  margin: 0;
-  font-size: 14px;
-  line-height: 1.8;
+.tone-card-script {
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 1.75;
   color: var(--ink);
 }
 

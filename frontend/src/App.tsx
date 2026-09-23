@@ -1266,6 +1266,7 @@ export function App() {
           )}
           shortsCount={youtubeShortsCount}
           lengthBand={youtubeLengthBand}
+          usage={usage}
           onBackToStudio={handleBackToStudio}
           onVideoUpdated={mergeVideoStatus}
           onHighlightsReady={(videoId, items) => {

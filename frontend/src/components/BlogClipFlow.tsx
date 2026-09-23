@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { SCRIPT_TONE_HINTS, SCRIPT_TONE_LABELS, SCRIPT_TONES, userFacingProgressLabel } from "../constants";
 import type { BlogClip, ScriptTone, VisualStyleSlug } from "../types";
 import { AliveProgressBar } from "./AliveProgressBar";
+import { detectSource } from "./CreateStudio";
 import { BlogClipRestylePanel } from "./BlogClipRestylePanel";
 import { BlogClipVersionsPanel } from "./BlogClipVersionsPanel";
 import { CompletedShortPlayer } from "./CompletedShortPlayer";
@@ -273,10 +274,15 @@ export function BlogClipFlow({
   );
 }
 
-const PREPARE_TASKS = [
+const PREPARE_TASKS_BLOG = [
   { key: "read", label: "글 읽는 중", done: "글 본문 읽음", at: 18 },
-  { key: "images", label: "사진 모으는 중", done: "사진 찾음", at: 34 },
-  { key: "script", label: "대본 쓰는 중", done: "대본 3안 완성", at: 42 },
+  { key: "images", label: "쓸 만한 사진 찾는 중", done: "사진 찾음", at: 34 },
+  { key: "script", label: "대본 3안 쓰는 중", done: "대본 3안 완성", at: 42 },
+];
+const PREPARE_TASKS_PRODUCT = [
+  { key: "read", label: "상품 정보 읽는 중", done: "상품 정보 읽음", at: 18 },
+  { key: "images", label: "상품 사진 모으는 중", done: "사진 모음", at: 34 },
+  { key: "script", label: "매력 포인트 찾는 중", done: "대본 3안 완성", at: 42 },
 ];
 const RENDER_TASKS = [
   { key: "voice", label: "음성 만드는 중", done: "음성 합성 완료", at: 72 },
@@ -294,7 +300,8 @@ function ProgressLog({
   stageLabel: string;
 }) {
   const percent = blogClip.progress_percent ?? 0;
-  const tasks = isFinalRender ? RENDER_TASKS : PREPARE_TASKS;
+  const isProductSource = detectSource(blogClip.source_url) === "product";
+  const tasks = isFinalRender ? RENDER_TASKS : isProductSource ? PREPARE_TASKS_PRODUCT : PREPARE_TASKS_BLOG;
   const currentIndex = tasks.findIndex((task) => percent < task.at);
 
   // 프론트 경과 타이머로 대략적인 ETA (정확하지 않음)
@@ -341,7 +348,13 @@ function ProgressLog({
       <div className="progress-head">
         <div>
           <p className="create-kicker">{isFinalRender ? "만드는 중" : "준비 중"}</p>
-          <h1>{isFinalRender ? "영상을 합치고 있어요" : "글을 읽고 장면을 짜는 중이에요"}</h1>
+          <h1>
+            {isFinalRender
+              ? "영상을 합치고 있어요"
+              : isProductSource
+                ? "상품을 읽고 매력 포인트를 찾고 있어요"
+                : "글을 읽고 대본 3안을 쓰고 있어요"}
+          </h1>
         </div>
         {eta ? <span className="progress-eta">{eta}</span> : null}
       </div>
@@ -388,42 +401,40 @@ function ScriptToneStep({
   onEdit: (tone: ScriptTone) => void;
 }) {
   const [active, setActive] = useState<ScriptTone>(tones[0]);
-  const script = blogClip.script_candidates[active] ?? "";
-  const chars = script.replace(/\s/g, "").length;
-  const seconds = Math.max(1, Math.round(chars / 4.5)); // 한국어 TTS 대략 4.5자/초
 
   return (
     <section className="flow-card">
       <h1>어떤 말투로 읽어줄까요?</h1>
-      <p className="flow-lead">말투만 고르면 나머지는 자동입니다. 나중에 바꿀 수 있어요.</p>
+      <p className="flow-lead">마음에 드는 대본을 직접 골라주세요. 나중에 바꿀 수 있어요.</p>
 
-      <div className="tone-switch" role="tablist" aria-label="말투">
-        {tones.map((tone) => (
-          <button
-            key={tone}
-            type="button"
-            role="tab"
-            aria-selected={active === tone}
-            className={`tone-switch-item ${active === tone ? "is-active" : ""}`}
-            onClick={() => setActive(tone)}
-          >
-            {SCRIPT_TONE_LABELS[tone]}
-          </button>
-        ))}
-      </div>
-
-      <div className="tone-preview">
-        <div className="tone-preview-meta">
-          <span>
-            읽는 시간 <strong>{seconds}초</strong>
-          </span>
-          <span>·</span>
-          <span>
-            글자 <strong>{chars}자</strong>
-          </span>
-          <span className="tone-preview-hint">{SCRIPT_TONE_HINTS[active]}</span>
-        </div>
-        <p className="narration-script">{script}</p>
+      <div className="tone-card-grid" role="radiogroup" aria-label="말투">
+        {tones.map((tone) => {
+          const script = blogClip.script_candidates[tone] ?? "";
+          const chars = script.replace(/\s/g, "").length;
+          const seconds = Math.max(1, Math.round(chars / 4.5)); // 한국어 TTS 대략 4.5자/초
+          const selected = active === tone;
+          return (
+            <button
+              key={tone}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              className={`tone-card ${selected ? "is-selected" : ""}`}
+              onClick={() => setActive(tone)}
+            >
+              <span className="tone-card-radio" aria-hidden="true" />
+              <span className="tone-card-head">
+                <strong>{SCRIPT_TONE_LABELS[tone]}</strong>
+                {tone === "hook" ? <span className="tone-card-badge">추천</span> : null}
+              </span>
+              <span className="tone-card-meta">
+                읽는 시간 {seconds}초 · 글자 {chars}자
+              </span>
+              <span className="tone-card-hint">{SCRIPT_TONE_HINTS[tone]}</span>
+              <p className="tone-card-script">{script}</p>
+            </button>
+          );
+        })}
       </div>
 
       <div className="tone-actions">
@@ -431,7 +442,7 @@ function ScriptToneStep({
           장면 다듬기
         </button>
         <button className="btn-primary btn-lg" type="button" disabled={busy} onClick={() => onSelect(active)}>
-          {busy ? "준비 중…" : "이 말투로 영상 만들기"}
+          {busy ? "준비 중…" : "이 대본으로 계속"}
         </button>
       </div>
     </section>

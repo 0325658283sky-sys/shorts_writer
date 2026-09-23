@@ -2,13 +2,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { authorizedBlob, authorizedRequest } from "../api/client";
 import { friendlyProgressFromVideoStatus } from "../constants";
 import type { YoutubeLengthBand } from "../constants";
-import type { Clip, ClipMetadata, Highlight, SubtitleStyle, Transcript, TtsMode, Video, VideoStatusResponse } from "../types";
+import type { Clip, ClipMetadata, Highlight, SubtitleStyle, Transcript, TtsMode, Usage, Video, VideoStatusResponse } from "../types";
 import { AliveProgressBar } from "./AliveProgressBar";
 import { GenerationOptionsPanel } from "./GenerationOptionsPanel";
 import { TemplateGalleryStep } from "./TemplateGalleryStep";
 
 const FLOW_STEPS = [
   { id: "progress", label: "분석" },
+  { id: "candidates", label: "후보" },
   { id: "generating", label: "생성" },
   { id: "template", label: "템플릿" },
   { id: "hub", label: "완료" },
@@ -49,8 +50,10 @@ export function YoutubeClipFlow({
   onMessage,
   shortsCount = 2,
   lengthBand = "medium",
+  usage = null,
 }: {
   video: Video;
+  usage?: Usage | null;
   highlights: Highlight[];
   clips: Record<number, Clip>;
   projectTitle?: string | null;
@@ -90,6 +93,9 @@ export function YoutubeClipFlow({
   const [hubThumb, setHubThumb] = useState<string | null>(projectThumbnailUrl ?? null);
   const [generatedCount, setGeneratedCount] = useState(0);
   const [localClips, setLocalClips] = useState<Clip[]>([]);
+  // ② 구간 후보 비교: 자동으로 상위 N개를 바로 만들지 않고, 점수·이유를 보여주고 사용자가 여러 개 고르게 한다.
+  const [candidateHighlights, setCandidateHighlights] = useState<Highlight[]>([]);
+  const [selectedHighlightIds, setSelectedHighlightIds] = useState<number[]>([]);
   // ④ 템플릿 갤러리: 쇼츠 생성 완료 후 한 번 보여주고, 적용/건너뛰기 후엔 숨긴다(블로그 흐름과 동일 패턴).
   const [showTemplateGallery, setShowTemplateGallery] = useState(true);
   const autoGenRef = useRef(false);
@@ -97,6 +103,8 @@ export function YoutubeClipFlow({
 
   const subtitleStyle = initialSubtitleStyle ?? "shorts";
   const displayTitle = projectTitle?.trim() || video.original_filename;
+  // 채널 정보는 유튜브 가져오기에서만 채워진다(MP4 업로드는 없음) — ①-b 대기 문구 분기용.
+  const isYoutubeSource = Boolean(projectChannel);
 
   const videoClips = useMemo(() => {
     return Object.values(clips)
@@ -137,12 +145,18 @@ export function YoutubeClipFlow({
     };
   }, []);
 
-  async function generateShorts(items: Highlight[]) {
+  function enterCandidates(items: Highlight[]) {
+    setCandidateHighlights(items);
+    const preselected = pickHighlightTargets(items, shortsCount, lengthBand);
+    setSelectedHighlightIds(preselected.map((item) => item.id));
+    setStep("candidates");
+  }
+
+  async function generateShorts(targets: Highlight[]) {
     if (autoGenRef.current) return;
     autoGenRef.current = true;
     setStep("generating");
     setPipelineError("");
-    const targets = pickHighlightTargets(items, shortsCount, lengthBand);
 
     if (targets.length === 0) {
       setPipelineError("생성할 하이라이트가 없습니다.");
@@ -234,9 +248,9 @@ export function YoutubeClipFlow({
         const items = await authorizedRequest<Highlight[]>(`/videos/${latest.id}/highlights`);
         if (cancelled) return;
         onHighlightsReady(latest.id, items);
-        setProgress(76);
-        setStageLabel("편집점 확정 · 쇼츠 생성 준비");
-        if (!cancelled) await generateShorts(items);
+        setProgress(100);
+        setStageLabel("볼 만한 구간 후보 준비 완료");
+        if (!cancelled) enterCandidates(items);
       } catch (error) {
         if (cancelled) return;
         const message = error instanceof Error ? error.message : "유튜브 하이라이트 추출에 실패했습니다.";
@@ -259,7 +273,7 @@ export function YoutubeClipFlow({
     }
 
     if (highlights.length > 0) {
-      void generateShorts(highlights);
+      enterCandidates(highlights);
       return;
     }
 
@@ -272,7 +286,32 @@ export function YoutubeClipFlow({
 
   const workspaceClips = localClips.length > 0 ? localClips : videoClips;
   const isTemplateStep = step === "hub" && showTemplateGallery && workspaceClips.length > 0;
-  const stepIndex = step === "progress" ? 0 : step === "generating" ? 1 : isTemplateStep ? 2 : 3;
+  const stepIndex =
+    step === "progress" ? 0 : step === "candidates" ? 1 : step === "generating" ? 2 : isTemplateStep ? 3 : 4;
+
+  const creditRemaining = usage?.remaining ?? null;
+  const estimatedCost = selectedHighlightIds.length;
+  const overBudget = creditRemaining != null && estimatedCost > creditRemaining;
+
+  function toggleCandidate(highlightId: number) {
+    setSelectedHighlightIds((current) => {
+      if (current.includes(highlightId)) return current.filter((id) => id !== highlightId);
+      if (creditRemaining != null && current.length >= creditRemaining) {
+        onMessage(`남은 크레딧(${creditRemaining}개)만큼만 고를 수 있어요.`);
+        return current;
+      }
+      return [...current, highlightId];
+    });
+  }
+
+  function handleContinueFromCandidates() {
+    const chosen = candidateHighlights.filter((item) => selectedHighlightIds.includes(item.id));
+    if (chosen.length === 0) {
+      onMessage("하이라이트를 하나 이상 골라주세요.");
+      return;
+    }
+    void generateShorts(chosen);
+  }
 
   async function handleTemplateApplied(updated: Clip) {
     const templateId = updated.subtitle_template_id ?? null;
@@ -336,12 +375,14 @@ export function YoutubeClipFlow({
               <h1>
                 {step === "generating"
                   ? "쇼츠를 만들고 있어요"
-                  : "AI가 바이럴 구간을 찾고 있어요"}
+                  : isYoutubeSource
+                    ? "원본 영상을 보고 하이라이트를 찾고 있어요"
+                    : "파일을 올리고 하이라이트를 찾고 있어요"}
               </h1>
               <p className="flow-lead">
                 {step === "generating"
                   ? "선택한 템플릿에 맞춰 자막을 입히고 미리보기를 준비합니다."
-                  : "롱폼에서 하이라이트를 잡은 뒤 쇼츠로 자동 변환합니다. 프로젝트 탭으로 나가도 됩니다."}
+                  : "원본 영상 가져오기 → 말소리 받아쓰기 → 볼 만한 구간 고르기 → 후보별 자막 붙이기. 프로젝트 탭으로 나가도 됩니다."}
               </p>
               <AliveProgressBar percent={progress} active={!pipelineError && progress < 100} label={stageLabel} />
               {pipelineError ? (
@@ -365,6 +406,62 @@ export function YoutubeClipFlow({
               <button className="ghost-button" type="button" onClick={onBackToStudio}>
                 프로젝트 목록으로
               </button>
+            </section>
+          ) : null}
+
+          {step === "candidates" ? (
+            <section className="flow-card candidates-step">
+              <p className="create-kicker">구간 후보</p>
+              <h1>하이라이트 후보 {candidateHighlights.length}개를 찾았어요</h1>
+              <p className="flow-lead">
+                점수와 이유를 보고 쓸 구간을 여러 개 고르세요. 고른 구간마다 쇼츠가 한 편씩 만들어집니다.
+              </p>
+              <div className="candidates-grid">
+                {[...candidateHighlights]
+                  .sort((a, b) => b.score - a.score)
+                  .map((highlight, index) => {
+                    const selected = selectedHighlightIds.includes(highlight.id);
+                    const blocked = !selected && creditRemaining != null && selectedHighlightIds.length >= creditRemaining;
+                    return (
+                      <button
+                        key={highlight.id}
+                        type="button"
+                        className={`candidate-card ${selected ? "is-selected" : ""}`}
+                        aria-pressed={selected}
+                        disabled={blocked}
+                        onClick={() => toggleCandidate(highlight.id)}
+                      >
+                        <span className={`candidate-score ${index === 0 ? "is-top" : ""}`}>
+                          {Math.round(highlight.score)}점{index === 0 ? " · 최고" : ""}
+                        </span>
+                        {selected ? <span className="candidate-check" aria-hidden="true">✓</span> : null}
+                        <span className="candidate-duration">
+                          {Math.max(0, Math.round(highlight.end_time - highlight.start_time))}초
+                        </span>
+                        <strong className="candidate-title">{highlight.title}</strong>
+                        <span className="candidate-reason">{highlight.reason}</span>
+                      </button>
+                    );
+                  })}
+              </div>
+              <div className="image-step-foot candidates-foot">
+                <span>
+                  <strong>{selectedHighlightIds.length}개</strong> 선택됨 — 선택한 후보마다 쇼츠가 하나씩 만들어집니다
+                </span>
+                {creditRemaining != null ? (
+                  <span className={`candidates-credit ${overBudget ? "is-over" : ""}`}>
+                    예상 차감 {estimatedCost} / {creditRemaining}회 남음
+                  </span>
+                ) : null}
+                <button
+                  className="btn-primary btn-lg flow-primary-cta"
+                  type="button"
+                  disabled={selectedHighlightIds.length === 0 || overBudget}
+                  onClick={handleContinueFromCandidates}
+                >
+                  선택한 구간으로 계속
+                </button>
+              </div>
             </section>
           ) : null}
 

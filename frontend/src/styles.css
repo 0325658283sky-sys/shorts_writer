@@ -752,6 +752,92 @@ select:disabled {
   white-space: nowrap;
 }
 
+/* ⑨-d 모바일 반응형: 별도 3화면 플로우 대신, 기존 화면을 좁은 폭에서도 쓸 수 있게
+   레이아웃만 접는다(기능/조작은 데스크톱과 동일하게 유지). 가장 큰 문제는 244px 고정
+   레일이 375px 화면의 대부분을 차지하던 것 — 레일을 상단 가로 바로 접는다. */
+@media (max-width: 768px) {
+  .studio-shell {
+    flex-direction: column;
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+
+  .studio-rail {
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+    height: auto;
+    max-height: none;
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+    overflow-x: auto;
+    overflow-y: visible;
+    flex-shrink: 0;
+  }
+
+  .studio-rail-brand {
+    height: 52px;
+    padding: 0 12px;
+    border-bottom: none;
+    border-right: 1px solid var(--line);
+    flex-shrink: 0;
+  }
+
+  .studio-switcher {
+    margin: 0 6px;
+  }
+
+  .studio-rail-nav {
+    flex-direction: row;
+    flex: none;
+    padding: 8px;
+    gap: 4px;
+  }
+
+  .studio-rail-link {
+    width: auto;
+    white-space: nowrap;
+    padding: 8px 10px;
+  }
+
+  /* 프로젝트별 하위 항목(최근 쇼츠 등)은 가로 바에서는 너무 길어져 숨긴다 —
+     해당 목록은 "프로젝트" 탭 본문에서 이미 볼 수 있다. */
+  .studio-rail-subitem {
+    display: none;
+  }
+
+  .studio-rail-foot {
+    flex-shrink: 0;
+    flex-direction: row;
+    align-items: center;
+    border-top: none;
+    border-left: 1px solid var(--line);
+    padding: 8px;
+  }
+
+  .studio-rail-cta {
+    width: auto;
+    min-height: 36px;
+    padding: 0 14px;
+    margin-bottom: 0;
+    white-space: nowrap;
+  }
+
+  .studio-usage-meter {
+    display: none;
+  }
+
+  .studio-shell-title {
+    padding: 0 12px;
+    height: 46px;
+  }
+
+  .studio-main {
+    padding: 16px 14px 32px;
+  }
+}
+
 .studio-usage-reset {
   font-size: 9.5px;
   color: var(--muted);

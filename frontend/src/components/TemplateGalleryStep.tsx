@@ -104,12 +104,14 @@ export function TemplateGalleryStep({
         if (cancelled) return;
         const gallery = loaded.filter((t) => t.category !== "legacy");
         setTemplates(gallery);
-        // 아직 선택된 템플릿이 없으면(신규 진입) 소스에 맞는 기본값을 골라준다.
-        if (!initialTemplateId) {
+        // 선택된 템플릿이 없거나(신규 진입) 갤러리에 없는 값(예: legacy 기본값)이면
+        // 소스에 맞는 기본값을 골라준다.
+        setSelectedId((current) => {
+          if (current != null && gallery.some((t) => t.id === current)) return current;
           const defaultSlug = isProductSource ? "commerce_price" : "impact_yellow";
           const byDefault = gallery.find((t) => t.slug === defaultSlug);
-          setSelectedId((current) => current ?? byDefault?.id ?? gallery[0]?.id ?? null);
-        }
+          return byDefault?.id ?? gallery[0]?.id ?? null;
+        });
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : "템플릿을 불러오지 못했습니다.");

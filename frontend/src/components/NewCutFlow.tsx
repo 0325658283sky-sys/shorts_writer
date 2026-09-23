@@ -297,10 +297,14 @@ export function NewCutFlow({
   async function loadOptionsData() {
     setLoadingOptions(true);
     try {
-      const [voiceList, templateList] = await Promise.all([
+      const [voiceList, allTemplates] = await Promise.all([
         authorizedRequest<Voice[]>("/voices"),
-        authorizedRequest<SubtitleTemplate[]>("/subtitle-templates?category=gallery"),
+        // "?category=gallery"는 실제 DB 카테고리 값(impact/minimal/news/commerce/legacy)과
+        // 매칭되지 않아 항상 빈 배열을 반환한다(기존 TemplateGalleryStep.tsx도 동일한 문제).
+        // 전체를 받아와 갤러리에 노출하지 않는 legacy만 클라이언트에서 제외한다.
+        authorizedRequest<SubtitleTemplate[]>("/subtitle-templates"),
       ]);
+      const templateList = allTemplates.filter((t) => t.category !== "legacy");
       setVoices(voiceList);
       if (voiceList.length > 0) setSelectedVoiceId((current) => current || voiceList[0].id);
       setTemplates(templateList);

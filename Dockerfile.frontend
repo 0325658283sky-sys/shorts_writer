@@ -26,7 +26,7 @@ RUN npm run build
 FROM node:20-slim
 WORKDIR /app
 COPY --from=build /repo/frontend/dist ./dist
-COPY --from=build /repo/frontend/node_modules/serve ./node_modules/serve
+RUN npm install --omit=dev serve@14.2.4
 
 EXPOSE 3000
-CMD ["sh", "-c", "node node_modules/serve/build/main.js -s dist -l ${PORT:-3000}"]
+CMD ["sh", "-c", "npx serve -s dist -l ${PORT:-3000}"]

@@ -160,6 +160,7 @@ export function NewCutFlow({
   const pollRef = useRef<number | null>(null);
   const startedAtRef = useRef<number>(0);
   const pollFailRef = useRef<number>(0);
+  const renderFailRef = useRef<number>(0);
 
   // Results (step 4)
   const [highlights, setHighlights] = useState<Highlight[]>([]);
@@ -439,6 +440,7 @@ export function NewCutFlow({
     if (pollRef.current) window.clearInterval(pollRef.current);
     if (!startedAtRef.current) startedAtRef.current = Date.now();
     pollFailRef.current = 0;
+    renderFailRef.current = 0;
     // NOTE: 실제 웹소켓/서버 푸시가 없어 클라이언트 setInterval 폴링만 사용한다.
     // 즉 "닫아도 계속 만듭니다"는 서버 작업 자체는 계속 진행되지만, 이 화면(탭)을 벗어나면
     // 폴링이 멈추고, 다시 New Cut 화면으로 돌아왔을 때(재방문 시) 상태를 다시 조회해야 한다.
@@ -461,17 +463,41 @@ export function NewCutFlow({
           const candidates = await authorizedRequest<{ id: number }[]>(`/blog-clips/${blogClipId}/images`).catch(
             () => [],
           );
-          if (candidates.length > 0) {
+          // 이미지 후보가 백엔드 최소 개수(기본 3장) 미만이면 자동선택 PUT은 항상 400으로
+          // 거부되어 재시도해도 영원히 같은 결과가 나온다 — 재시도 대신 바로 실패 처리한다.
+          if (candidates.length < 3) {
+            if (pollRef.current) window.clearInterval(pollRef.current);
+            onMessage(
+              `이 소스에서 찾은 이미지가 ${candidates.length}장뿐이라 쇼츠를 만들 수 없어요(최소 3장 필요). 다른 글/상품 URL로 시도해주세요.`,
+            );
+            setStep("options");
+            return;
+          }
+          try {
             await authorizedRequest<BlogClip>(`/blog-clips/${blogClipId}/images/selection`, {
               method: "PUT",
               body: JSON.stringify({ image_ids: candidates.map((c) => c.id) }),
-            }).catch(() => null);
+            });
+          } catch (selectionError) {
+            if (pollRef.current) window.clearInterval(pollRef.current);
+            onMessage(selectionError instanceof Error ? selectionError.message : "이미지 선택에 실패했습니다.");
+            setStep("options");
           }
           return;
         }
         if (updated.status === "awaiting_boards") {
           // 장면(보드) 세부 편집은 New Cut 4단계 플로우 범위를 벗어남 — 기본 구성 그대로 렌더 시작.
-          await authorizedRequest<BlogClip>(`/blog-clips/${blogClipId}/render`, { method: "POST" }).catch(() => null);
+          try {
+            await authorizedRequest<BlogClip>(`/blog-clips/${blogClipId}/render`, { method: "POST" });
+            renderFailRef.current = 0;
+          } catch (renderError) {
+            renderFailRef.current += 1;
+            if (renderFailRef.current >= 5) {
+              if (pollRef.current) window.clearInterval(pollRef.current);
+              onMessage(renderError instanceof Error ? renderError.message : "렌더 시작에 실패했습니다.");
+              setStep("options");
+            }
+          }
           return;
         }
         if (updated.status === "completed") {

@@ -9,7 +9,16 @@ export type CaptionWordTiming = {
   endSec: number;
 };
 
+/** 장면별 텍스트 스타일 오버라이드(편집기 "텍스트" 탭). 없는 키는 템플릿/전체 스타일 값을 그대로 쓴다. */
+export type BoardTextStyle = {
+  fontFamily?: ShortsFontId | string | null;
+  fontSize?: number | null;
+  accentColor?: string | null;
+  animation?: CaptionAnimation | null;
+};
+
 export type BlogBoardProps = {
+  textStyle?: BoardTextStyle | null;
   boardId?: number | null;
   /** http(s) URL, or path under remotion/public for staticFile() */
   imageUrl?: string | null;

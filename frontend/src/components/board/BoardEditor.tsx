@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { authorizedRequest } from "../../api/client";
-import type { BlogClip, Board } from "../../types";
+import type { BlogClip, Board, BoardTextStyle } from "../../types";
 import { BoardList } from "./BoardList";
 import { MediaPanel } from "./MediaPanel";
 import { RemotionPreviewPane, type RemotionPreviewPaneHandle } from "./RemotionPreviewPane";
@@ -289,6 +289,28 @@ export function BoardEditor({
       throw err;
     } finally {
       setAssigningSpeaker(false);
+    }
+  }
+
+  const [savingTextStyle, setSavingTextStyle] = useState(false);
+
+  /** 장면별 텍스트 스타일 저장. null이면 템플릿/전체 스타일 값으로 되돌린다. */
+  async function handleTextStyleChange(textStyle: BoardTextStyle | null) {
+    if (!selectedBoard || savingTextStyle) return;
+    setSavingTextStyle(true);
+    setError("");
+    try {
+      const updated = await authorizedRequest<Board>(`/blog-clips/${blogClip.id}/boards/${selectedBoard.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ text_style: textStyle }),
+      });
+      setBoards((current) => current.map((board) => (board.id === updated.id ? updated : board)));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "텍스트 스타일 저장에 실패했습니다.";
+      setError(message);
+      throw err;
+    } finally {
+      setSavingTextStyle(false);
     }
   }
 
@@ -585,6 +607,8 @@ export function BoardEditor({
             ttsSpeed={ttsSpeed}
             onTtsSpeedChange={(speed) => void handleTtsSpeedChange(speed)}
             onAssignSpeaker={handleAssignSpeaker}
+            onTextStyleChange={handleTextStyleChange}
+            savingTextStyle={savingTextStyle}
             onApplyVoiceToAll={handleApplyVoiceToAll}
             assigningSpeaker={assigningSpeaker}
             appliedVisualStyle={visualStyle}

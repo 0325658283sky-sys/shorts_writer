@@ -35,6 +35,7 @@ from app.db.schemas import (
 from app.services.blog_service import (
     BGM_ASSET_UNSET,
     SFX_UNSET,
+    parse_board_text_style,
     SPEAKER_UNSET,
     apply_blog_clip_template,
     blog_clip_download_path,
@@ -167,6 +168,7 @@ def _to_board_response(board: BlogClipBoard) -> BoardResponse:
         speaker=board.speaker,
         duration_seconds=board.duration_seconds,
         sfx_asset_id=board.sfx_asset_id,
+        text_style=parse_board_text_style(board.text_style_json),
         created_at=board.created_at,
         updated_at=board.updated_at,
     )
@@ -369,6 +371,7 @@ def update_blog_clip_board_endpoint(
         duration_seconds=payload.get("duration_seconds"),
         speaker=payload["speaker"] if "speaker" in payload else SPEAKER_UNSET,
         sfx_asset_id=payload["sfx_asset_id"] if "sfx_asset_id" in payload else SFX_UNSET,
+        text_style=payload["text_style"] if "text_style" in payload else SFX_UNSET,
     )
     return _to_board_response(board)
 

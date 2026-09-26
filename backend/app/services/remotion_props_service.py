@@ -190,6 +190,7 @@ def _props_from_boards(
                 "words": _estimate_word_timings(board.text or "", duration_sec),
                 "backgroundColor": None,
                 "speaker": board.speaker,
+                "textStyle": _board_text_style(board),
             }
         )
 
@@ -245,6 +246,12 @@ def _props_from_boards(
     }
 
 
+def _board_text_style(board: BlogClipBoard) -> dict | None:
+    from app.services.blog_service import parse_board_text_style
+
+    return parse_board_text_style(getattr(board, "text_style_json", None))
+
+
 def _caption_template_payload(conn: sqlite3.Connection, subtitle_template_id: int | None) -> dict | None:
     """④ 템플릿 갤러리에서 고른 subtitle_template을 Remotion captionTemplate prop으로 변환.
 
@@ -257,7 +264,9 @@ def _caption_template_payload(conn: sqlite3.Connection, subtitle_template_id: in
     from app.services.template_service import get_template_by_id
 
     template = get_template_by_id(conn, subtitle_template_id)
-    if template is None or template.category != "gallery":
+    # DB의 갤러리 템플릿 category는 impact/news/minimal/commerce 등이고 "gallery"라는 값은
+    # 존재하지 않는다. legacy(FFmpeg 번인 전용)만 제외한다.
+    if template is None or template.category == "legacy":
         return None
     return {
         "position": template.position or "bottom",

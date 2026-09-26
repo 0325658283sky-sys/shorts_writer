@@ -102,6 +102,7 @@ class BlogClipBoard:
     sfx_asset_id: int | None
     created_at: str
     updated_at: str
+    text_style_json: str | None = None
 
 
 @dataclass(frozen=True)

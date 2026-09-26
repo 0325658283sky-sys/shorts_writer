@@ -6029,3 +6029,47 @@ button.flow-stepper-item.is-clickable:hover {
   line-height: 1.5;
   margin: 2px 0 0;
 }
+
+/* ⑤ 편집기 텍스트 탭(장면별 자막 스타일) */
+.scene-text-style {
+  display: grid;
+  gap: 12px;
+}
+
+.scene-text-style-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.scene-text-style-swatches {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.scene-text-swatch {
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.scene-text-swatch.is-active {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.scene-text-hex {
+  width: 92px;
+}
+
+.small-button.is-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}

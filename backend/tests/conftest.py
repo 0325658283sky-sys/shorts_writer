@@ -97,6 +97,7 @@ def conn() -> sqlite3.Connection:
             speaker TEXT,
             duration_seconds REAL,
             sfx_asset_id INTEGER,
+            text_style_json TEXT,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         )

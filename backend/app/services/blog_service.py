@@ -792,12 +792,13 @@ def _row_to_blog_clip_board(row: sqlite3.Row) -> BlogClipBoard:
         sfx_asset_id=row["sfx_asset_id"] if "sfx_asset_id" in keys else None,
         created_at=row["created_at"],
         updated_at=row["updated_at"],
+        text_style_json=row["text_style_json"] if "text_style_json" in keys else None,
     )
 
 
 _BLOG_CLIP_BOARD_COLUMNS = """
     id, blog_clip_id, order_index, image_path, text, speaker, duration_seconds, sfx_asset_id,
-    created_at, updated_at
+    created_at, updated_at, text_style_json
 """
 
 
@@ -1117,6 +1118,54 @@ def create_blog_clip_board(
     return _row_to_blog_clip_board(row)
 
 
+_TEXT_STYLE_FONTS = {"pretendard", "paperlogy", "gmarket_sans", "suit", "jalnan"}
+_TEXT_STYLE_ANIMATIONS = {"none", "highlight"}
+
+
+def sanitize_board_text_style(raw: Any) -> dict[str, Any] | None:
+    """장면별 텍스트 스타일 오버라이드 검증. 비어 있으면 None(=템플릿 값 사용)."""
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="text_style must be an object.")
+    out: dict[str, Any] = {}
+    font = raw.get("fontFamily")
+    if font not in (None, ""):
+        if font not in _TEXT_STYLE_FONTS:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unknown fontFamily.")
+        out["fontFamily"] = font
+    size = raw.get("fontSize")
+    if size not in (None, ""):
+        try:
+            size_val = int(size)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="fontSize must be a number.")
+        if not 20 <= size_val <= 120:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="fontSize must be 20-120.")
+        out["fontSize"] = size_val
+    color = raw.get("accentColor")
+    if color not in (None, ""):
+        if not isinstance(color, str) or not re.fullmatch(r"#[0-9a-fA-F]{6}", color):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="accentColor must be #RRGGBB.")
+        out["accentColor"] = color
+    animation = raw.get("animation")
+    if animation not in (None, ""):
+        if animation not in _TEXT_STYLE_ANIMATIONS:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unknown animation.")
+        out["animation"] = animation
+    return out or None
+
+
+def parse_board_text_style(raw: str | None) -> dict[str, Any] | None:
+    if not raw:
+        return None
+    try:
+        parsed = json.loads(raw)
+    except (TypeError, json.JSONDecodeError):
+        return None
+    return parsed if isinstance(parsed, dict) and parsed else None
+
+
 def update_blog_clip_board(
     conn: sqlite3.Connection,
     user_id: int,
@@ -1127,6 +1176,7 @@ def update_blog_clip_board(
     duration_seconds: float | None = None,
     speaker: Any = SPEAKER_UNSET,
     sfx_asset_id: Any = SFX_UNSET,
+    text_style: Any = SFX_UNSET,
 ) -> BlogClipBoard:
     blog_clip = get_blog_clip_for_user(conn, user_id, blog_clip_id)
     if blog_clip is None:
@@ -1164,6 +1214,13 @@ def update_blog_clip_board(
             assert_audio_asset_usable(conn, user_id, int(sfx_asset_id), kind="sfx")
             updates.append("sfx_asset_id = ?")
             values.append(int(sfx_asset_id))
+    if text_style is not SFX_UNSET:
+        cleaned = sanitize_board_text_style(text_style)
+        if cleaned is None:
+            updates.append("text_style_json = NULL")
+        else:
+            updates.append("text_style_json = ?")
+            values.append(json.dumps(cleaned, ensure_ascii=False))
 
     if not updates:
         return _row_to_blog_clip_board(row)

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { authorizedBlob, authorizedRequest } from "../../api/client";
-import type { BlogClip, Board, StockSearchResponse, Voice } from "../../types";
+import { SHORTS_FONTS } from "../../lib/shortsFonts";
+import type { BlogClip, Board, BoardTextStyle, StockSearchResponse, Voice } from "../../types";
 import { BgmPanel } from "./BgmPanel";
 import { VisualStylePanel } from "../VisualStylePanel";
 import { useBoardImageUrl } from "./useBoardImageUrl";
@@ -28,6 +29,172 @@ function MediaThumb({
   );
 }
 
+const TEXT_ACCENT_SWATCHES = ["#FFE500", "#FF5C5C", "#7CFF6B", "#FFFFFF"];
+const TEXT_ANIMATIONS: { id: "highlight" | "none"; label: string }[] = [
+  { id: "highlight", label: "글자 튀기기" },
+  { id: "none", label: "없음" },
+];
+
+/** ⑤ 편집기 "텍스트" 탭 — 선택한 장면의 자막 폰트·크기·강조색·등장 애니메이션.
+ *  비워 둔 항목은 ④ 템플릿/전체 스타일 값을 그대로 쓰고, "되돌리기"로 장면 값을 지운다. */
+function SceneTextStyleEditor({
+  style,
+  saving,
+  onChange,
+}: {
+  style: BoardTextStyle | null;
+  saving: boolean;
+  onChange: (textStyle: BoardTextStyle | null) => Promise<void>;
+}) {
+  const [sizeDraft, setSizeDraft] = useState(style?.fontSize ? String(style.fontSize) : "");
+  const [colorDraft, setColorDraft] = useState(style?.accentColor ?? "");
+  const [error, setError] = useState("");
+
+  async function apply(patch: Partial<BoardTextStyle>) {
+    const merged: BoardTextStyle = { ...(style ?? {}), ...patch };
+    const cleaned: BoardTextStyle = {};
+    if (merged.fontFamily) cleaned.fontFamily = merged.fontFamily;
+    if (merged.fontSize) cleaned.fontSize = merged.fontSize;
+    if (merged.accentColor) cleaned.accentColor = merged.accentColor;
+    if (merged.animation) cleaned.animation = merged.animation;
+    setError("");
+    try {
+      await onChange(Object.keys(cleaned).length > 0 ? cleaned : null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "저장에 실패했습니다.");
+    }
+  }
+
+  function commitSize() {
+    const trimmed = sizeDraft.trim();
+    if (!trimmed) {
+      if (style?.fontSize) void apply({ fontSize: null });
+      return;
+    }
+    const value = Number(trimmed);
+    if (!Number.isFinite(value) || value < 20 || value > 120) {
+      setError("크기는 20~120 사이 숫자로 입력하세요.");
+      setSizeDraft(style?.fontSize ? String(style.fontSize) : "");
+      return;
+    }
+    if (Math.round(value) !== style?.fontSize) void apply({ fontSize: Math.round(value) });
+  }
+
+  function commitColor() {
+    const trimmed = colorDraft.trim();
+    if (!trimmed) {
+      if (style?.accentColor) void apply({ accentColor: null });
+      return;
+    }
+    if (!/^#[0-9a-fA-F]{6}$/.test(trimmed)) {
+      setError("색상은 #RRGGBB 형식으로 입력하세요.");
+      setColorDraft(style?.accentColor ?? "");
+      return;
+    }
+    if (trimmed !== style?.accentColor) void apply({ accentColor: trimmed });
+  }
+
+  return (
+    <div className="scene-text-style">
+      <p className="muted">바꾸지 않은 항목은 ④ 템플릿 값을 따릅니다.</p>
+
+      <label className="voice-speed">
+        폰트
+        <select
+          value={style?.fontFamily ?? ""}
+          disabled={saving}
+          onChange={(event) => void apply({ fontFamily: event.target.value || null })}
+        >
+          <option value="">템플릿 기본</option>
+          {SHORTS_FONTS.map((font) => (
+            <option key={font.id} value={font.id}>
+              {font.label}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className="voice-speed">
+        크기(px)
+        <input
+          type="number"
+          min={20}
+          max={120}
+          step={2}
+          placeholder="템플릿 기본"
+          value={sizeDraft}
+          disabled={saving}
+          onChange={(event) => setSizeDraft(event.target.value)}
+          onBlur={commitSize}
+        />
+      </label>
+
+      <div>
+        <span className="scene-text-style-label">강조색</span>
+        <div className="scene-text-style-swatches">
+          {TEXT_ACCENT_SWATCHES.map((color) => (
+            <button
+              key={color}
+              type="button"
+              className={`scene-text-swatch${style?.accentColor?.toLowerCase() === color.toLowerCase() ? " is-active" : ""}`}
+              style={{ background: color }}
+              aria-label={`강조색 ${color}`}
+              disabled={saving}
+              onClick={() => {
+                setColorDraft(color);
+                void apply({ accentColor: color });
+              }}
+            />
+          ))}
+          <input
+            type="text"
+            className="scene-text-hex"
+            placeholder="#RRGGBB"
+            maxLength={7}
+            value={colorDraft}
+            disabled={saving}
+            onChange={(event) => setColorDraft(event.target.value)}
+            onBlur={commitColor}
+          />
+        </div>
+      </div>
+
+      <div>
+        <span className="scene-text-style-label">등장 애니메이션</span>
+        <div className="scene-text-style-swatches">
+          {TEXT_ANIMATIONS.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className={`small-button${style?.animation === item.id ? " is-active" : ""}`}
+              disabled={saving}
+              onClick={() => void apply({ animation: item.id })}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {error ? <p className="form-message">{error}</p> : null}
+      {style ? (
+        <button
+          type="button"
+          className="ghost-button"
+          disabled={saving}
+          onClick={() => {
+            setSizeDraft("");
+            setColorDraft("");
+            void onChange(null);
+          }}
+        >
+          이 장면 스타일 되돌리기
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
 export function MediaPanel({
   blogClipId,
   boards,
@@ -38,6 +205,8 @@ export function MediaPanel({
   ttsSpeed,
   onTtsSpeedChange,
   onAssignSpeaker,
+  onTextStyleChange,
+  savingTextStyle,
   onApplyVoiceToAll,
   assigningSpeaker,
   appliedVisualStyle,
@@ -75,6 +244,8 @@ export function MediaPanel({
   ttsSpeed: number;
   onTtsSpeedChange: (speed: number) => void;
   onAssignSpeaker: (voiceId: string | null) => Promise<void>;
+  onTextStyleChange: (textStyle: BoardTextStyle | null) => Promise<void>;
+  savingTextStyle: boolean;
   onApplyVoiceToAll: (voiceId: string) => Promise<void>;
   assigningSpeaker: boolean;
   appliedVisualStyle?: string | null;
@@ -264,10 +435,16 @@ export function MediaPanel({
       {tab === "text" ? (
         <div className="media-tab-body">
           <p className="media-scope-label">이 장면</p>
-          <p className="muted">
-            장면별 자막 문장·폰트·크기·강조색·등장 애니메이션은 준비 중입니다. 지금은 ④ 템플릿에서 고른 스타일이
-            모든 장면에 그대로 적용됩니다.
-          </p>
+          {selectedBoard ? (
+            <SceneTextStyleEditor
+              key={selectedBoard.id}
+              style={selectedBoard.text_style ?? null}
+              saving={savingTextStyle}
+              onChange={onTextStyleChange}
+            />
+          ) : (
+            <p className="muted">장면을 선택한 뒤 자막 스타일을 바꾸세요. 바꾸지 않은 항목은 ④ 템플릿 값을 따릅니다.</p>
+          )}
         </div>
       ) : null}
 

@@ -127,7 +127,17 @@
           }
         },
         "backgroundColor": { "type": ["string", "null"] },
-        "speaker": { "type": ["string", "null"] }
+        "speaker": { "type": ["string", "null"] },
+        "textStyle": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "properties": {
+            "fontFamily": { "type": ["string", "null"] },
+            "fontSize": { "type": ["number", "null"] },
+            "accentColor": { "type": ["string", "null"] },
+            "animation": { "type": ["string", "null"], "enum": ["none", "highlight", null] }
+          }
+        }
       }
     }
   }

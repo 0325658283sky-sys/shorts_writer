@@ -347,8 +347,16 @@ export type Board = {
   speaker: string | null;
   duration_seconds: number | null;
   sfx_asset_id: number | null;
+  text_style?: BoardTextStyle | null;
   created_at: string;
   updated_at: string;
+};
+
+export type BoardTextStyle = {
+  fontFamily?: string | null;
+  fontSize?: number | null;
+  accentColor?: string | null;
+  animation?: "none" | "highlight" | null;
 };
 
 export type AudioAsset = {

@@ -314,6 +314,7 @@ def _create_blog_clip_boards_table(conn: sqlite3.Connection) -> None:
             speaker TEXT,
             duration_seconds REAL,
             sfx_asset_id INTEGER,
+            text_style_json TEXT,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (blog_clip_id) REFERENCES blog_clips (id)
@@ -327,6 +328,8 @@ def _migrate_blog_clip_boards_table(conn: sqlite3.Connection) -> None:
     columns = _sqlite_columns(conn, "blog_clip_boards")
     if "sfx_asset_id" not in columns:
         conn.execute("ALTER TABLE blog_clip_boards ADD COLUMN sfx_asset_id INTEGER")
+    if "text_style_json" not in columns:
+        conn.execute("ALTER TABLE blog_clip_boards ADD COLUMN text_style_json TEXT")
 
 
 def _migrate_blog_clips_table(conn: sqlite3.Connection) -> None:

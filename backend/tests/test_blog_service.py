@@ -471,3 +471,40 @@ def test_restyle_requires_completed(conn, awaiting_boards_clip):
     with pytest.raises(HTTPException) as exc:
         create_blog_clip_versions(conn, 1, awaiting_boards_clip, "restyle", visual_style="card_white")
     assert exc.value.status_code == 409
+
+
+def _make_board(conn, clip_id):
+    from unittest.mock import patch
+
+    with patch("app.services.blog_service._validate_board_image_path", return_value="x.jpg"):
+        return create_blog_clip_board(conn, 1, clip_id, image_path="x.jpg", text="자막")
+
+
+def test_board_text_style_roundtrip_and_clear(conn, awaiting_boards_clip):
+    from app.services.blog_service import parse_board_text_style, update_blog_clip_board
+
+    board = _make_board(conn, awaiting_boards_clip)
+    assert board.text_style_json is None
+
+    updated = update_blog_clip_board(
+        conn, 1, awaiting_boards_clip, board.id,
+        text_style={"fontFamily": "jalnan", "fontSize": 64, "accentColor": "#FFD400", "animation": "none", "junk": 1},
+    )
+    assert parse_board_text_style(updated.text_style_json) == {
+        "fontFamily": "jalnan", "fontSize": 64, "accentColor": "#FFD400", "animation": "none",
+    }
+    cleared = update_blog_clip_board(conn, 1, awaiting_boards_clip, board.id, text_style=None)
+    assert cleared.text_style_json is None
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [{"fontFamily": "comic"}, {"fontSize": 5}, {"fontSize": "big"}, {"accentColor": "red"}, {"animation": "spin"}, "str"],
+)
+def test_board_text_style_rejects_invalid(conn, awaiting_boards_clip, bad):
+    from app.services.blog_service import update_blog_clip_board
+
+    board = _make_board(conn, awaiting_boards_clip)
+    with pytest.raises(HTTPException) as exc:
+        update_blog_clip_board(conn, 1, awaiting_boards_clip, board.id, text_style=bad)
+    assert exc.value.status_code == 400

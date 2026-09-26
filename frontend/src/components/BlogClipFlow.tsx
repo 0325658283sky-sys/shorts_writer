@@ -10,6 +10,7 @@ import { CompletedShortPlayer } from "./CompletedShortPlayer";
 import { ImageSelectStep } from "./ImageSelectStep";
 import { MetadataBox } from "./MetadataBox";
 import { GenerationOptionsPanel } from "./GenerationOptionsPanel";
+import { WaitScreen } from "./WaitScreen";
 import { TemplateGalleryStep } from "./TemplateGalleryStep";
 
 const PHASE2_STAGES = new Set(["synthesizing_audio", "rendering_video", "burning_subtitles"]);
@@ -105,7 +106,7 @@ export function BlogClipFlow({
         {flowMessage ? <p className="error-text flow-inline-error">{flowMessage}</p> : null}
 
         {isProgress ? (
-          <ProgressLog blogClip={blogClip} isFinalRender={isFinalRender} stageLabel={stageLabel} />
+          <ProgressLog blogClip={blogClip} isFinalRender={isFinalRender} stageLabel={stageLabel} onLeave={onBackToStudio} />
         ) : null}
 
         {isAwaitingImages ? (
@@ -271,10 +272,12 @@ function ProgressLog({
   blogClip,
   isFinalRender,
   stageLabel,
+  onLeave,
 }: {
   blogClip: BlogClip;
   isFinalRender: boolean;
   stageLabel: string;
+  onLeave: () => void;
 }) {
   const percent = blogClip.progress_percent ?? 0;
   const isProductSource = detectSource(blogClip.source_url) === "product";
@@ -320,47 +323,33 @@ function ProgressLog({
     }
   }
 
+  const activeIndex = currentIndex === -1 ? tasks.length : currentIndex;
+  const sourceLabel = isFinalRender ? "영상 합치기" : isProductSource ? "상품 페이지" : "블로그 글";
+  const title = isFinalRender
+    ? "영상을 합치고 있어요"
+    : isProductSource
+      ? "상품을 읽고 매력 포인트를 찾고 있어요"
+      : "글을 읽고 대본 3안을 쓰고 있어요";
+
   return (
-    <section className="flow-card flow-progress-card" aria-live="polite">
-      <div className="progress-head">
-        <div>
-          <p className="create-kicker">{isFinalRender ? "만드는 중" : "준비 중"}</p>
-          <h1>
-            {isFinalRender
-              ? "영상을 합치고 있어요"
-              : isProductSource
-                ? "상품을 읽고 매력 포인트를 찾고 있어요"
-                : "글을 읽고 대본 3안을 쓰고 있어요"}
-          </h1>
-        </div>
-        {eta ? <span className="progress-eta">{eta}</span> : null}
-      </div>
-
-      <AliveProgressBar className="blog-progress" percent={percent} active label={stageLabel} />
-
-      <ul className="progress-tasklog">
-        {tasks.map((task, index) => {
-          const state = percent >= task.at ? "done" : index === currentIndex ? "current" : "pending";
-          return (
-            <li key={task.key} className={`progress-task is-${state}`}>
-              <span className="progress-task-mark" aria-hidden="true">
-                {state === "done" ? "✓" : null}
-              </span>
-              <span className="progress-task-label">{state === "done" ? task.done : task.label}</span>
-            </li>
-          );
-        })}
-      </ul>
-
-      {notifyAvailable ? (
-        <label className="progress-notify">
-          <input type="checkbox" checked={notify} onChange={toggleNotify} />
-          <span>다 되면 알림 드릴게요 — 창을 닫아도 됩니다</span>
-        </label>
-      ) : null}
-
-      <p className="create-note flow-url">{blogClip.source_url}</p>
-    </section>
+    <WaitScreen
+      sourceLabel={sourceLabel}
+      title={title}
+      steps={tasks.map((task) => task.label)}
+      activeIndex={activeIndex}
+      percent={percent}
+      caption={eta ? `${stageLabel} · ${eta}` : stageLabel}
+      note="창을 닫아도 서버에서 계속 만들어요."
+      onLeave={onLeave}
+      aside={
+        notifyAvailable ? (
+          <label className="wait-notify">
+            <input type="checkbox" checked={notify} onChange={toggleNotify} />
+            <span>다 되면 알림 드릴게요</span>
+          </label>
+        ) : null
+      }
+    />
   );
 }
 

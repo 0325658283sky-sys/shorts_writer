@@ -124,6 +124,7 @@ class HighlightResponse(BaseModel):
 class ClipCreateRequest(BaseModel):
     highlight_id: int
     visual_style: str | None = None
+    remove_silence: bool = False
 
 
 SubtitleStyle = Literal["basic", "bold", "shorts"]

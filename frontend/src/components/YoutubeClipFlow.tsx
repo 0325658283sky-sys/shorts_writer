@@ -86,7 +86,7 @@ export function YoutubeClipFlow({
   onVideoUpdated: (status: VideoStatusResponse) => void;
   onHighlightsReady: (videoId: number, items: Highlight[]) => void;
   onTranscriptReady: (videoId: number, transcript: Transcript) => void;
-  onCreateClip: (highlightId: number) => Promise<Clip | null>;
+  onCreateClip: (highlightId: number, removeSilence?: boolean) => Promise<Clip | null>;
   onBurnSubtitles: (clip: Clip, style?: SubtitleStyle) => Promise<Clip | null>;
   onApplyNarration?: (clip: Clip) => void;
   onGenerateMetadata?: (clip: Clip) => void;
@@ -167,6 +167,7 @@ export function YoutubeClipFlow({
     setStep("candidates");
   }
 
+  const [removeSilence, setRemoveSilence] = useState(false);
   const [voiceMode, setVoiceMode] = useState<"original_audio" | "ai_narration">("original_audio");
 
   async function generateShorts(targets: Highlight[]) {
@@ -197,7 +198,7 @@ export function YoutubeClipFlow({
         const clip =
           existing && existing.status === "completed"
             ? existing
-            : await onCreateClip(highlight.id);
+            : await onCreateClip(highlight.id, removeSilence);
         if (!clip) throw new Error(`쇼츠 생성에 실패했습니다: ${highlight.title}`);
         onStyleChange(clip.id, subtitleStyle);
         let burned = (await onBurnSubtitles(clip, subtitleStyle)) ?? clip;
@@ -495,6 +496,21 @@ export function YoutubeClipFlow({
                 <span className="candidates-options-label">
                   {isYoutubeSource ? "유튜브" : "MP4"} 옵션 · 고른 구간 전체에 적용
                 </span>
+                <div className="candidates-option-row">
+                  <div>
+                    <div className="candidates-option-title">무음 구간 제거</div>
+                    <div className="candidates-option-desc">0.6초 넘는 공백을 잘라 템포를 올립니다</div>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={removeSilence}
+                    className={`ncf-switch ${removeSilence ? "is-on" : ""}`}
+                    onClick={() => setRemoveSilence((value) => !value)}
+                  >
+                    <span />
+                  </button>
+                </div>
                 <div className="candidates-option-row">
                   <div>
                     <div className="candidates-option-title">음성</div>

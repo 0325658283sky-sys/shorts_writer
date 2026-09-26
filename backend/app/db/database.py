@@ -230,6 +230,8 @@ def _create_clips_table(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE clips ADD COLUMN templated_output_path TEXT")
     if "subtitle_template_id" not in columns:
         conn.execute("ALTER TABLE clips ADD COLUMN subtitle_template_id INTEGER")
+    if "silence_cuts_json" not in columns:
+        conn.execute("ALTER TABLE clips ADD COLUMN silence_cuts_json TEXT")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_clips_user_id ON clips (user_id)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_clips_highlight_id ON clips (highlight_id)")
 

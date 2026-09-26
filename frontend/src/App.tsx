@@ -1004,7 +1004,7 @@ export function App() {
     }
   }
 
-  async function handleCreateClip(highlightId: number): Promise<Clip | null> {
+  async function handleCreateClip(highlightId: number, removeSilence = false): Promise<Clip | null> {
     setCreatingClipId(highlightId);
     setUploadMessage("");
     try {
@@ -1017,7 +1017,7 @@ export function App() {
         meta?.visualStyle || preferredYoutubeVisualStyle || "yt_profile";
       const clip = await authorizedRequest<Clip>("/clips/create", {
         method: "POST",
-        body: JSON.stringify({ highlight_id: highlightId, visual_style: visualStyle }),
+        body: JSON.stringify({ highlight_id: highlightId, visual_style: visualStyle, remove_silence: removeSilence }),
       });
       setClips((current) => ({ ...current, [highlightId]: clip }));
       setClipMetadata((current) => {

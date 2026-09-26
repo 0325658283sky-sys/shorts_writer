@@ -704,3 +704,113 @@ def replace_video_audio_with_narration(source_path: str, narration_path: str, ou
         destination.unlink(missing_ok=True)
         error = (result.stderr or result.stdout or "FFmpeg narration merge failed.").strip()
         raise FFmpegNarrationError(error[-1000:])
+
+
+SILENCE_MIN_SECONDS = 0.6
+SILENCE_KEEP_PAD = 0.15
+
+
+def parse_silence_intervals(stderr: str, total_duration: float) -> list[tuple[float, float]]:
+    import re
+
+    starts = [float(m) for m in re.findall(r"silence_start:\s*(-?[\d.]+)", stderr)]
+    ends = [float(m) for m in re.findall(r"silence_end:\s*(-?[\d.]+)", stderr)]
+    intervals: list[tuple[float, float]] = []
+    for index, start in enumerate(starts):
+        end = ends[index] if index < len(ends) else total_duration
+        intervals.append((max(0.0, start), min(total_duration, end)))
+    return intervals
+
+
+def compute_keep_intervals(
+    total_duration: float,
+    silences: list[tuple[float, float]],
+    *,
+    pad: float = SILENCE_KEEP_PAD,
+) -> list[tuple[float, float]]:
+    """무음 구간은 앞뒤 pad초만 남기고 잘라낸 '남길 구간' 목록."""
+    keeps: list[tuple[float, float]] = []
+    cursor = 0.0
+    for start, end in sorted(silences):
+        cut_start = start + pad
+        cut_end = end - pad
+        if cut_end - cut_start < 0.05:
+            continue
+        if cut_start > cursor:
+            keeps.append((cursor, cut_start))
+        cursor = max(cursor, cut_end)
+    if cursor < total_duration:
+        keeps.append((cursor, total_duration))
+    return [(s, e) for s, e in keeps if e - s > 0.05]
+
+
+def remap_time_through_keeps(t: float, keeps: list[tuple[float, float]]) -> float | None:
+    """원본 시각 t를 잘라낸 뒤의 시각으로 바꾼다. 잘린 구간 안이면 None."""
+    offset = 0.0
+    for start, end in keeps:
+        if t < start:
+            return None
+        if t <= end:
+            return offset + (t - start)
+        offset += end - start
+    return None
+
+
+def remap_events_through_keeps(
+    events: list[tuple[float, float, str]],
+    keeps: list[tuple[float, float]],
+) -> list[tuple[float, float, str]]:
+    remapped: list[tuple[float, float, str]] = []
+    for start, end, text in events:
+        new_start = None
+        new_end = None
+        offset = 0.0
+        for keep_start, keep_end in keeps:
+            overlap_start = max(start, keep_start)
+            overlap_end = min(end, keep_end)
+            if overlap_end > overlap_start:
+                if new_start is None:
+                    new_start = offset + (overlap_start - keep_start)
+                new_end = offset + (overlap_end - keep_start)
+            offset += keep_end - keep_start
+        if new_start is not None and new_end is not None and new_end - new_start > 0.05:
+            remapped.append((new_start, new_end, text))
+    return remapped
+
+
+def detect_silence_keep_intervals(video_path: str) -> tuple[float, list[tuple[float, float]]]:
+    ensure_ffmpeg_available()
+    total = get_video_duration_seconds(video_path)
+    command = [
+        "ffmpeg", "-hide_banner", "-nostats", "-i", video_path,
+        "-af", f"silencedetect=noise=-35dB:d={SILENCE_MIN_SECONDS}",
+        "-vn", "-f", "null", "-",
+    ]
+    result = subprocess.run(command, capture_output=True, text=True, timeout=60 * 10)
+    if result.returncode != 0:
+        raise FFmpegClipError((result.stderr or "silencedetect failed")[-500:])
+    silences = parse_silence_intervals(result.stderr or "", total)
+    return total, compute_keep_intervals(total, silences)
+
+
+def cut_keep_intervals(source_path: str, output_path: str, keeps: list[tuple[float, float]]) -> None:
+    ensure_ffmpeg_available()
+    parts: list[str] = []
+    labels: list[str] = []
+    for index, (start, end) in enumerate(keeps):
+        parts.append(f"[0:v]trim=start={start:.3f}:end={end:.3f},setpts=PTS-STARTPTS[v{index}]")
+        parts.append(f"[0:a]atrim=start={start:.3f}:end={end:.3f},asetpts=PTS-STARTPTS[a{index}]")
+        labels.append(f"[v{index}][a{index}]")
+    parts.append(f"{''.join(labels)}concat=n={len(keeps)}:v=1:a=1[v][a]")
+    command = [
+        "ffmpeg", "-y", "-i", source_path,
+        "-filter_complex", ";".join(parts),
+        "-map", "[v]", "-map", "[a]",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+        "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart",
+        output_path,
+    ]
+    result = subprocess.run(command, capture_output=True, text=True, timeout=60 * 30)
+    if result.returncode != 0:
+        Path(output_path).unlink(missing_ok=True)
+        raise FFmpegClipError((result.stderr or "silence cut failed")[-1000:])

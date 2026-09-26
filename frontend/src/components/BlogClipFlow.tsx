@@ -175,7 +175,7 @@ export function BlogClipFlow({
         {isCompleted ? (
           <section className="flow-result">
             <div className="flow-card flow-result-hero">
-              <p className="create-kicker">결과</p>
+              <p className="create-kicker is-done">완성</p>
               <h1>{blogClip.blog_title ?? "쇼츠가 완성되었습니다"}</h1>
               {blogClip.render_spec?.fallback_used || blogClip.render_spec?.engine === "ffmpeg" ? (
                 <div className="flow-notice flow-notice-warning" role="status">

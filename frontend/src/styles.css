@@ -2250,6 +2250,13 @@ button.flow-stepper-item.is-clickable:hover {
 .flow-result {
   display: grid;
   gap: 14px;
+  width: 100%;
+  max-width: 620px;
+  justify-self: center;
+}
+
+.create-kicker.is-done {
+  color: #0f7b52;
 }
 
 .flow-result-hero {

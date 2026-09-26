@@ -12,6 +12,7 @@ from fastapi import HTTPException, status
 from openai import APIConnectionError, APIStatusError, OpenAI, OpenAIError, RateLimitError
 
 from app.core.config import settings
+from app.services.elevenlabs_labels_ko import voice_labels_ko, voice_name_ko, voice_traits_ko
 from app.services.korean_roman_to_hangul import display_voice_name_ko
 from app.services.transcription_service import get_transcript_for_video, transcript_segments
 from app.services.video_service import STORAGE_ROOT, get_video_for_user
@@ -322,8 +323,10 @@ def _fetch_elevenlabs_voices(*, force: bool = False) -> list[dict[str, str]]:
         if not voice_id or not name:
             continue
         labels = item.get("labels") or {}
-        parts = [str(labels.get(key)) for key in ("gender", "age", "accent", "use_case", "descriptive") if labels.get(key)]
-        catalog.append({"id": voice_id, "name": name, "description": " · ".join(parts) or "ElevenLabs 보이스"})
+        parts = voice_labels_ko(labels) + voice_traits_ko(name)
+        catalog.append(
+            {"id": voice_id, "name": voice_name_ko(name), "description": " · ".join(parts) or "ElevenLabs 보이스"}
+        )
     if not catalog:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="ElevenLabs returned an empty voice list.")
     _elevenlabs_voice_cache = catalog

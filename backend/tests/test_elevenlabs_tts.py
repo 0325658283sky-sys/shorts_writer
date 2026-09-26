@@ -25,10 +25,24 @@ def _eleven_env(monkeypatch, tmp_path):
 
 
 def test_catalog_and_validate(monkeypatch):
-    payload = {"voices": [{"voice_id": "v1", "name": "Rachel", "labels": {"gender": "female", "accent": "korean"}}]}
+    payload = {
+        "voices": [
+            {
+                "voice_id": "v1",
+                "name": "Roger - Laid-Back, Casual, Resonant",
+                "labels": {"gender": "male", "age": "middle_aged", "accent": "american", "use_case": "conversational"},
+            },
+            {"voice_id": "v2", "name": "Rachel", "labels": {"gender": "female", "accent": "korean"}},
+        ]
+    }
     monkeypatch.setattr(tts_service.requests, "get", lambda *a, **k: _Resp(payload=payload))
     catalog = tts_service.list_voice_catalog()
-    assert catalog == [{"id": "v1", "name": "Rachel", "description": "female · korean"}]
+    assert catalog[0] == {
+        "id": "v1",
+        "name": "로저",
+        "description": "남성 · 중년 · 미국 · 대화형 · 여유로운 · 편안한 · 울림 있는",
+    }
+    assert catalog[1] == {"id": "v2", "name": "Rachel", "description": "여성 · 한국어"}
     assert tts_service.validate_voice_id("v1") == "v1"
     assert tts_service.default_tts_voice() == "v1"
     with pytest.raises(HTTPException):

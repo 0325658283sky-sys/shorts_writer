@@ -1,0 +1,44 @@
+# Backend + Remotion render sidecar in ONE container.
+#
+# 왜 한 컨테이너인가: 백엔드가 보드 이미지/나레이션을 remotion/public/clips/{id}/ 에 파일로 써두고,
+# Remotion 서비스가 같은 디스크에서 읽어 outputPath 에 MP4 를 쓴다(remotion_props_service.py,
+# remotion/server.mjs). Railway 서비스끼리는 디스크를 공유하지 못하므로 별도 서비스로 분리할 수 없다.
+# 백엔드 기본값(REMOTION_SERVICE_URL=http://127.0.0.1:3100)과도 일치한다.
+#
+# 빌드 컨텍스트는 레포 루트여야 한다(backend/ 와 remotion/ 를 둘 다 복사) —
+# Railway 서비스 설정: Root Directory 비우기 + Builder=Dockerfile + Dockerfile Path=Dockerfile.backend
+FROM node:20-bookworm-slim
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
+# python + ffmpeg(자막/폴백 렌더, ffprobe) + Remotion 이 내려받는 headless Chrome 실행에 필요한 라이브러리
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      python3 python3-venv python3-pip ffmpeg ca-certificates curl \
+      libnss3 libdbus-1-3 libatk1.0-0 libatk-bridge2.0-0 libasound2 libxrandr2 libxkbcommon0 \
+      libxfixes3 libxcomposite1 libxdamage1 libgbm1 libcups2 libpango-1.0-0 libcairo2 libxshmfence1 \
+      fonts-noto-cjk \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# --- python deps ---
+COPY backend/requirements.txt backend/requirements.txt
+RUN python3 -m venv /opt/venv && /opt/venv/bin/pip install -r backend/requirements.txt
+ENV PATH="/opt/venv/bin:${PATH}"
+
+# --- remotion deps (+ Chrome 를 빌드 시점에 받아 둔다: 첫 렌더 지연/네트워크 실패 방지) ---
+COPY remotion/package.json remotion/package-lock.json remotion/
+RUN cd remotion && npm ci
+COPY remotion remotion
+RUN cd remotion && npx remotion browser ensure
+
+# --- app ---
+COPY backend backend
+COPY scripts/start-backend.sh /app/start-backend.sh
+RUN chmod +x /app/start-backend.sh
+
+WORKDIR /app/backend
+EXPOSE 8080
+CMD ["/app/start-backend.sh"]

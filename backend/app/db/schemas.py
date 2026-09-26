@@ -208,6 +208,10 @@ class BlogClipSelectScriptRequest(BaseModel):
     tone: ScriptTone
 
 
+class BlogClipRewriteScriptRequest(BaseModel):
+    speech_style: str | None = None
+
+
 class BlogClipImageCandidateResponse(BaseModel):
     id: int
     blog_clip_id: int

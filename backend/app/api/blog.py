@@ -29,6 +29,7 @@ from app.db.schemas import (
     BoardReorderRequest,
     BoardResponse,
     BoardUpdateRequest,
+    BlogClipRewriteScriptRequest,
     StockImageApplyRequest,
     StockSearchResponse,
 )
@@ -68,6 +69,7 @@ from app.services.blog_service import (
     run_blog_clip_pipeline,
     run_blog_clip_render_pipeline,
     run_blog_clip_version_pipeline,
+    regenerate_blog_clip_script_candidates,
     select_blog_clip_script,
     set_active_blog_clip_version,
     start_blog_clip_render,
@@ -266,6 +268,17 @@ def read_blog_clip_image_file(
         ".webp": "image/webp",
     }.get(path.suffix.lower(), "application/octet-stream")
     return FileResponse(path=path, media_type=media_type, filename=path.name)
+
+
+@router.post("/{blog_clip_id}/rewrite-scripts", response_model=BlogClipResponse)
+def rewrite_blog_clip_scripts_endpoint(
+    blog_clip_id: int,
+    request: BlogClipRewriteScriptRequest,
+    current_user: User = Depends(get_current_user),
+    conn: sqlite3.Connection = Depends(get_connection),
+) -> BlogClipResponse:
+    blog_clip = regenerate_blog_clip_script_candidates(conn, current_user.id, blog_clip_id, request.speech_style)
+    return _to_blog_clip_response(blog_clip)
 
 
 @router.post("/{blog_clip_id}/select-script", response_model=BlogClipResponse)

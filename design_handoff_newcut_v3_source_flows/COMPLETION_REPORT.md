@@ -16,8 +16,12 @@
 - `pytest -q` 138 passed(신규 8: 저장/되돌리기/검증 거부/템플릿 category), `npm run build` 통과.
 - 프로덕션: 저장 200·잘못된 값 400·`remotion-props.boards[].textStyle` 전달, UI에서 장면 2 강조색 클릭 → DB에 장면별로만 저장, 새 클립에서 편집기 **미리보기**에 장면 1 자막이 jalnan 90px로 반영됨.
 
-### ⚠ 반드시 알아야 할 것: 최종 MP4는 아직 반영되지 않음
-프로덕션에는 **Remotion 렌더 서비스가 떠 있지 않습니다**(`/health`의 `remotion.ok=false`, `127.0.0.1:3100` 연결 거부). 그래서 최종 렌더는 항상 **FFmpeg 폴백**(`render_spec.engine=ffmpeg, fallback_used=true` — 완료 화면의 "간단 버전으로 만들어졌어요")이고, **템플릿·장면별 텍스트 스타일은 편집기 미리보기에서만 보이고 다운로드한 MP4에는 안 들어갑니다.** 이건 이번 변경 이전부터의 인프라 상태입니다. 해결하려면 `remotion/server.mjs`를 별도 Railway 서비스로 배포(Chromium+FFmpeg 필요)하고 백엔드 `REMOTION_SERVICE_URL`을 그 주소로 지정해야 합니다.
+### Remotion 렌더 서비스 프로덕션 배포 (해결됨)
+원래 프로덕션에는 Remotion 렌더 서비스가 없어 최종 MP4가 항상 FFmpeg 폴백("간단 버전")이었고, 템플릿·장면 스타일이 편집기 미리보기에만 보이고 MP4에는 안 들어갔습니다(이번 변경 이전부터의 상태).
+- 백엔드가 `remotion/public/`에 파일을 쓰고 Remotion이 같은 디스크에서 읽으므로 Railway 별도 서비스로 나눌 수 없어, **백엔드 컨테이너 안에서 Remotion을 127.0.0.1:3100 사이드카로** 띄움: `Dockerfile.backend` + `scripts/start-backend.sh`(죽으면 5초 뒤 재시작), `.dockerignore`, `.gitattributes`(sh/Dockerfile LF 고정).
+- Railway 설정: Root Directory 비움 + `RAILWAY_DOCKERFILE_PATH=Dockerfile.backend` + **Custom Start Command 비움**(예전 Railpack용 `uvicorn --port $PORT`가 Dockerfile CMD를 덮어써 `'$PORT' is not a valid integer`로 크래시했음).
+- 검증(프로덕션): `/health` → `remotion.ok=true`. 새 클립(27) 렌더 → `engine=remotion, fallback_used=false`, 1080×1920 30fps 24.8초 35MB. 다운로드 MP4 프레임에서 **템플릿 박스 자막 + 장면 1에만 지정한 빨간 강조색·큰 폰트가 실제로 표시됨.**
+- 남은 위험: Chrome 렌더 메모리(플랜에 따라 OOM 가능), `max_concurrent=1`이라 동시 렌더는 대기열.
 
 ---
 

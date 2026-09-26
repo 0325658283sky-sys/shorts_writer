@@ -270,6 +270,8 @@ ELEVENLABS_SPEED_MIN = 0.7
 ELEVENLABS_SPEED_MAX = 1.2
 ELEVENLABS_TEXT_MAX = 5000
 ELEVENLABS_VOICE_CACHE_TTL_SEC = 600
+# 무료 플랜은 API로 라이브러리(공유) 보이스를 못 쓴다. 유료 플랜이면 ELEVENLABS_ALLOW_LIBRARY_VOICES=true.
+ELEVENLABS_FREE_CATEGORIES = {"premade", "cloned", "generated"}
 
 _elevenlabs_voice_cache: list[dict[str, str]] | None = None
 _elevenlabs_voice_cache_at: float = 0.0
@@ -288,6 +290,11 @@ def _elevenlabs_error(response: requests.Response, what: str) -> HTTPException:
         return HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="ElevenLabs API key is invalid or lacks the required permission.",
+        )
+    if response.status_code == 402:
+        return HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="이 보이스는 ElevenLabs 유료 플랜에서만 쓸 수 있어요. 다른 보이스를 골라주세요.",
         )
     if response.status_code == 429:
         return HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="ElevenLabs rate limit or quota reached.")
@@ -316,11 +323,15 @@ def _fetch_elevenlabs_voices(*, force: bool = False) -> list[dict[str, str]]:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Could not connect to ElevenLabs: {exc}") from exc
     if response.status_code >= 400:
         raise _elevenlabs_error(response, "voices")
+    allow_library = (os.getenv("ELEVENLABS_ALLOW_LIBRARY_VOICES") or "").strip().lower() in {"1", "true", "yes"}
     catalog: list[dict[str, str]] = []
     for item in response.json().get("voices", []):
         voice_id = str(item.get("voice_id") or "").strip()
         name = str(item.get("name") or "").strip()
         if not voice_id or not name:
+            continue
+        category = str(item.get("category") or "premade").lower()
+        if not allow_library and category not in ELEVENLABS_FREE_CATEGORIES:
             continue
         labels = item.get("labels") or {}
         parts = voice_labels_ko(labels) + voice_traits_ko(name)

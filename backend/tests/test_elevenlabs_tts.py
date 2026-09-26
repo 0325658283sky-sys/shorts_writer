@@ -33,6 +33,7 @@ def test_catalog_and_validate(monkeypatch):
                 "labels": {"gender": "male", "age": "middle_aged", "accent": "american", "use_case": "conversational"},
             },
             {"voice_id": "v2", "name": "Rachel", "labels": {"gender": "female", "accent": "korean"}},
+            {"voice_id": "lib", "name": "Eunha", "category": "professional"},
         ]
     }
     monkeypatch.setattr(tts_service.requests, "get", lambda *a, **k: _Resp(payload=payload))
@@ -71,3 +72,22 @@ def test_invalid_key_maps_to_401(monkeypatch):
     with pytest.raises(HTTPException) as exc:
         tts_service.list_voice_catalog()
     assert exc.value.status_code == 401
+
+
+def test_library_voices_hidden_on_free_plan(monkeypatch):
+    payload = {"voices": [{"voice_id": "lib", "name": "Eunha", "category": "professional"}, {"voice_id": "p", "name": "Sarah", "category": "premade"}]}
+    monkeypatch.setattr(tts_service.requests, "get", lambda *a, **k: _Resp(payload=payload))
+    assert [v["id"] for v in tts_service.list_voice_catalog()] == ["p"]
+    monkeypatch.setattr(tts_service, "_elevenlabs_voice_cache", None)
+    monkeypatch.setenv("ELEVENLABS_ALLOW_LIBRARY_VOICES", "true")
+    assert [v["id"] for v in tts_service.list_voice_catalog()] == ["lib", "p"]
+
+
+def test_payment_required_message(monkeypatch):
+    monkeypatch.setattr(
+        tts_service.requests, "get", lambda *a, **k: _Resp(payload={"voices": [{"voice_id": "v1", "name": "Rachel"}]})
+    )
+    monkeypatch.setattr(tts_service.requests, "post", lambda *a, **k: _Resp(status_code=402))
+    with pytest.raises(HTTPException) as exc:
+        tts_service.synthesize_openai_tts(1, 1, "안녕", voice="v1")
+    assert exc.value.status_code == 402 and "유료" in exc.value.detail

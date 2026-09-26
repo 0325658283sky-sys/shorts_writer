@@ -3202,25 +3202,52 @@ button.flow-stepper-item.is-clickable:hover {
   margin: 14px 0;
 }
 
+.candidates-head {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.candidates-head h1 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.candidates-head .flow-lead {
+  margin: 4px 0 0;
+  font-size: 12px;
+}
+
+.candidates-origin {
+  margin-left: auto;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--muted);
+}
+
 .candidate-card {
   position: relative;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 10px;
-  aspect-ratio: 9 / 14;
+  padding: 8px;
   border: 1.5px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--ink);
-  color: #fff;
+  border-radius: 11px;
+  background: var(--surface);
+  color: var(--ink);
   cursor: pointer;
   text-align: left;
-  overflow: hidden;
 }
 
 .candidate-card.is-selected {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  background: var(--accent-soft);
 }
 
 .candidate-card:disabled {
@@ -3228,9 +3255,22 @@ button.flow-stepper-item.is-clickable:hover {
   cursor: not-allowed;
 }
 
+.candidate-thumb {
+  position: relative;
+  display: block;
+  aspect-ratio: 9 / 16;
+  border-radius: 8px;
+  background: #16161a;
+}
+
 .candidate-score {
-  align-self: flex-start;
-  padding: 2px 6px;
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 7px;
   border-radius: 5px;
   background: #f0f0f3;
   color: var(--ink-soft);
@@ -3260,31 +3300,60 @@ button.flow-stepper-item.is-clickable:hover {
 
 .candidate-duration {
   position: absolute;
-  bottom: 10px;
-  right: 10px;
+  right: 8px;
+  bottom: 8px;
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
   font-size: 10.5px;
-  color: rgba(255, 255, 255, 0.75);
+  font-weight: 700;
+}
+
+.candidate-at {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  font-size: 10px;
+  color: #8b8b98;
 }
 
 .candidate-title {
-  margin-top: auto;
   font-size: 12px;
-  font-weight: 700;
-  line-height: 1.3;
+  font-weight: 600;
+  line-height: 1.35;
 }
 
 .candidate-reason {
   font-size: 10.5px;
-  color: rgba(255, 255, 255, 0.65);
-  line-height: 1.4;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.candidate-card.is-selected .candidate-reason {
+  color: var(--accent);
 }
 
 .candidates-credit {
-  font-size: 11.5px;
-  color: var(--muted);
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-2);
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.candidates-credit strong {
+  font-size: 13px;
+  color: var(--accent);
+}
+
+.candidates-foot {
+  flex-wrap: wrap;
 }
 
 .candidates-credit.is-over {
+  border-color: #f0dfb4;
   color: #8a6410;
 }
 

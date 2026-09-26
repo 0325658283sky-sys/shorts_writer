@@ -438,11 +438,16 @@ export function YoutubeClipFlow({
 
           {step === "candidates" ? (
             <section className="flow-card candidates-step">
-              <p className="create-kicker">구간 후보</p>
-              <h1>하이라이트 후보 {candidateHighlights.length}개를 찾았어요</h1>
-              <p className="flow-lead">
-                점수와 이유를 보고 쓸 구간을 여러 개 고르세요. 고른 구간마다 쇼츠가 한 편씩 만들어집니다.
-              </p>
+              <div className="candidates-head">
+                <div>
+                  <p className="create-kicker">구간 후보</p>
+                  <h1>하이라이트 후보 {candidateHighlights.length}개를 찾았어요</h1>
+                  <p className="flow-lead">
+                    점수와 이유를 보고 쓸 구간을 여러 개 고르세요. 고른 구간마다 쇼츠가 한 편씩 만들어집니다.
+                  </p>
+                </div>
+                <span className="candidates-origin">원본 · {displayTitle}</span>
+              </div>
               <div className="candidates-grid">
                 {[...candidateHighlights]
                   .sort((a, b) => b.score - a.score)
@@ -458,12 +463,15 @@ export function YoutubeClipFlow({
                         disabled={blocked}
                         onClick={() => toggleCandidate(highlight.id)}
                       >
-                        <span className={`candidate-score ${index === 0 ? "is-top" : ""}`}>
-                          {Math.round(highlight.score)}점{index === 0 ? " · 최고" : ""}
-                        </span>
-                        {selected ? <span className="candidate-check" aria-hidden="true">✓</span> : null}
-                        <span className="candidate-duration">
-                          {Math.max(0, Math.round(highlight.end_time - highlight.start_time))}초
+                        <span className="candidate-thumb">
+                          <span className={`candidate-score ${index === 0 ? "is-top" : ""}`}>
+                            {Math.round(highlight.score)}점{index === 0 ? " · 최고" : ""}
+                          </span>
+                          {selected ? <span className="candidate-check" aria-hidden="true">✓</span> : null}
+                          <span className="candidate-at">{mmss(highlight.start_time)}~</span>
+                          <span className="candidate-duration">
+                            {Math.max(0, Math.round(highlight.end_time - highlight.start_time))}초
+                          </span>
                         </span>
                         <strong className="candidate-title">{highlight.title}</strong>
                         <span className="candidate-reason">{highlight.reason}</span>
@@ -472,12 +480,15 @@ export function YoutubeClipFlow({
                   })}
               </div>
               <div className="image-step-foot candidates-foot">
+                <button className="ghost-button" type="button" onClick={onBackToStudio}>
+                  ← 다른 링크
+                </button>
                 <span>
                   <strong>{selectedHighlightIds.length}개</strong> 선택됨 — 선택한 후보마다 쇼츠가 하나씩 만들어집니다
                 </span>
                 {creditRemaining != null ? (
                   <span className={`candidates-credit ${overBudget ? "is-over" : ""}`}>
-                    예상 차감 {estimatedCost} / {creditRemaining}회 남음
+                    예상 차감 <strong>{estimatedCost}</strong> / {creditRemaining}회 남음
                   </span>
                 ) : null}
                 <button

@@ -167,6 +167,8 @@ export function YoutubeClipFlow({
     setStep("candidates");
   }
 
+  const [voiceMode, setVoiceMode] = useState<"original_audio" | "ai_narration">("original_audio");
+
   async function generateShorts(targets: Highlight[]) {
     if (autoGenRef.current) return;
     autoGenRef.current = true;
@@ -198,7 +200,17 @@ export function YoutubeClipFlow({
             : await onCreateClip(highlight.id);
         if (!clip) throw new Error(`쇼츠 생성에 실패했습니다: ${highlight.title}`);
         onStyleChange(clip.id, subtitleStyle);
-        const burned = (await onBurnSubtitles(clip, subtitleStyle)) ?? clip;
+        let burned = (await onBurnSubtitles(clip, subtitleStyle)) ?? clip;
+        if (voiceMode === "ai_narration") {
+          try {
+            burned = await authorizedRequest<Clip>(`/clips/${burned.id}/narration`, {
+              method: "POST",
+              body: JSON.stringify({ mode: "ai_narration" }),
+            });
+          } catch (narrationError) {
+            onMessage(narrationError instanceof Error ? narrationError.message : "AI 나레이션 적용에 실패했습니다. 원본 음성으로 두었어요.");
+          }
+        }
         made.push(burned);
         done += 1;
         setGeneratedCount(done);
@@ -478,6 +490,36 @@ export function YoutubeClipFlow({
                       </button>
                     );
                   })}
+              </div>
+              <div className="candidates-options">
+                <span className="candidates-options-label">
+                  {isYoutubeSource ? "유튜브" : "MP4"} 옵션 · 고른 구간 전체에 적용
+                </span>
+                <div className="candidates-option-row">
+                  <div>
+                    <div className="candidates-option-title">음성</div>
+                    <div className="candidates-option-desc">원본 목소리를 쓸지, AI 나레이션으로 덮을지</div>
+                  </div>
+                  <div className="tone-switch" role="radiogroup" aria-label="음성">
+                    {(
+                      [
+                        ["original_audio", "원본 음성"],
+                        ["ai_narration", "AI 나레이션"],
+                      ] as const
+                    ).map(([value, label]) => (
+                      <button
+                        key={value}
+                        type="button"
+                        role="radio"
+                        aria-checked={voiceMode === value}
+                        className={voiceMode === value ? "is-active" : ""}
+                        onClick={() => setVoiceMode(value)}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
               <div className="image-step-foot candidates-foot">
                 <button className="ghost-button" type="button" onClick={onBackToStudio}>

@@ -6460,3 +6460,66 @@ button.flow-stepper-item.is-clickable:hover {
     display: none;
   }
 }
+
+.candidates-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--surface-2);
+}
+
+.candidates-options-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.03em;
+}
+
+.candidates-option-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.candidates-option-title {
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.candidates-option-desc {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.tone-switch {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 9px;
+  background: #f3f3f5;
+}
+
+.tone-switch button {
+  min-height: 26px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tone-switch button.is-active {
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 700;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}

@@ -1,4 +1,23 @@
-# 완료 보고 — Phase 1 / Phase 3 / Phase 2 / Phase 4 (모바일 반응형)
+# 완료 보고 — Phase 1 / Phase 3 / Phase 2 / Phase 4 (모바일 반응형) / 후속: 텍스트 탭 실기능
+
+---
+
+## 후속 — 편집기 "텍스트" 탭 실기능 (백엔드 포함, 사용자 승인)
+
+### 변경
+- **DB**: `blog_clip_boards.text_style_json TEXT` 추가(기동 시 `ALTER TABLE`, 기존 행 NULL = 템플릿 값 유지). 프로덕션 마이그레이션 성공 확인.
+- **API**: `PATCH /blog-clips/{id}/boards/{board_id}`에 `text_style`(fontFamily 화이트리스트 · fontSize 20~120 · accentColor `#RRGGBB` · animation `none|highlight`) 추가. 잘못된 값 400, `null`이면 되돌리기. 응답 `BoardResponse.text_style`, `remotion-props`의 각 board `textStyle`.
+- **Remotion**: `BoardCaption`이 `board.textStyle`로 폰트·크기·강조색·애니메이션을 덮어씀. props JSON 스키마(`additionalProperties:false`)와 백엔드 응답 모델에 `textStyle` 추가.
+- **프론트**: 편집기 텍스트 탭 — 폰트 선택 · 크기 · 강조색(스와치 4 + 직접 입력) · 등장 애니메이션(글자 튀기기/없음) · "이 장면 스타일 되돌리기". 장면별로 격리 저장.
+- **함께 고친 버그**: `_caption_template_payload`가 DB에 없는 `category == "gallery"`만 허용해 **템플릿을 골라도 렌더 자막에 반영되지 않던** 문제 → `legacy`만 제외로 수정(이제 `captionTemplate`이 실제 값으로 채워짐).
+- 등장 애니메이션은 Remotion이 지원하는 `highlight`/`none` 두 가지만(v2 README의 "페이드"는 미지원).
+
+### 검증
+- `pytest -q` 138 passed(신규 8: 저장/되돌리기/검증 거부/템플릿 category), `npm run build` 통과.
+- 프로덕션: 저장 200·잘못된 값 400·`remotion-props.boards[].textStyle` 전달, UI에서 장면 2 강조색 클릭 → DB에 장면별로만 저장, 새 클립에서 편집기 **미리보기**에 장면 1 자막이 jalnan 90px로 반영됨.
+
+### ⚠ 반드시 알아야 할 것: 최종 MP4는 아직 반영되지 않음
+프로덕션에는 **Remotion 렌더 서비스가 떠 있지 않습니다**(`/health`의 `remotion.ok=false`, `127.0.0.1:3100` 연결 거부). 그래서 최종 렌더는 항상 **FFmpeg 폴백**(`render_spec.engine=ffmpeg, fallback_used=true` — 완료 화면의 "간단 버전으로 만들어졌어요")이고, **템플릿·장면별 텍스트 스타일은 편집기 미리보기에서만 보이고 다운로드한 MP4에는 안 들어갑니다.** 이건 이번 변경 이전부터의 인프라 상태입니다. 해결하려면 `remotion/server.mjs`를 별도 Railway 서비스로 배포(Chromium+FFmpeg 필요)하고 백엔드 `REMOTION_SERVICE_URL`을 그 주소로 지정해야 합니다.
 
 ---
 

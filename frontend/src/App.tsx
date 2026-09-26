@@ -4,6 +4,7 @@ import { AuthPanel } from "./components/AuthPanel";
 import { BlogClipFlow } from "./components/BlogClipFlow";
 import { BoardEditor } from "./components/board/BoardEditor";
 import { Dashboard } from "./components/Dashboard";
+import { FlowCrumbs, type FlowCrumbState } from "./components/FlowCrumbs";
 import { StudioShell } from "./components/StudioShell";
 import { type YoutubePreview } from "./components/YoutubeConfirmStep";
 import { YoutubeClipFlow } from "./components/YoutubeClipFlow";
@@ -71,6 +72,7 @@ export function App() {
   const [user, setUser] = useState<User | null>(null);
   const [videos, setVideos] = useState<Video[]>([]);
   const [usage, setUsage] = useState<Usage | null>(null);
+  const [flowCrumb, setFlowCrumb] = useState<FlowCrumbState | null>(null);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [transcripts, setTranscripts] = useState<Record<number, Transcript>>({});
   const [highlights, setHighlights] = useState<Record<number, Highlight[]>>({});
@@ -1267,6 +1269,7 @@ export function App() {
           shortsCount={youtubeShortsCount}
           lengthBand={youtubeLengthBand}
           usage={usage}
+          onCrumbChange={setFlowCrumb}
           onBackToStudio={handleBackToStudio}
           onVideoUpdated={mergeVideoStatus}
           onHighlightsReady={(videoId, items) => {
@@ -1305,6 +1308,7 @@ export function App() {
           }}
           onMessage={setUploadMessage}
           flowMessage={uploadMessage}
+          onCrumbChange={setFlowCrumb}
         />
       );
     } else {
@@ -1404,14 +1408,8 @@ export function App() {
             <span className={`status-badge status-${editingYoutubeClip.status}`}>
               {CLIP_STATUS_LABELS[editingYoutubeClip.status]}
             </span>
-          ) : isFlow && focusBlogClip ? (
-            <span className={`status-badge status-${focusBlogClip.status}`}>
-              {BLOG_CLIP_STATUS_LABELS[focusBlogClip.status]}
-            </span>
-          ) : isFlow && focusYoutubeVideo ? (
-            <span className={`status-badge status-${focusYoutubeVideo.status}`}>
-              {VIDEO_STATUS_LABELS[focusYoutubeVideo.status]}
-            </span>
+          ) : isFlow && flowCrumb ? (
+            <FlowCrumbs source={flowCrumb.source} step={flowCrumb.step} />
           ) : null
         }
         onNavChange={handleStudioNavChange}

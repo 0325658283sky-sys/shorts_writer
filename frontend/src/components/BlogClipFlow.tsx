@@ -1,8 +1,9 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { SCRIPT_TONE_HINTS, SCRIPT_TONE_LABELS, SCRIPT_TONES, userFacingProgressLabel } from "../constants";
 import type { BlogClip, ScriptTone, VisualStyleSlug } from "../types";
 import { AliveProgressBar } from "./AliveProgressBar";
 import { detectSource } from "./CreateStudio";
+import type { FlowCrumbState, FlowStepKey } from "./FlowCrumbs";
 import { BlogClipRestylePanel } from "./BlogClipRestylePanel";
 import { BlogClipVersionsPanel } from "./BlogClipVersionsPanel";
 import { CompletedShortPlayer } from "./CompletedShortPlayer";
@@ -10,13 +11,6 @@ import { ImageSelectStep } from "./ImageSelectStep";
 import { MetadataBox } from "./MetadataBox";
 import { GenerationOptionsPanel } from "./GenerationOptionsPanel";
 import { TemplateGalleryStep } from "./TemplateGalleryStep";
-
-const FLOW_STEPS = [
-  { id: "progress", label: "준비" },
-  { id: "images", label: "이미지" },
-  { id: "script", label: "대본" },
-  { id: "done", label: "완료" },
-] as const;
 
 const PHASE2_STAGES = new Set(["synthesizing_audio", "rendering_video", "burning_subtitles"]);
 
@@ -45,6 +39,7 @@ export function BlogClipFlow({
   onBlogClipUpdated,
   onMessage,
   flowMessage,
+  onCrumbChange,
 }: {
   blogClip: BlogClip;
   copiedKey: string | null;
@@ -64,6 +59,7 @@ export function BlogClipFlow({
   onBlogClipUpdated: (blogClip: BlogClip) => void;
   onMessage: (message: string) => void;
   flowMessage?: string;
+  onCrumbChange?: (crumb: FlowCrumbState | null) => void;
 }) {
   const [versionRefresh, setVersionRefresh] = useState(0);
   // ④ 템플릿 갤러리: awaiting_boards 진입 시 한 번 보여주고, 적용/건너뛰기 후엔 숨긴다.
@@ -79,22 +75,24 @@ export function BlogClipFlow({
   const stageLabel = userFacingProgressLabel(blogClip.progress_stage);
   const availableTones = SCRIPT_TONES.filter((tone) => Boolean(blogClip.script_candidates[tone]));
 
-  const stepIndex = isFinalRender || isAwaitingBoards
-    ? 3
-    : isProgress
-      ? 0
-      : isAwaitingImages
-        ? 1
+  const crumbSource = detectSource(blogClip.source_url) === "product" ? "product" : "blog";
+  const crumbStep: FlowStepKey = isCompleted
+    ? "done"
+    : isFinalRender || (isAwaitingBoards && !showTemplateGallery)
+      ? "editor"
+      : isAwaitingBoards
+        ? "template"
         : isAwaitingScript
-          ? 2
-          : isCompleted || isFailed
-            ? 3
-            : 0;
+          ? "script"
+          : isAwaitingImages
+            ? "photos"
+            : "wait";
 
-  const stepperSteps = FLOW_STEPS.map((step, index) => {
-    if (index === 3 && (isFinalRender || isAwaitingBoards)) return { ...step, label: "렌더 중" };
-    return step;
-  });
+  useEffect(() => {
+    onCrumbChange?.({ source: crumbSource, step: crumbStep });
+    return () => onCrumbChange?.(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [crumbSource, crumbStep]);
 
   // NOTE(Phase 2): 예전엔 여기서 템플릿 갤러리 이후 자동으로 onRender(blogClip)를 호출했다.
   // 그런데 그 즉시 실행되는 바람에 "장면 직접 편집"/"이대로 영상 만들기" 두 버튼이 화면에 뜨는
@@ -103,23 +101,6 @@ export function BlogClipFlow({
 
   return (
     <div className="flow-shell">
-      <nav className="flow-progress-bar" aria-label="제작 단계">
-        <ol className="flow-stepper-list">
-          {stepperSteps.map((step, index) => {
-            const isCurrent = index === stepIndex;
-            const isDone = index < stepIndex;
-            return (
-              <li key={step.id}>
-                <div className={`flow-stepper-item ${isCurrent ? "is-current" : ""} ${isDone ? "is-done" : ""}`} aria-current={isCurrent ? "step" : undefined}>
-                  <span className="flow-step-dot">{index + 1}</span>
-                  <span>{step.label}</span>
-                </div>
-              </li>
-            );
-          })}
-        </ol>
-      </nav>
-
       <main className="flow-main">
         {flowMessage ? <p className="error-text flow-inline-error">{flowMessage}</p> : null}
 

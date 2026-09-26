@@ -951,10 +951,20 @@ select:disabled {
   letter-spacing: -0.015em;
 }
 
+.studio-shell-title-text {
+  min-width: 0;
+  flex: 0 1 auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .studio-shell-title-aside {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .studio-shell-body {
@@ -2175,11 +2185,13 @@ button.flow-stepper-item.is-clickable:hover {
 }
 
 .flow-main {
-  width: min(920px, 100%);
+  width: min(1100px, 100%);
   margin: 0 auto;
-  padding: 18px 16px 48px;
+  padding: 22px 24px 48px;
   display: grid;
-  gap: 16px;
+  gap: 18px;
+  /* 자식 카드가 화면 높이만큼 늘어나 내용이 벌어지지 않게 위쪽 정렬 */
+  align-content: start;
 }
 
 .flow-inline-error {
@@ -2198,6 +2210,7 @@ button.flow-stepper-item.is-clickable:hover {
   box-shadow: var(--shadow);
   display: grid;
   gap: 18px;
+  align-content: start;
   animation: panel-in 380ms ease-out;
 }
 
@@ -6072,4 +6085,292 @@ button.flow-stepper-item.is-clickable:hover {
   border-color: var(--accent);
   background: var(--accent-soft);
   color: var(--accent-strong);
+}
+
+
+/* 타이틀 바 오른쪽 소스별 단계 알약(FlowCrumbs) */
+.flow-crumbs {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: nowrap;
+  gap: 4px;
+  overflow: hidden;
+  white-space: nowrap;
+  flex: none;
+}
+
+.flow-crumbs-label {
+  margin-right: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.flow-crumb-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.flow-crumb {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  background: transparent;
+}
+
+.flow-crumb.is-past {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.flow-crumb.is-current {
+  background: var(--ink);
+  color: #fff;
+  font-weight: 700;
+}
+
+.flow-crumb.is-later {
+  color: #c2c2cc;
+}
+
+.flow-crumb-arrow {
+  color: #c2c2cc;
+  font-size: 10px;
+}
+
+@media (max-width: 900px) {
+  .flow-crumbs-label {
+    display: none;
+  }
+}
+
+/* ①-b 분석 대기(다크 2단 카드) — 목업 수치 그대로 */
+.wait-screen {
+  border-radius: var(--radius);
+  background: #16161a;
+  padding: 24px 26px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 200px;
+  gap: 24px;
+  align-items: center;
+}
+
+.wait-main {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+
+.wait-kicker {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  color: #8b8b98;
+}
+
+.wait-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: #fff;
+}
+
+.wait-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+
+.wait-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.wait-step.is-pending {
+  opacity: 0.45;
+}
+
+.wait-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  border: 1.5px solid #63636f;
+  background: transparent;
+}
+
+.wait-step.is-done .wait-dot {
+  background: #0f7b52;
+  border-color: transparent;
+}
+
+.wait-step.is-on .wait-dot {
+  background: #8b7cff;
+  border-color: transparent;
+}
+
+.wait-step-label {
+  font-size: 13.5px;
+  font-weight: 400;
+  color: #8b8b98;
+}
+
+.wait-step.is-done .wait-step-label {
+  color: #f2f2f5;
+}
+
+.wait-step.is-on .wait-step-label {
+  font-weight: 600;
+  color: #fff;
+}
+
+.wait-track {
+  height: 6px;
+  border-radius: 9999px;
+  background: #26262f;
+  overflow: hidden;
+}
+
+.wait-fill {
+  display: block;
+  height: 100%;
+  background: #8b7cff;
+  transition: width 0.5s ease;
+}
+
+.wait-caption {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: #8b8b98;
+}
+
+.wait-found {
+  border-radius: var(--radius);
+  background: #1a1a21;
+  border: 1px solid #26262f;
+  padding: 13px 15px;
+}
+
+.wait-found-label {
+  margin: 0 0 5px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #8b7cff;
+}
+
+.wait-found-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #c9c9d2;
+}
+
+.wait-side {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.wait-phone {
+  position: relative;
+  aspect-ratio: 9 / 16;
+  border-radius: var(--radius);
+  background: #1a1a21;
+  border: 1px solid #26262f;
+  overflow: hidden;
+}
+
+.wait-phone-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 5px;
+  background: #8b7cff;
+  color: #16161a;
+  font-size: 10.5px;
+  font-weight: 800;
+}
+
+.wait-phone-title {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 14px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.4;
+}
+
+.wait-leave {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 44px;
+  border-radius: var(--radius);
+  border: 1px solid #332c52;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 600;
+  color: #8b8b98;
+  cursor: pointer;
+}
+
+.wait-leave:hover {
+  color: #fff;
+}
+
+.wait-note {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #63636f;
+  text-align: center;
+}
+
+.wait-notify {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #63636f;
+  cursor: pointer;
+}
+
+.wait-error {
+  margin: 0;
+  font-size: 12.5px;
+  color: #ff8a80;
+}
+
+@media (max-width: 720px) {
+  .wait-screen {
+    grid-template-columns: 1fr;
+  }
+
+  .wait-phone {
+    display: none;
+  }
 }

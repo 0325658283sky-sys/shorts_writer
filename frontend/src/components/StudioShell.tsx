@@ -236,7 +236,7 @@ export function StudioShell({
       </aside>
       <div className="studio-shell-main">
         <header className="studio-shell-title">
-          <span>{title}</span>
+          <span className="studio-shell-title-text">{title}</span>
           {titleAside ? <div className="studio-shell-title-aside">{titleAside}</div> : null}
         </header>
         <div className={`studio-shell-body is-${bodyMode}`}>{children}</div>

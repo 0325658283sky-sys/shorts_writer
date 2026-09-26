@@ -8,11 +8,13 @@ function CandidateThumb({
   blogClipId,
   candidate,
   order,
+  isStock,
   onToggle,
 }: {
   blogClipId: number;
   candidate: BlogClipImageCandidate;
   order: number | null;
+  isStock: boolean;
   onToggle: () => void;
 }) {
   const { url, error } = useCandidateImageUrl(blogClipId, candidate.id);
@@ -26,6 +28,7 @@ function CandidateThumb({
     >
       {url ? <img src={url} alt="" /> : <span className="image-candidate-fallback">{error ? "!" : "…"}</span>}
       {selected ? <span className="image-candidate-order">{order}</span> : null}
+      {isStock ? <span className="image-candidate-stock">스톡</span> : null}
     </button>
   );
 }
@@ -83,7 +86,35 @@ export function ImageSelectStep({
   }
 
   const count = selectedIds.length;
-  const canContinue = count >= BLOG_IMAGE_MIN_COUNT && count <= BLOG_IMAGE_MAX_COUNT && !confirming;
+  const [stockFill, setStockFill] = useState(false);
+  const [filling, setFilling] = useState(false);
+  const shortage = BLOG_IMAGE_MIN_COUNT - count;
+  const needsStock = shortage > 0;
+  const canContinue =
+    count <= BLOG_IMAGE_MAX_COUNT &&
+    !confirming &&
+    !filling &&
+    (count >= BLOG_IMAGE_MIN_COUNT || (stockFill && !isProduct && count >= 1));
+
+  async function handleContinue() {
+    let ids = selectedIds;
+    if (needsStock) {
+      setFilling(true);
+      try {
+        const added = await authorizedRequest<BlogClipImageCandidate[]>(
+          `/blog-clips/${blogClip.id}/images/stock-fill?need=${shortage}`,
+          { method: "POST" },
+        );
+        ids = [...selectedIds, ...added.map((item) => item.id)];
+      } catch (error) {
+        onMessage(error instanceof Error ? error.message : "스톡 사진을 가져오지 못했습니다.");
+        setFilling(false);
+        return;
+      }
+      setFilling(false);
+    }
+    onConfirm(ids, blogClip.visual_style || "impact_full");
+  }
 
   return (
     <section className="flow-card flow-images-card">
@@ -116,10 +147,31 @@ export function ImageSelectStep({
                 blogClipId={blogClip.id}
                 candidate={candidate}
                 order={index === -1 ? null : index + 1}
+                isStock={Boolean(candidate.source_url?.includes("images.pexels.com"))}
                 onToggle={() => toggle(candidate.id)}
               />
             );
           })}
+        </div>
+      ) : null}
+
+      {!isProduct ? (
+        <div className="image-stock-row">
+          <div>
+            <div className="candidates-option-title">사진 부족 시 스톡 보충</div>
+            <div className="candidates-option-desc">
+              고른 사진이 {BLOG_IMAGE_MIN_COUNT}장보다 적으면 글 제목에 맞는 스톡 사진으로 부족한 만큼 채웁니다
+            </div>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={stockFill}
+            className={`ncf-switch ${stockFill ? "is-on" : ""}`}
+            onClick={() => setStockFill((value) => !value)}
+          >
+            <span />
+          </button>
         </div>
       ) : null}
 
@@ -129,18 +181,20 @@ export function ImageSelectStep({
             ← 다른 링크
           </button>
         ) : null}
-        <span className={`image-step-hint ${count < BLOG_IMAGE_MIN_COUNT ? "is-warn" : ""}`}>
-          {count < BLOG_IMAGE_MIN_COUNT
-            ? `${BLOG_IMAGE_MIN_COUNT}장 이상 골라야 다음으로 갈 수 있어요`
+        <span className={`image-step-hint ${needsStock && !(stockFill && !isProduct) ? "is-warn" : ""}`}>
+          {needsStock
+            ? stockFill && !isProduct
+              ? `부족한 ${shortage}장은 스톡 사진으로 채워요`
+              : `${BLOG_IMAGE_MIN_COUNT}장 이상 골라야 다음으로 갈 수 있어요`
             : `${count}장 선택됨`}
         </span>
         <button
           className="btn-primary btn-lg"
           type="button"
           disabled={!canContinue}
-          onClick={() => onConfirm(selectedIds, blogClip.visual_style || "impact_full")}
+          onClick={() => void handleContinue()}
         >
-          {confirming ? "확인 중…" : isProduct ? "셀링포인트로" : "대본 고르기"}
+          {confirming || filling ? "확인 중…" : isProduct ? "셀링포인트로" : "대본 고르기"}
         </button>
       </div>
     </section>

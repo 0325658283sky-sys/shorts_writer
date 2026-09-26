@@ -85,7 +85,11 @@ from app.services.blog_service import (
 )
 from app.services.remotion_props_service import build_blog_shorts_props
 from app.services.render_queue import run_with_render_slot
-from app.services.stock_service import apply_stock_image_to_board, search_stock_images
+from app.services.stock_service import (
+    add_stock_candidates_for_shortage,
+    apply_stock_image_to_board,
+    search_stock_images,
+)
 
 router = APIRouter(prefix="/blog-clips", tags=["blog-clips"])
 
@@ -573,6 +577,21 @@ def reorder_blog_clip_boards_endpoint(
 ) -> list[BoardResponse]:
     boards = reorder_blog_clip_boards(conn, current_user.id, blog_clip_id, request.board_ids)
     return [_to_board_response(board) for board in boards]
+
+
+@router.post("/{blog_clip_id}/images/stock-fill", response_model=list[BlogClipImageCandidateResponse])
+def stock_fill_images_endpoint(
+    blog_clip_id: int,
+    need: int = Query(..., ge=1, le=8),
+    current_user: User = Depends(get_current_user),
+    conn: sqlite3.Connection = Depends(get_connection),
+) -> list[BlogClipImageCandidateResponse]:
+    new_ids = add_stock_candidates_for_shortage(conn, current_user.id, blog_clip_id, need)
+    return [
+        _to_image_candidate_response(candidate)
+        for candidate in list_blog_clip_image_candidates(conn, current_user.id, blog_clip_id)
+        if candidate.id in new_ids
+    ]
 
 
 @router.get("/{blog_clip_id}/stock-search", response_model=StockSearchResponse)

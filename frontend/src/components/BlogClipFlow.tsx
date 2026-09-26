@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { authorizedRequest } from "../api/client";
 import { SCRIPT_TONE_HINTS, SCRIPT_TONE_LABELS, SCRIPT_TONES, userFacingProgressLabel } from "../constants";
 import type { BlogClip, ScriptTone, VisualStyleSlug } from "../types";
 import { AliveProgressBar } from "./AliveProgressBar";
@@ -127,6 +128,8 @@ export function BlogClipFlow({
             busy={selectingBlogScriptId === blogClip.id}
             onSelect={(tone) => onSelectScript(blogClip, tone)}
             onEdit={(tone) => onSelectScript(blogClip, tone, { openEditor: true })}
+            onRewritten={onBlogClipUpdated}
+            onMessage={onMessage}
           />
         ) : null}
 
@@ -361,14 +364,35 @@ function ScriptToneStep({
   busy,
   onSelect,
   onEdit,
+  onRewritten,
+  onMessage,
 }: {
   blogClip: BlogClip;
   tones: ScriptTone[];
   busy: boolean;
   onSelect: (tone: ScriptTone) => void;
   onEdit: (tone: ScriptTone) => void;
+  onRewritten: (blogClip: BlogClip) => void;
+  onMessage: (message: string) => void;
 }) {
   const [active, setActive] = useState<ScriptTone>(tones[0]);
+  const [speechStyle, setSpeechStyle] = useState("");
+  const [rewriting, setRewriting] = useState(false);
+
+  async function handleRewrite() {
+    setRewriting(true);
+    try {
+      const updated = await authorizedRequest<BlogClip>(`/blog-clips/${blogClip.id}/rewrite-scripts`, {
+        method: "POST",
+        body: JSON.stringify({ speech_style: speechStyle || null }),
+      });
+      onRewritten(updated);
+    } catch (error) {
+      onMessage(error instanceof Error ? error.message : "대본을 다시 쓰지 못했습니다.");
+    } finally {
+      setRewriting(false);
+    }
+  }
 
   return (
     <section className="flow-card">
@@ -408,6 +432,26 @@ function ScriptToneStep({
             </button>
           );
         })}
+      </div>
+
+      <div className="tone-style-box">
+        <span className="candidates-options-label">말투</span>
+        <div className="tone-style-row">
+          <select
+            className="tone-style-select"
+            value={speechStyle}
+            disabled={rewriting || busy}
+            onChange={(event) => setSpeechStyle(event.target.value)}
+          >
+            <option value="">기본 말투</option>
+            <option value="calm_info">차분한 정보형</option>
+            <option value="friendly_review">친근한 리뷰어</option>
+            <option value="energetic_promo">활기찬 홍보형</option>
+          </select>
+          <button className="btn-outline" type="button" disabled={rewriting || busy} onClick={() => void handleRewrite()}>
+            {rewriting ? "다시 쓰는 중…" : "이 말투로 3안 다시 쓰기"}
+          </button>
+        </div>
       </div>
 
       <div className="tone-actions">

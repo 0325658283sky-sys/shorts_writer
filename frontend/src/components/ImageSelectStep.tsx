@@ -33,13 +33,17 @@ function CandidateThumb({
 export function ImageSelectStep({
   blogClip,
   confirming,
+  isProduct = false,
   onConfirm,
   onMessage,
+  onBack,
 }: {
   blogClip: BlogClip;
   confirming: boolean;
+  isProduct?: boolean;
   onConfirm: (imageIds: number[], visualStyle: VisualStyleSlug | string) => void;
   onMessage: (message: string) => void;
+  onBack?: () => void;
 }) {
   const [candidates, setCandidates] = useState<BlogClipImageCandidate[]>([]);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -85,12 +89,15 @@ export function ImageSelectStep({
     <section className="flow-card flow-images-card">
       <div className="image-step-head">
         <div>
-          <h1>쇼츠에 넣을 사진 고르기</h1>
-          <p className="flow-lead">고른 순서대로 장면이 됩니다. 최소 {BLOG_IMAGE_MIN_COUNT}장.</p>
+          <p className="create-kicker">{isProduct ? "상품 사진" : "글 속 사진"}</p>
+          <h1>쇼츠에 쓸 사진을 골라주세요</h1>
+          <p className="flow-lead">
+            고른 순서대로 장면이 됩니다. 최소 {BLOG_IMAGE_MIN_COUNT}장, 최대 {BLOG_IMAGE_MAX_COUNT}장까지 고를 수 있어요.
+          </p>
         </div>
         <div className="image-step-counter">
           <strong>{count}</strong>
-          <span> / 최대 {BLOG_IMAGE_MAX_COUNT}</span>
+          <span> / {BLOG_IMAGE_MAX_COUNT}장</span>
           <span className="image-step-gauge">
             <span style={{ width: `${Math.min(100, (count / BLOG_IMAGE_MAX_COUNT) * 100)}%` }} />
           </span>
@@ -117,14 +124,23 @@ export function ImageSelectStep({
       ) : null}
 
       <div className="image-step-foot">
-        <span className="create-note">사진이 {BLOG_IMAGE_MIN_COUNT}장보다 적으면 다음으로 넘어갈 수 없어요.</span>
+        {onBack ? (
+          <button className="ghost-button" type="button" onClick={onBack}>
+            ← 다른 링크
+          </button>
+        ) : null}
+        <span className={`image-step-hint ${count < BLOG_IMAGE_MIN_COUNT ? "is-warn" : ""}`}>
+          {count < BLOG_IMAGE_MIN_COUNT
+            ? `${BLOG_IMAGE_MIN_COUNT}장 이상 골라야 다음으로 갈 수 있어요`
+            : `${count}장 선택됨`}
+        </span>
         <button
           className="btn-primary btn-lg"
           type="button"
           disabled={!canContinue}
           onClick={() => onConfirm(selectedIds, blogClip.visual_style || "impact_full")}
         >
-          {confirming ? "확인 중…" : "다음 · 말투 고르기"}
+          {confirming ? "확인 중…" : isProduct ? "셀링포인트로" : "대본 고르기"}
         </button>
       </div>
     </section>

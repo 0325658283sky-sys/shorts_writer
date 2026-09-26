@@ -113,6 +113,8 @@ export function BlogClipFlow({
           <ImageSelectStep
             blogClip={blogClip}
             confirming={confirmingImageSelection}
+            isProduct={detectSource(blogClip.source_url) === "product"}
+            onBack={onBackToStudio}
             onConfirm={(imageIds, visualStyle) => onConfirmImages(blogClip, imageIds, visualStyle)}
             onMessage={onMessage}
           />
@@ -370,8 +372,13 @@ function ScriptToneStep({
 
   return (
     <section className="flow-card">
-      <h1>어떤 말투로 읽어줄까요?</h1>
-      <p className="flow-lead">마음에 드는 대본을 직접 골라주세요. 나중에 바꿀 수 있어요.</p>
+      <div>
+        <p className="create-kicker">대본</p>
+        <h1>AI가 쓴 대본 3안 중 하나를 골라주세요</h1>
+        <p className="flow-lead tone-lead">
+          마음에 드는 안을 직접 골라주세요. 문장은 편집기에서 장면별로 고칠 수 있습니다.
+        </p>
+      </div>
 
       <div className="tone-card-grid" role="radiogroup" aria-label="말투">
         {tones.map((tone) => {
@@ -388,13 +395,13 @@ function ScriptToneStep({
               className={`tone-card ${selected ? "is-selected" : ""}`}
               onClick={() => setActive(tone)}
             >
-              <span className="tone-card-radio" aria-hidden="true" />
               <span className="tone-card-head">
+                <span className="tone-card-radio" aria-hidden="true" />
                 <strong>{SCRIPT_TONE_LABELS[tone]}</strong>
                 {tone === "hook" ? <span className="tone-card-badge">추천</span> : null}
-              </span>
-              <span className="tone-card-meta">
-                읽는 시간 {seconds}초 · 글자 {chars}자
+                <span className="tone-card-meta">
+                  약 {seconds}초 · {chars}자
+                </span>
               </span>
               <span className="tone-card-hint">{SCRIPT_TONE_HINTS[tone]}</span>
               <p className="tone-card-script">{script}</p>

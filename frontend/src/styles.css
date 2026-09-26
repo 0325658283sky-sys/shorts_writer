@@ -3091,6 +3091,18 @@ button.flow-stepper-item.is-clickable:hover {
 
 .image-step-head h1 {
   margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.image-step-hint {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.image-step-hint.is-warn {
+  color: #8a6410;
 }
 
 .image-step-counter {
@@ -5275,7 +5287,7 @@ button.flow-stepper-item.is-clickable:hover {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 10px;
   padding: 16px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -5290,9 +5302,7 @@ button.flow-stepper-item.is-clickable:hover {
 }
 
 .tone-card-radio {
-  position: absolute;
-  top: 14px;
-  right: 14px;
+  flex: none;
   width: 18px;
   height: 18px;
   border-radius: 50%;
@@ -5307,8 +5317,7 @@ button.flow-stepper-item.is-clickable:hover {
 .tone-card-head {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding-right: 24px;
+  gap: 8px;
   font-size: 13.5px;
 }
 
@@ -5322,17 +5331,18 @@ button.flow-stepper-item.is-clickable:hover {
 }
 
 .tone-card-meta {
+  margin-left: auto;
   font-size: 11px;
   color: var(--muted);
 }
 
 .tone-card-hint {
   font-size: 11.5px;
-  color: var(--ink-soft);
+  color: var(--muted);
 }
 
 .tone-card-script {
-  margin: 4px 0 0;
+  margin: 0;
   font-size: 13px;
   line-height: 1.75;
   color: var(--ink);

@@ -52,9 +52,10 @@ import type {
 
 const DITODIO_HUB_URL = (import.meta.env.VITE_DITODIO_HUB_URL as string | undefined)?.replace(/\/$/, "") || "";
 
-function ditodioLoginUrl(mode: "login" | "register") {
-  const callbackUrl = "/handoff/new-cut";
-  return `${DITODIO_HUB_URL}/${mode}?callbackUrl=${encodeURIComponent(callbackUrl)}`;
+/** Opt out of the auto-redirect to Ditodio's home for local testing: ?local=1 */
+function hasLocalBypass() {
+  if (typeof window === "undefined") return false;
+  return new URLSearchParams(window.location.search).get("local") === "1";
 }
 
 function subtitleStyleFromVisual(style: string): SubtitleStyle {
@@ -74,7 +75,8 @@ type YoutubeProjectMeta = {
 
 export function App() {
   const [view, setView] = useState<View>("login");
-  const [showLocalAuth, setShowLocalAuth] = useState(!DITODIO_HUB_URL);
+  const [authChecked, setAuthChecked] = useState(false);
+  const shouldRedirectToDitodio = Boolean(DITODIO_HUB_URL) && !hasLocalBypass();
   const [email, setEmail] = useState("stage2-test@example.com");
   const [password, setPassword] = useState("Password123!");
   const [user, setUser] = useState<User | null>(null);
@@ -232,6 +234,12 @@ export function App() {
     }
   }
 
+  // New Cut has no landing/login of its own anymore — Ditodio's home is the shared front door.
+  useEffect(() => {
+    if (!authChecked || view === "dashboard" || !shouldRedirectToDitodio) return;
+    window.location.replace(`${DITODIO_HUB_URL}/`);
+  }, [authChecked, view, shouldRedirectToDitodio]);
+
   function handleStudioNavChange(tab: StudioTab) {
     if (
       tab === studioNav &&
@@ -300,14 +308,18 @@ export function App() {
           if (existing) await loadCurrentUser(existing);
         } finally {
           setIsLoading(false);
+          setAuthChecked(true);
         }
       })();
       return;
     }
 
     const token = localStorage.getItem(TOKEN_KEY);
-    if (!token) return;
-    loadCurrentUser(token);
+    if (!token) {
+      setAuthChecked(true);
+      return;
+    }
+    void loadCurrentUser(token).finally(() => setAuthChecked(true));
   }, []);
 
   // Ditodio / blog_writer: ?from=&url=&brandId=&postId=#/studio/create
@@ -1429,6 +1441,15 @@ export function App() {
     );
   }
 
+  if (shouldRedirectToDitodio) {
+    return (
+      <main className="app-root landing-shell">
+        <div className="landing-atmosphere" aria-hidden="true" />
+        <p style={{ color: "var(--ink-soft)", fontSize: 14 }}>Ditodio으로 이동 중…</p>
+      </main>
+    );
+  }
+
   return (
     <main className="app-root landing-shell">
       <div className="landing-atmosphere" aria-hidden="true" />
@@ -1442,42 +1463,20 @@ export function App() {
           <li>버전 다운로드 · 메타데이터</li>
         </ul>
       </section>
-      {DITODIO_HUB_URL && !showLocalAuth ? (
-        <section className="auth-panel" aria-label="로그인">
-          <p className="create-kicker">로그인</p>
-          <h2>스튜디오 입장</h2>
-          <p className="auth-lead">
-            Ditodio 계정으로 로그인하면 블로그 생성기와 쇼츠 스튜디오를 같은 계정으로 이용할 수 있어요.
-          </p>
-          <a className="cta-button" href={ditodioLoginUrl("login")} style={{ display: "block", textAlign: "center", textDecoration: "none", lineHeight: "42px" }}>
-            Ditodio 계정으로 로그인
-          </a>
-          <p className="auth-lead" style={{ marginTop: 12, marginBottom: 0 }}>
-            계정이 없나요?{" "}
-            <a href={ditodioLoginUrl("register")} style={{ color: "var(--accent-strong)" }}>
-              Ditodio 회원가입
-            </a>
-          </p>
-          <button className="link-button" type="button" onClick={() => setShowLocalAuth(true)}>
-            이메일로 로그인 (테스트용)
-          </button>
-        </section>
-      ) : (
-        <AuthPanel
-          view={view}
-          email={email}
-          password={password}
-          message={message}
-          isLoading={isLoading}
-          onEmailChange={setEmail}
-          onPasswordChange={setPassword}
-          onSubmit={view === "login" ? handleLogin : handleRegister}
-          onToggleView={() => {
-            setView(view === "login" ? "register" : "login");
-            setMessage("");
-          }}
-        />
-      )}
+      <AuthPanel
+        view={view}
+        email={email}
+        password={password}
+        message={message}
+        isLoading={isLoading}
+        onEmailChange={setEmail}
+        onPasswordChange={setPassword}
+        onSubmit={view === "login" ? handleLogin : handleRegister}
+        onToggleView={() => {
+          setView(view === "login" ? "register" : "login");
+          setMessage("");
+        }}
+      />
     </main>
   );
 }

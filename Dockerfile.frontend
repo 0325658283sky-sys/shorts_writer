@@ -21,6 +21,8 @@ RUN ln -s /repo/frontend/node_modules /repo/remotion/node_modules
 WORKDIR /repo/frontend
 ARG VITE_API_BASE_URL
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+ARG VITE_DITODIO_HUB_URL
+ENV VITE_DITODIO_HUB_URL=$VITE_DITODIO_HUB_URL
 RUN npm run build
 
 FROM node:20-slim

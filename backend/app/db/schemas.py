@@ -124,6 +124,7 @@ class HighlightResponse(BaseModel):
 class ClipCreateRequest(BaseModel):
     highlight_id: int
     visual_style: str | None = None
+    remove_silence: bool = False
 
 
 SubtitleStyle = Literal["basic", "bold", "shorts"]
@@ -207,6 +208,10 @@ class BlogClipSelectScriptRequest(BaseModel):
     tone: ScriptTone
 
 
+class BlogClipRewriteScriptRequest(BaseModel):
+    speech_style: str | None = None
+
+
 class BlogClipImageCandidateResponse(BaseModel):
     id: int
     blog_clip_id: int
@@ -232,6 +237,7 @@ class BoardResponse(BaseModel):
     speaker: str | None = None
     duration_seconds: float | None = None
     sfx_asset_id: int | None = None
+    text_style: dict | None = None
     created_at: str
     updated_at: str
 
@@ -253,6 +259,7 @@ class BlogShortsBoardProps(BaseModel):
     words: list[BlogShortsWordTiming] | None = None
     backgroundColor: str | None = None
     speaker: str | None = None
+    textStyle: dict | None = None
 
 
 class BlogShortsStyleProps(BaseModel):
@@ -336,6 +343,7 @@ class BoardUpdateRequest(BaseModel):
     duration_seconds: float | None = None
     speaker: str | None = None
     sfx_asset_id: int | None = None
+    text_style: dict | None = None
 
 
 class BlogClipTtsSettingsRequest(BaseModel):

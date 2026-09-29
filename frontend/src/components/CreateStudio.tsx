@@ -4,8 +4,6 @@ import {
   NARRATION_LANGUAGES,
   SCRIPT_MODEL_LABELS,
   SCRIPT_MODELS,
-  SUBTITLE_STYLE_LABELS,
-  SUBTITLE_STYLES,
   TARGET_LENGTH_LABELS,
   TARGET_LENGTHS,
   YOUTUBE_LENGTH_BAND_LABELS,
@@ -27,11 +25,11 @@ const SOURCE_BADGE: Record<CreateSource, string> = {
 };
 
 /** URL 패턴으로 소스 종류를 추론한다(백엔드가 블로그/상품을 최종 판별). */
-function detectSource(value: string): CreateSource | null {
+export function detectSource(value: string): CreateSource | null {
   const v = value.trim().toLowerCase();
   if (!v) return null;
   if (/youtube\.com|youtu\.be/.test(v)) return "youtube";
-  if (/amazon\.|amzn\.|smartstore\.naver\.|brand\.naver\.|smartstore\.|m\.smartstore\./.test(v)) return "product";
+  if (/amazon\.|amzn\.|smartstore\.naver\.|brand\.naver\.|smartstore\.|m\.smartstore\.|coupang\./.test(v)) return "product";
   if (/^https?:\/\//.test(v) || /\.[a-z]{2,}(\/|$)/.test(v)) return "blog";
   return null;
 }
@@ -275,6 +273,18 @@ export function CreateStudio({
             />
           ) : null}
 
+          {detected !== "youtube" && detectSource(url) ? (
+            <div className="create-detected-card">
+              <span className="create-detected-thumb" aria-hidden="true" />
+              <div className="create-detected-body">
+                <p className="create-detected-check">✓ {SOURCE_BADGE[detected]}로 인식됨</p>
+                {detected === "blog" ? (
+                  <p className="create-detected-note">사진이 3장보다 적은 글은 만들 수 없어요</p>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+
           <div className="create-quick-settings">
             <div className="create-chip-group">
               <span className="create-chip-label">길이</span>
@@ -291,28 +301,6 @@ export function CreateStudio({
                 ))}
               </div>
             </div>
-
-            {!isVideoKind ? (
-              <div className="create-chip-group">
-                <span className="create-chip-label">자막 템플릿</span>
-                <div className="create-swatch-row">
-                  {SUBTITLE_STYLES.map((style) => (
-                    <button
-                      key={style}
-                      type="button"
-                      className={`create-swatch create-swatch-${style}${
-                        blogSubtitleStyle === style ? " is-active" : ""
-                      }`}
-                      aria-label={SUBTITLE_STYLE_LABELS[style]}
-                      title={SUBTITLE_STYLE_LABELS[style]}
-                      onClick={() => onBlogSubtitleStyleChange(style)}
-                    >
-                      가
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : null}
 
             <div className="create-credit-box">
               <span>이 쇼츠에 쓰는 크레딧</span>
@@ -383,15 +371,26 @@ export function CreateStudio({
           <ol className="create-steps">
             {isVideoKind ? (
               <>
-                <li>영상 확인 후 템플릿 선택</li>
-                <li>하이라이트 상위 {youtubeShortsCount}편 자동 생성</li>
-                <li>프로젝트에서 편집 · 다운로드</li>
+                <li>구간 후보 여러 개 중 고르기</li>
+                <li>템플릿 고르기</li>
+                <li>편집</li>
+                <li>다운로드</li>
+              </>
+            ) : detected === "product" ? (
+              <>
+                <li>상품 사진 고르기</li>
+                <li>셀링포인트 3개 다듬기</li>
+                <li>템플릿 고르기</li>
+                <li>편집</li>
+                <li>다운로드</li>
               </>
             ) : (
               <>
-                <li>{detected === "product" ? "상품 정보·이미지 수집" : "글 읽고 대본 3종 생성"}</li>
-                <li>이미지 · 말투 선택</li>
-                <li>렌더 · 다운로드</li>
+                <li>사진 고르기</li>
+                <li>대본 3안 중 고르기</li>
+                <li>템플릿 고르기</li>
+                <li>편집</li>
+                <li>다운로드</li>
               </>
             )}
           </ol>
@@ -404,7 +403,7 @@ export function CreateStudio({
             <div className="create-preview-media" />
             <p className="create-preview-caption">자막이 이렇게 보여요</p>
           </div>
-          <p className="create-preview-note">설정을 바꾸면 이 미리보기가 바뀝니다</p>
+          <p className="create-preview-note">스타일은 다음 단계 템플릿에서 고릅니다</p>
         </div>
       </div>
     </section>

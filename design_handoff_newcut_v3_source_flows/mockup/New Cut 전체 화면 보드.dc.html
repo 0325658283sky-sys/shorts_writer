@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+html,body{margin:0;background:#F3F3F5;font-family:"Pretendard Variable","Pretendard","Noto Sans KR",sans-serif;color:#16161A;-webkit-font-smoothing:antialiased}
+*{box-sizing:border-box}
+a{color:#2563EB}a:hover{color:#1D4ED8}
+</style>
+</helmet>
+
+<div style="padding:48px 56px 80px;display:flex;flex-direction:column;gap:44px;width:max-content;">
+  <header style="display:flex;flex-direction:column;gap:8px;max-width:980px;">
+    <p style="margin:0;color:#1D4ED8;font-size:12px;font-weight:800;letter-spacing:.08em;">NEW CUT 리뉴얼 · 소스별 프로세스</p>
+    <h1 style="margin:0;font-size:30px;font-weight:700;letter-spacing:-0.03em;">4개 소스 × 전체 화면</h1>
+    <p style="margin:0;font-size:14px;line-height:1.6;color:#6B6B75;">앞단(구간 후보 / 사진 / 대본·셀링포인트)만 소스별로 갈리고, ④ 템플릿 · ⑥ 완료는 모두 공유합니다. 각 화면은 실제 프로토타입(<a href="New Cut 소스별 플로우.dc.html">New Cut 소스별 플로우</a>)을 해당 단계로 띄운 것입니다. ⑤ 편집기는 Phase 2 범위라 제외했습니다.</p>
+    <div style="display:flex;gap:14px;margin-top:6px;font-size:12px;color:#6B6B75;">
+      <span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:3px;background:#2563EB;"></span>소스별 화면</span>
+      <span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:3px;background:#16161A;"></span>공유 화면</span>
+      <span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:3px;background:#C2453C;"></span>예외 상태</span>
+    </div>
+  </header>
+
+  <sc-for list="{{ lanes }}" as="lane" hint-placeholder-count="4">
+    <section style="display:flex;flex-direction:column;gap:14px;">
+      <div style="display:flex;align-items:baseline;gap:12px;">
+        <h2 style="margin:0;font-size:20px;font-weight:700;letter-spacing:-0.02em;">{{ lane.title }}</h2>
+        <span style="font-size:13px;color:#6B6B75;">{{ lane.sub }}</span>
+      </div>
+      <div style="display:flex;gap:18px;align-items:flex-start;">
+        <sc-for list="{{ lane.frames }}" as="f" hint-placeholder-count="5">
+          <div style="display:flex;flex-direction:column;gap:8px;width:480px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:6px;background:{{ f.tagBg }};color:#fff;font-size:11px;font-weight:700;">{{ f.tag }}</span>
+              <span style="font-size:13px;font-weight:700;">{{ f.label }}</span>
+              <span style="margin-left:auto;font-size:11.5px;color:#9C9CA6;">{{ f.note }}</span>
+            </div>
+            <div style="width:480px;height:300px;overflow:hidden;border-radius:10px;border:1px solid #E0E0E6;background:#F3F3F5;box-shadow:0 1px 2px rgba(22,22,26,.06);">
+              <div style="width:1280px;height:800px;transform:scale(0.375);transform-origin:top left;">
+                <dc-import name="New Cut 소스별 플로우" start-source="{{ f.src }}" start-step="{{ f.step }}" start-p="{{ f.p }}" start-sel="{{ f.sel }}" credits-remaining="{{ f.credits }}" error-demo="{{ f.err }}" embed-height="800px" hint-size="1280px,800px"></dc-import>
+              </div>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+  </sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const BLUE = '#2563EB', INK = '#16161A', RED = '#C2453C';
+const f = (src, step, label, note, extra = {}) => {
+  const shared = step === 'template' || step === 'done';
+  return { src, step, label, note, p: null, sel: [1, 2], credits: 7, err: 'none', tag: shared ? '공유' : '소스별', tagBg: shared ? INK : BLUE, ...extra };
+};
+const E = (src, step, label, note, err, extra = {}) => f(src, step, label, note, { err, tag: '예외', tagBg: RED, ...extra });
+
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      lanes: [
+        { title: '유튜브', sub: '긴 영상을 여러 편으로 — 링크 → 구간 후보 6개 → 템플릿 → 완료', frames: [
+          f('youtube', 'input', '① 입력', '단일 입력창 + 자동 판별'),
+          f('youtube', 'wait', '①-b 분석 대기', '2~3분 · 먼저 찾은 구간', { p: 0.62 }),
+          f('youtube', 'candidates', '② 구간 후보', '여러 개 선택 · 선택 수 × 1크레딧', { sel: [1, 2, 3] }),
+          f('youtube', 'template', '④ 템플릿', '고른 3편에 한 번에 적용', { sel: [1, 2, 3] }),
+          f('youtube', 'done', '⑥ 완료', '편별 다운로드', { sel: [1, 2, 3] }),
+        ] },
+        { title: 'MP4', sub: '내 영상, 여러 편으로 — 업로드·검사 → 구간 후보 → 템플릿 → 완료', frames: [
+          f('mp4', 'input', '① 입력', '드래그&드롭 유지'),
+          f('mp4', 'wait', '①-b 업로드', '실제 bytes 기준 %', { p: 0.14 }),
+          f('mp4', 'candidates', '② 구간 후보', '남은 크레딧 초과 선택 차단', { sel: [1, 2], credits: 2 }),
+          f('mp4', 'template', '④ 템플릿', '유튜브와 동일'),
+          f('mp4', 'done', '⑥ 완료', '유튜브와 동일'),
+        ] },
+        { title: '블로그 URL', sub: '글을 영상으로 — 사진 → 대본 3안 → 템플릿 → 완료', frames: [
+          f('blog', 'input', '① 입력', '사진 3장 미만 사전 안내'),
+          f('blog', 'wait', '①-b 분석 대기', '1분 40초', { p: 0.48 }),
+          f('blog', 'photos', '③ 사진 선택', '3~8장 · 스톡 보충'),
+          f('blog', 'script', '대본 3안', '자동(hook 고정) 폐지 · 나레이션 미리듣기'),
+          f('blog', 'template', '④ 템플릿', '공유'),
+          f('blog', 'done', '⑥ 완료', '1편 기본'),
+        ] },
+        { title: '상품 URL', sub: '팔기 위한 쇼츠 — 상품 사진 → 셀링포인트 3개 → 템플릿 → 완료', frames: [
+          f('product', 'input', '① 입력', '쿠팡·스마트스토어·아마존'),
+          f('product', 'wait', '①-b 분석 대기', '1분 20초 · 가장 짧음', { p: 0.55 }),
+          f('product', 'photos', '③ 상품 사진', '3~8장'),
+          f('product', 'selling', '셀링포인트 (신규)', '한 줄 입력 3개 + 가격·할인·리뷰 칩'),
+          f('product', 'template', '④ 템플릿', '커머스 가격형 우선'),
+          f('product', 'done', '⑥ 완료', '설명란 상품 링크 자동 첨부'),
+        ] },
+        { title: '예외 상태', sub: '무슨 일이 있었나 · 무엇을 하면 되나 · 크레딧은 어떻게 되나 — 버튼 최대 2개', frames: [
+          E('youtube', 'input', '크레딧 소진', 'neutral', 'credit_out', { credits: 0 }),
+          E('youtube', 'input', '비공개·삭제된 영상', 'danger', 'private_video'),
+          E('blog', 'photos', '이미지 후보 부족', 'danger · 블로그·상품', 'image_short'),
+          E('blog', 'done', '렌더 폴백', 'amber', 'render_fallback'),
+          E('youtube', 'done', '저작권 음원 감지', 'amber · 유튜브·MP4', 'copyright'),
+        ] },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

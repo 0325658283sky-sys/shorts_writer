@@ -29,12 +29,14 @@ from app.db.schemas import (
     BoardReorderRequest,
     BoardResponse,
     BoardUpdateRequest,
+    BlogClipRewriteScriptRequest,
     StockImageApplyRequest,
     StockSearchResponse,
 )
 from app.services.blog_service import (
     BGM_ASSET_UNSET,
     SFX_UNSET,
+    parse_board_text_style,
     SPEAKER_UNSET,
     apply_blog_clip_template,
     blog_clip_download_path,
@@ -67,6 +69,7 @@ from app.services.blog_service import (
     run_blog_clip_pipeline,
     run_blog_clip_render_pipeline,
     run_blog_clip_version_pipeline,
+    regenerate_blog_clip_script_candidates,
     select_blog_clip_script,
     set_active_blog_clip_version,
     start_blog_clip_render,
@@ -84,7 +87,11 @@ from app.services.blog_service import (
 )
 from app.services.remotion_props_service import build_blog_shorts_props
 from app.services.render_queue import run_with_render_slot
-from app.services.stock_service import apply_stock_image_to_board, search_stock_images
+from app.services.stock_service import (
+    add_stock_candidates_for_shortage,
+    apply_stock_image_to_board,
+    search_stock_images,
+)
 
 router = APIRouter(prefix="/blog-clips", tags=["blog-clips"])
 
@@ -167,6 +174,7 @@ def _to_board_response(board: BlogClipBoard) -> BoardResponse:
         speaker=board.speaker,
         duration_seconds=board.duration_seconds,
         sfx_asset_id=board.sfx_asset_id,
+        text_style=parse_board_text_style(board.text_style_json),
         created_at=board.created_at,
         updated_at=board.updated_at,
     )
@@ -260,6 +268,17 @@ def read_blog_clip_image_file(
         ".webp": "image/webp",
     }.get(path.suffix.lower(), "application/octet-stream")
     return FileResponse(path=path, media_type=media_type, filename=path.name)
+
+
+@router.post("/{blog_clip_id}/rewrite-scripts", response_model=BlogClipResponse)
+def rewrite_blog_clip_scripts_endpoint(
+    blog_clip_id: int,
+    request: BlogClipRewriteScriptRequest,
+    current_user: User = Depends(get_current_user),
+    conn: sqlite3.Connection = Depends(get_connection),
+) -> BlogClipResponse:
+    blog_clip = regenerate_blog_clip_script_candidates(conn, current_user.id, blog_clip_id, request.speech_style)
+    return _to_blog_clip_response(blog_clip)
 
 
 @router.post("/{blog_clip_id}/select-script", response_model=BlogClipResponse)
@@ -369,6 +388,7 @@ def update_blog_clip_board_endpoint(
         duration_seconds=payload.get("duration_seconds"),
         speaker=payload["speaker"] if "speaker" in payload else SPEAKER_UNSET,
         sfx_asset_id=payload["sfx_asset_id"] if "sfx_asset_id" in payload else SFX_UNSET,
+        text_style=payload["text_style"] if "text_style" in payload else SFX_UNSET,
     )
     return _to_board_response(board)
 
@@ -570,6 +590,21 @@ def reorder_blog_clip_boards_endpoint(
 ) -> list[BoardResponse]:
     boards = reorder_blog_clip_boards(conn, current_user.id, blog_clip_id, request.board_ids)
     return [_to_board_response(board) for board in boards]
+
+
+@router.post("/{blog_clip_id}/images/stock-fill", response_model=list[BlogClipImageCandidateResponse])
+def stock_fill_images_endpoint(
+    blog_clip_id: int,
+    need: int = Query(..., ge=1, le=8),
+    current_user: User = Depends(get_current_user),
+    conn: sqlite3.Connection = Depends(get_connection),
+) -> list[BlogClipImageCandidateResponse]:
+    new_ids = add_stock_candidates_for_shortage(conn, current_user.id, blog_clip_id, need)
+    return [
+        _to_image_candidate_response(candidate)
+        for candidate in list_blog_clip_image_candidates(conn, current_user.id, blog_clip_id)
+        if candidate.id in new_ids
+    ]
 
 
 @router.get("/{blog_clip_id}/stock-search", response_model=StockSearchResponse)

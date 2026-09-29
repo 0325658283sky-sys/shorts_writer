@@ -12,6 +12,7 @@ from fastapi import HTTPException, status
 from openai import APIConnectionError, APIStatusError, OpenAI, OpenAIError, RateLimitError
 
 from app.core.config import settings
+from app.services.elevenlabs_labels_ko import voice_labels_ko, voice_name_ko, voice_traits_ko
 from app.services.korean_roman_to_hangul import display_voice_name_ko
 from app.services.transcription_service import get_transcript_for_video, transcript_segments
 from app.services.video_service import STORAGE_ROOT, get_video_for_user
@@ -264,7 +265,128 @@ def _fetch_typecast_voices(*, force: bool = False) -> list[dict[str, str]]:
     return catalog
 
 
+ELEVENLABS_BASE_URL = "https://api.elevenlabs.io"
+ELEVENLABS_SPEED_MIN = 0.7
+ELEVENLABS_SPEED_MAX = 1.2
+ELEVENLABS_TEXT_MAX = 5000
+ELEVENLABS_VOICE_CACHE_TTL_SEC = 600
+# 무료 플랜은 API로 라이브러리(공유) 보이스를 못 쓴다. 유료 플랜이면 ELEVENLABS_ALLOW_LIBRARY_VOICES=true.
+ELEVENLABS_FREE_CATEGORIES = {"premade", "cloned", "generated"}
+
+_elevenlabs_voice_cache: list[dict[str, str]] | None = None
+_elevenlabs_voice_cache_at: float = 0.0
+
+
+def _elevenlabs_api_key() -> str:
+    _refresh_tts_env()
+    key = (os.getenv("ELEVENLABS_API_KEY") or settings.elevenlabs_api_key or "").strip()
+    if not key:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ELEVENLABS_API_KEY is not configured.")
+    return key
+
+
+def _elevenlabs_error(response: requests.Response, what: str) -> HTTPException:
+    if response.status_code == 401:
+        return HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="ElevenLabs API key is invalid or lacks the required permission.",
+        )
+    if response.status_code == 402:
+        return HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="이 보이스는 ElevenLabs 유료 플랜에서만 쓸 수 있어요. 다른 보이스를 골라주세요.",
+        )
+    if response.status_code == 429:
+        return HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="ElevenLabs rate limit or quota reached.")
+    return HTTPException(
+        status_code=status.HTTP_502_BAD_GATEWAY,
+        detail=f"ElevenLabs {what} error ({response.status_code}): {response.text[:300]}",
+    )
+
+
+def _fetch_elevenlabs_voices(*, force: bool = False) -> list[dict[str, str]]:
+    global _elevenlabs_voice_cache, _elevenlabs_voice_cache_at
+    now = time.time()
+    if (
+        not force
+        and _elevenlabs_voice_cache is not None
+        and now - _elevenlabs_voice_cache_at < ELEVENLABS_VOICE_CACHE_TTL_SEC
+    ):
+        return _elevenlabs_voice_cache
+    try:
+        response = requests.get(
+            f"{ELEVENLABS_BASE_URL}/v1/voices",
+            headers={"xi-api-key": _elevenlabs_api_key()},
+            timeout=30,
+        )
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Could not connect to ElevenLabs: {exc}") from exc
+    if response.status_code >= 400:
+        raise _elevenlabs_error(response, "voices")
+    allow_library = (os.getenv("ELEVENLABS_ALLOW_LIBRARY_VOICES") or "").strip().lower() in {"1", "true", "yes"}
+    catalog: list[dict[str, str]] = []
+    for item in response.json().get("voices", []):
+        voice_id = str(item.get("voice_id") or "").strip()
+        name = str(item.get("name") or "").strip()
+        if not voice_id or not name:
+            continue
+        category = str(item.get("category") or "premade").lower()
+        if not allow_library and category not in ELEVENLABS_FREE_CATEGORIES:
+            continue
+        labels = item.get("labels") or {}
+        parts = voice_labels_ko(labels) + voice_traits_ko(name)
+        catalog.append(
+            {"id": voice_id, "name": voice_name_ko(name), "description": " · ".join(parts) or "ElevenLabs 보이스"}
+        )
+    if not catalog:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="ElevenLabs returned an empty voice list.")
+    _elevenlabs_voice_cache = catalog
+    _elevenlabs_voice_cache_at = now
+    return catalog
+
+
+def _synthesize_elevenlabs_tts(
+    user_id: int,
+    clip_id: int,
+    script: str,
+    *,
+    voice: str | None = None,
+    speed: float | None = None,
+) -> str:
+    cleaned_script = _clean_text(script)
+    if not cleaned_script:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="TTS script is empty.")
+    cleaned_script = cleaned_script[:ELEVENLABS_TEXT_MAX]
+    resolved_voice = validate_voice_id(voice) if voice else default_tts_voice()
+    resolved_speed = max(ELEVENLABS_SPEED_MIN, min(ELEVENLABS_SPEED_MAX, clamp_tts_speed(speed)))
+    output_dir = TTS_ROOT / str(user_id)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = output_dir / f"clip_{clip_id}_{uuid.uuid4().hex}.mp3"
+    try:
+        response = requests.post(
+            f"{ELEVENLABS_BASE_URL}/v1/text-to-speech/{resolved_voice}",
+            params={"output_format": "mp3_44100_128"},
+            headers={"xi-api-key": _elevenlabs_api_key()},
+            json={
+                "text": cleaned_script,
+                "model_id": os.getenv("ELEVENLABS_MODEL_ID") or settings.elevenlabs_model_id,
+                "voice_settings": {"speed": resolved_speed},
+            },
+            timeout=120,
+        )
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Could not connect to ElevenLabs: {exc}") from exc
+    if response.status_code >= 400:
+        raise _elevenlabs_error(response, "TTS")
+    if not response.content:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="ElevenLabs returned empty audio.")
+    output_path.write_bytes(response.content)
+    return str(output_path)
+
+
 def list_voice_catalog() -> list[dict[str, str]]:
+    if tts_provider_name() == "elevenlabs":
+        return [dict(item) for item in _fetch_elevenlabs_voices()]
     if tts_provider_name() == "typecast":
         return [dict(item) for item in _fetch_typecast_voices()]
     return [dict(item) for item in OPENAI_VOICE_CATALOG]
@@ -279,6 +401,14 @@ def is_known_voice(voice_id: str) -> bool:
 
 
 def validate_voice_id(voice_id: str) -> str:
+    if tts_provider_name() == "elevenlabs":
+        cleaned = voice_id.strip()
+        if cleaned not in {item["id"] for item in _fetch_elevenlabs_voices()}:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unknown ElevenLabs voice '{voice_id}'. Use GET /voices for the catalog.",
+            )
+        return cleaned
     if tts_provider_name() == "typecast":
         cleaned = _normalize_typecast_voice_id(voice_id)
         known = {item["id"] for item in _fetch_typecast_voices()}
@@ -318,6 +448,12 @@ def _speed_to_typecast_tempo(speed: float) -> float:
 
 
 def default_tts_voice() -> str:
+    if tts_provider_name() == "elevenlabs":
+        catalog = _fetch_elevenlabs_voices()
+        configured = (os.getenv("ELEVENLABS_VOICE_ID") or settings.elevenlabs_voice_id or "").strip()
+        if configured and any(item["id"] == configured for item in catalog):
+            return configured
+        return catalog[0]["id"]
     if tts_provider_name() == "typecast":
         configured = _typecast_setting("TYPECAST_VOICE_ID", settings.typecast_voice_id)
         if configured:
@@ -551,13 +687,15 @@ def synthesize_openai_tts(
     Name kept for call-site compatibility; dispatches on TTS_PROVIDER.
     """
     provider = tts_provider_name()
+    if provider == "elevenlabs":
+        return _synthesize_elevenlabs_tts(user_id, clip_id, script, voice=voice, speed=speed)
     if provider == "typecast":
         return _synthesize_typecast_tts(user_id, clip_id, script, voice=voice, speed=speed)
     if provider == "openai":
         return _synthesize_openai_tts(user_id, clip_id, script, voice=voice, speed=speed)
     raise HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
-        detail=f"Unsupported TTS_PROVIDER '{settings.tts_provider}'. Use 'openai' or 'typecast'.",
+        detail=f"Unsupported TTS_PROVIDER '{settings.tts_provider}'. Use 'openai', 'typecast' or 'elevenlabs'.",
     )
 
 
@@ -570,6 +708,11 @@ def get_or_create_voice_sample(voice_id: str) -> Path:
     if sample_path.exists() and sample_path.stat().st_size > 0:
         return sample_path
 
+    if provider == "elevenlabs":
+        synthesized = _synthesize_elevenlabs_tts(0, 0, SAMPLE_SCRIPT, voice=voice, speed=1.0)
+        sample_path.write_bytes(Path(synthesized).read_bytes())
+        return sample_path
+
     if provider == "typecast":
         synthesized = _synthesize_typecast_tts(0, 0, SAMPLE_SCRIPT, voice=voice, speed=1.0)
         sample_path.write_bytes(Path(synthesized).read_bytes())
@@ -578,7 +721,7 @@ def get_or_create_voice_sample(voice_id: str) -> Path:
     if provider != "openai":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unsupported TTS_PROVIDER '{settings.tts_provider}'. Use 'openai' or 'typecast'.",
+            detail=f"Unsupported TTS_PROVIDER '{settings.tts_provider}'. Use 'openai', 'typecast' or 'elevenlabs'.",
         )
 
     api_key = settings.tts_api_key or settings.openai_api_key

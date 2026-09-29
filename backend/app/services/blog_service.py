@@ -792,12 +792,13 @@ def _row_to_blog_clip_board(row: sqlite3.Row) -> BlogClipBoard:
         sfx_asset_id=row["sfx_asset_id"] if "sfx_asset_id" in keys else None,
         created_at=row["created_at"],
         updated_at=row["updated_at"],
+        text_style_json=row["text_style_json"] if "text_style_json" in keys else None,
     )
 
 
 _BLOG_CLIP_BOARD_COLUMNS = """
     id, blog_clip_id, order_index, image_path, text, speaker, duration_seconds, sfx_asset_id,
-    created_at, updated_at
+    created_at, updated_at, text_style_json
 """
 
 
@@ -1117,6 +1118,54 @@ def create_blog_clip_board(
     return _row_to_blog_clip_board(row)
 
 
+_TEXT_STYLE_FONTS = {"pretendard", "paperlogy", "gmarket_sans", "suit", "jalnan"}
+_TEXT_STYLE_ANIMATIONS = {"none", "highlight"}
+
+
+def sanitize_board_text_style(raw: Any) -> dict[str, Any] | None:
+    """장면별 텍스트 스타일 오버라이드 검증. 비어 있으면 None(=템플릿 값 사용)."""
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="text_style must be an object.")
+    out: dict[str, Any] = {}
+    font = raw.get("fontFamily")
+    if font not in (None, ""):
+        if font not in _TEXT_STYLE_FONTS:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unknown fontFamily.")
+        out["fontFamily"] = font
+    size = raw.get("fontSize")
+    if size not in (None, ""):
+        try:
+            size_val = int(size)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="fontSize must be a number.")
+        if not 20 <= size_val <= 120:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="fontSize must be 20-120.")
+        out["fontSize"] = size_val
+    color = raw.get("accentColor")
+    if color not in (None, ""):
+        if not isinstance(color, str) or not re.fullmatch(r"#[0-9a-fA-F]{6}", color):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="accentColor must be #RRGGBB.")
+        out["accentColor"] = color
+    animation = raw.get("animation")
+    if animation not in (None, ""):
+        if animation not in _TEXT_STYLE_ANIMATIONS:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unknown animation.")
+        out["animation"] = animation
+    return out or None
+
+
+def parse_board_text_style(raw: str | None) -> dict[str, Any] | None:
+    if not raw:
+        return None
+    try:
+        parsed = json.loads(raw)
+    except (TypeError, json.JSONDecodeError):
+        return None
+    return parsed if isinstance(parsed, dict) and parsed else None
+
+
 def update_blog_clip_board(
     conn: sqlite3.Connection,
     user_id: int,
@@ -1127,6 +1176,7 @@ def update_blog_clip_board(
     duration_seconds: float | None = None,
     speaker: Any = SPEAKER_UNSET,
     sfx_asset_id: Any = SFX_UNSET,
+    text_style: Any = SFX_UNSET,
 ) -> BlogClipBoard:
     blog_clip = get_blog_clip_for_user(conn, user_id, blog_clip_id)
     if blog_clip is None:
@@ -1164,6 +1214,13 @@ def update_blog_clip_board(
             assert_audio_asset_usable(conn, user_id, int(sfx_asset_id), kind="sfx")
             updates.append("sfx_asset_id = ?")
             values.append(int(sfx_asset_id))
+    if text_style is not SFX_UNSET:
+        cleaned = sanitize_board_text_style(text_style)
+        if cleaned is None:
+            updates.append("text_style_json = NULL")
+        else:
+            updates.append("text_style_json = ?")
+            values.append(json.dumps(cleaned, ensure_ascii=False))
 
     if not updates:
         return _row_to_blog_clip_board(row)
@@ -2403,6 +2460,53 @@ def _openai_json_completion(
     return _extract_json_object(raw or "")
 
 
+SPEECH_STYLE_LABELS = {
+    "calm_info": "차분한 정보형",
+    "friendly_review": "친근한 리뷰어",
+    "energetic_promo": "활기찬 홍보형",
+}
+SPEECH_STYLE_GUIDANCE = {
+    "calm_info": "calm, precise and informative; steady tone, no exaggeration.",
+    "friendly_review": "warm and conversational like a friend sharing a personal review; casual polite Korean endings.",
+    "energetic_promo": "upbeat and punchy; short, high-energy sentences that build excitement without false claims.",
+}
+
+
+def regenerate_blog_clip_script_candidates(
+    conn: sqlite3.Connection,
+    user_id: int,
+    blog_clip_id: int,
+    speech_style: str | None,
+) -> BlogClip:
+    """대본 고르기 단계에서 말투를 바꿔 3안을 다시 쓴다. 크레딧은 쓰지 않는다."""
+    if speech_style is not None and speech_style not in SPEECH_STYLE_GUIDANCE:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unknown speech style.")
+    blog_clip = get_blog_clip_for_user(conn, user_id, blog_clip_id)
+    if blog_clip is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Blog short not found.")
+    if blog_clip.status != "awaiting_script":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Blog short is not waiting for script selection.")
+    if not (blog_clip.blog_body_text or "").strip():
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="원문이 저장되어 있지 않아 다시 쓸 수 없어요.")
+    candidates = generate_blog_narration_script_candidates(
+        blog_clip.blog_title or "",
+        blog_clip.blog_body_text or "",
+        target_length=blog_clip.target_length,
+        narration_language=blog_clip.narration_language,
+        model=blog_clip.script_model,
+        speech_style=speech_style,
+    )
+    conn.execute(
+        "UPDATE blog_clips SET script_candidates_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        (json.dumps(candidates, ensure_ascii=False), blog_clip_id),
+    )
+    conn.commit()
+    refreshed = get_blog_clip_for_user(conn, user_id, blog_clip_id)
+    if refreshed is None:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Blog short refresh failed.")
+    return refreshed
+
+
 def generate_blog_narration_script_candidates(
     blog_title: str,
     blog_text: str,
@@ -2410,6 +2514,7 @@ def generate_blog_narration_script_candidates(
     target_length: str = "short",
     narration_language: str = "original",
     model: str | None = None,
+    speech_style: str | None = None,
 ) -> dict[str, str]:
     """Generate summary/detailed on mini and hook on gpt-4o (unless model overrides hook)."""
     if not settings.openai_api_key:
@@ -2424,9 +2529,14 @@ def generate_blog_narration_script_candidates(
     draft_model = DRAFT_SCRIPT_MODEL
     hook_model = _resolve_hook_script_model(model)
     language = _narration_language_guidance(narration_language)
+    style_rule = (
+        f"\n- Speaking style: {SPEECH_STYLE_GUIDANCE[speech_style]}"
+        if speech_style in SPEECH_STYLE_GUIDANCE
+        else ""
+    )
     shared_rules = f"""
 Shared rules:
-- {language}
+- {language}{style_rule}
 - Use only facts present in the blog text. Do not invent claims.
 - Keep it natural when read aloud as a short-form voiceover.
 - Do not include stage directions, timestamps, markdown, hashtags, or the title text itself.
@@ -2949,10 +3059,12 @@ Narration script:
 
 
 def _board_voice_id(board: BlogClipBoard, default_voice: str | None = None) -> str:
-    if board.speaker and board.speaker.strip():
-        return validate_voice_id(board.speaker)
-    if default_voice and default_voice.strip():
-        return validate_voice_id(default_voice)
+    for candidate in (board.speaker, default_voice):
+        if candidate and candidate.strip():
+            try:
+                return validate_voice_id(candidate)
+            except HTTPException:
+                continue  # 공급자를 바꾼 뒤 예전 보이스 id가 남아 있으면 기본 보이스로 대체
     return default_tts_voice()
 
 

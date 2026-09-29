@@ -1119,6 +1119,8 @@ function BoardCaption({
   if (suppressText || !(board.text || "").trim()) return null;
 
   const resolved = resolveCaptionFromTemplate(overlay, style, captionTemplate);
+  const override = board.textStyle ?? null;
+  const layer = override?.fontSize ? { ...resolved.layer, fontSize: override.fontSize } : resolved.layer;
 
   // Hard-cut captions — never share fade/slide with media transitions.
   return (
@@ -1126,12 +1128,12 @@ function BoardCaption({
       text={board.text}
       words={board.words}
       caption={resolved.caption}
-      layer={resolved.layer}
-      captionFontId={resolved.captionFontId}
-      accentColor={resolved.accentColor}
+      layer={layer}
+      captionFontId={override?.fontFamily || resolved.captionFontId}
+      accentColor={override?.accentColor || resolved.accentColor}
       captionY={0}
       captionOpacity={1}
-      captionAnimation={overlay.captionAnimation ?? style.captionAnimation ?? "highlight"}
+      captionAnimation={override?.animation ?? overlay.captionAnimation ?? style.captionAnimation ?? "highlight"}
     />
   );
 }

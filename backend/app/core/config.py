@@ -19,6 +19,11 @@ class Settings(BaseSettings):
     tts_api_key: str | None = None
     openai_tts_model: str = "gpt-4o-mini-tts"
     openai_tts_voice: str = "alloy"
+    # ElevenLabs (https://elevenlabs.io/docs) - used when TTS_PROVIDER=elevenlabs.
+    elevenlabs_api_key: str | None = None
+    elevenlabs_model_id: str = "eleven_multilingual_v2"
+    elevenlabs_voice_id: str | None = None
+
     # Typecast API (https://typecast.ai/docs) — used when TTS_PROVIDER=typecast.
     typecast_api_key: str | None = None
     typecast_base_url: str = "https://api.typecast.ai"

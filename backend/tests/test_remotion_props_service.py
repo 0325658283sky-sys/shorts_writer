@@ -169,3 +169,23 @@ def test_props_materialize_preserves_gif_extension(conn, tmp_path, monkeypatch):
     assert image_url.endswith(".gif")
     assert props["boards"][0]["animated"] is True
     assert (public_root / image_url).is_file()
+
+
+def test_caption_template_payload_accepts_real_gallery_categories():
+    from types import SimpleNamespace
+    from unittest.mock import patch
+
+    from app.services.remotion_props_service import _caption_template_payload
+
+    def tpl(category):
+        return SimpleNamespace(
+            category=category, position="top", box_style="box", accent_color="#FFE500", font_family="jalnan"
+        )
+
+    for category in ("impact", "news", "minimal", "commerce"):
+        with patch("app.services.template_service.get_template_by_id", return_value=tpl(category)):
+            assert _caption_template_payload(None, 7) == {
+                "position": "top", "boxStyle": "box", "accentColor": "#FFE500", "fontFamily": "jalnan",
+            }
+    with patch("app.services.template_service.get_template_by_id", return_value=tpl("legacy")):
+        assert _caption_template_payload(None, 7) is None

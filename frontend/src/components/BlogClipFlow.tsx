@@ -1,21 +1,18 @@
 import { useEffect, useRef, useState } from "react";
+import { authorizedRequest } from "../api/client";
 import { SCRIPT_TONE_HINTS, SCRIPT_TONE_LABELS, SCRIPT_TONES, userFacingProgressLabel } from "../constants";
 import type { BlogClip, ScriptTone, VisualStyleSlug } from "../types";
 import { AliveProgressBar } from "./AliveProgressBar";
+import { detectSource } from "./CreateStudio";
+import type { FlowCrumbState, FlowStepKey } from "./FlowCrumbs";
 import { BlogClipRestylePanel } from "./BlogClipRestylePanel";
 import { BlogClipVersionsPanel } from "./BlogClipVersionsPanel";
 import { CompletedShortPlayer } from "./CompletedShortPlayer";
 import { ImageSelectStep } from "./ImageSelectStep";
 import { MetadataBox } from "./MetadataBox";
 import { GenerationOptionsPanel } from "./GenerationOptionsPanel";
+import { WaitScreen } from "./WaitScreen";
 import { TemplateGalleryStep } from "./TemplateGalleryStep";
-
-const FLOW_STEPS = [
-  { id: "progress", label: "준비" },
-  { id: "images", label: "이미지" },
-  { id: "script", label: "대본" },
-  { id: "done", label: "완료" },
-] as const;
 
 const PHASE2_STAGES = new Set(["synthesizing_audio", "rendering_video", "burning_subtitles"]);
 
@@ -44,6 +41,7 @@ export function BlogClipFlow({
   onBlogClipUpdated,
   onMessage,
   flowMessage,
+  onCrumbChange,
 }: {
   blogClip: BlogClip;
   copiedKey: string | null;
@@ -63,8 +61,8 @@ export function BlogClipFlow({
   onBlogClipUpdated: (blogClip: BlogClip) => void;
   onMessage: (message: string) => void;
   flowMessage?: string;
+  onCrumbChange?: (crumb: FlowCrumbState | null) => void;
 }) {
-  const autoRenderKey = useRef<number | null>(null);
   const [versionRefresh, setVersionRefresh] = useState(0);
   // ④ 템플릿 갤러리: awaiting_boards 진입 시 한 번 보여주고, 적용/건너뛰기 후엔 숨긴다.
   const [galleryHandledId, setGalleryHandledId] = useState<number | null>(null);
@@ -79,61 +77,45 @@ export function BlogClipFlow({
   const stageLabel = userFacingProgressLabel(blogClip.progress_stage);
   const availableTones = SCRIPT_TONES.filter((tone) => Boolean(blogClip.script_candidates[tone]));
 
-  const stepIndex = isFinalRender || isAwaitingBoards
-    ? 3
-    : isProgress
-      ? 0
-      : isAwaitingImages
-        ? 1
+  const crumbSource = detectSource(blogClip.source_url) === "product" ? "product" : "blog";
+  const crumbStep: FlowStepKey = isCompleted
+    ? "done"
+    : isFinalRender || (isAwaitingBoards && !showTemplateGallery)
+      ? "editor"
+      : isAwaitingBoards
+        ? "template"
         : isAwaitingScript
-          ? 2
-          : isCompleted || isFailed
-            ? 3
-            : 0;
-
-  const stepperSteps = FLOW_STEPS.map((step, index) => {
-    if (index === 3 && (isFinalRender || isAwaitingBoards)) return { ...step, label: "렌더 중" };
-    return step;
-  });
+          ? "script"
+          : isAwaitingImages
+            ? "photos"
+            : "wait";
 
   useEffect(() => {
-    // ④ 템플릿 갤러리를 아직 보여주는 중이면(선택/건너뛰기 전) 기본 렌더를 자동 시작하지 않는다.
-    if (!isAwaitingBoards || renderingFromFlow || showTemplateGallery) return;
-    if (autoRenderKey.current === blogClip.id) return;
-    autoRenderKey.current = blogClip.id;
-    onRender(blogClip);
-  }, [isAwaitingBoards, blogClip.id, renderingFromFlow, onRender, showTemplateGallery]);
+    onCrumbChange?.({ source: crumbSource, step: crumbStep });
+    return () => onCrumbChange?.(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [crumbSource, crumbStep]);
+
+  // NOTE(Phase 2): 예전엔 여기서 템플릿 갤러리 이후 자동으로 onRender(blogClip)를 호출했다.
+  // 그런데 그 즉시 실행되는 바람에 "장면 직접 편집"/"이대로 영상 만들기" 두 버튼이 화면에 뜨는
+  // 순간 이미 렌더가 시작되어 있어 사실상 눌릴 기회가 없었다(BoardEditor 진입 불가 버그).
+  // 자동 시작을 없애고, 아래 두 버튼 중 사용자가 실제로 고르게 한다.
 
   return (
     <div className="flow-shell">
-      <nav className="flow-progress-bar" aria-label="제작 단계">
-        <ol className="flow-stepper-list">
-          {stepperSteps.map((step, index) => {
-            const isCurrent = index === stepIndex;
-            const isDone = index < stepIndex;
-            return (
-              <li key={step.id}>
-                <div className={`flow-stepper-item ${isCurrent ? "is-current" : ""} ${isDone ? "is-done" : ""}`} aria-current={isCurrent ? "step" : undefined}>
-                  <span className="flow-step-dot">{index + 1}</span>
-                  <span>{step.label}</span>
-                </div>
-              </li>
-            );
-          })}
-        </ol>
-      </nav>
-
       <main className="flow-main">
         {flowMessage ? <p className="error-text flow-inline-error">{flowMessage}</p> : null}
 
         {isProgress ? (
-          <ProgressLog blogClip={blogClip} isFinalRender={isFinalRender} stageLabel={stageLabel} />
+          <ProgressLog blogClip={blogClip} isFinalRender={isFinalRender} stageLabel={stageLabel} onLeave={onBackToStudio} />
         ) : null}
 
         {isAwaitingImages ? (
           <ImageSelectStep
             blogClip={blogClip}
             confirming={confirmingImageSelection}
+            isProduct={detectSource(blogClip.source_url) === "product"}
+            onBack={onBackToStudio}
             onConfirm={(imageIds, visualStyle) => onConfirmImages(blogClip, imageIds, visualStyle)}
             onMessage={onMessage}
           />
@@ -146,6 +128,8 @@ export function BlogClipFlow({
             busy={selectingBlogScriptId === blogClip.id}
             onSelect={(tone) => onSelectScript(blogClip, tone)}
             onEdit={(tone) => onSelectScript(blogClip, tone, { openEditor: true })}
+            onRewritten={onBlogClipUpdated}
+            onMessage={onMessage}
           />
         ) : null}
 
@@ -194,7 +178,7 @@ export function BlogClipFlow({
         {isCompleted ? (
           <section className="flow-result">
             <div className="flow-card flow-result-hero">
-              <p className="create-kicker">결과</p>
+              <p className="create-kicker is-done">완성</p>
               <h1>{blogClip.blog_title ?? "쇼츠가 완성되었습니다"}</h1>
               {blogClip.render_spec?.fallback_used || blogClip.render_spec?.engine === "ffmpeg" ? (
                 <div className="flow-notice flow-notice-warning" role="status">
@@ -273,10 +257,15 @@ export function BlogClipFlow({
   );
 }
 
-const PREPARE_TASKS = [
+const PREPARE_TASKS_BLOG = [
   { key: "read", label: "글 읽는 중", done: "글 본문 읽음", at: 18 },
-  { key: "images", label: "사진 모으는 중", done: "사진 찾음", at: 34 },
-  { key: "script", label: "대본 쓰는 중", done: "대본 3안 완성", at: 42 },
+  { key: "images", label: "쓸 만한 사진 찾는 중", done: "사진 찾음", at: 34 },
+  { key: "script", label: "대본 3안 쓰는 중", done: "대본 3안 완성", at: 42 },
+];
+const PREPARE_TASKS_PRODUCT = [
+  { key: "read", label: "상품 정보 읽는 중", done: "상품 정보 읽음", at: 18 },
+  { key: "images", label: "상품 사진 모으는 중", done: "사진 모음", at: 34 },
+  { key: "script", label: "매력 포인트 찾는 중", done: "대본 3안 완성", at: 42 },
 ];
 const RENDER_TASKS = [
   { key: "voice", label: "음성 만드는 중", done: "음성 합성 완료", at: 72 },
@@ -288,13 +277,16 @@ function ProgressLog({
   blogClip,
   isFinalRender,
   stageLabel,
+  onLeave,
 }: {
   blogClip: BlogClip;
   isFinalRender: boolean;
   stageLabel: string;
+  onLeave: () => void;
 }) {
   const percent = blogClip.progress_percent ?? 0;
-  const tasks = isFinalRender ? RENDER_TASKS : PREPARE_TASKS;
+  const isProductSource = detectSource(blogClip.source_url) === "product";
+  const tasks = isFinalRender ? RENDER_TASKS : isProductSource ? PREPARE_TASKS_PRODUCT : PREPARE_TASKS_BLOG;
   const currentIndex = tasks.findIndex((task) => percent < task.at);
 
   // 프론트 경과 타이머로 대략적인 ETA (정확하지 않음)
@@ -336,41 +328,33 @@ function ProgressLog({
     }
   }
 
+  const activeIndex = currentIndex === -1 ? tasks.length : currentIndex;
+  const sourceLabel = isFinalRender ? "영상 합치기" : isProductSource ? "상품 페이지" : "블로그 글";
+  const title = isFinalRender
+    ? "영상을 합치고 있어요"
+    : isProductSource
+      ? "상품을 읽고 매력 포인트를 찾고 있어요"
+      : "글을 읽고 대본 3안을 쓰고 있어요";
+
   return (
-    <section className="flow-card flow-progress-card" aria-live="polite">
-      <div className="progress-head">
-        <div>
-          <p className="create-kicker">{isFinalRender ? "만드는 중" : "준비 중"}</p>
-          <h1>{isFinalRender ? "영상을 합치고 있어요" : "글을 읽고 장면을 짜는 중이에요"}</h1>
-        </div>
-        {eta ? <span className="progress-eta">{eta}</span> : null}
-      </div>
-
-      <AliveProgressBar className="blog-progress" percent={percent} active label={stageLabel} />
-
-      <ul className="progress-tasklog">
-        {tasks.map((task, index) => {
-          const state = percent >= task.at ? "done" : index === currentIndex ? "current" : "pending";
-          return (
-            <li key={task.key} className={`progress-task is-${state}`}>
-              <span className="progress-task-mark" aria-hidden="true">
-                {state === "done" ? "✓" : null}
-              </span>
-              <span className="progress-task-label">{state === "done" ? task.done : task.label}</span>
-            </li>
-          );
-        })}
-      </ul>
-
-      {notifyAvailable ? (
-        <label className="progress-notify">
-          <input type="checkbox" checked={notify} onChange={toggleNotify} />
-          <span>다 되면 알림 드릴게요 — 창을 닫아도 됩니다</span>
-        </label>
-      ) : null}
-
-      <p className="create-note flow-url">{blogClip.source_url}</p>
-    </section>
+    <WaitScreen
+      sourceLabel={sourceLabel}
+      title={title}
+      steps={tasks.map((task) => task.label)}
+      activeIndex={activeIndex}
+      percent={percent}
+      caption={eta ? `${stageLabel} · ${eta}` : stageLabel}
+      note="창을 닫아도 서버에서 계속 만들어요."
+      onLeave={onLeave}
+      aside={
+        notifyAvailable ? (
+          <label className="wait-notify">
+            <input type="checkbox" checked={notify} onChange={toggleNotify} />
+            <span>다 되면 알림 드릴게요</span>
+          </label>
+        ) : null
+      }
+    />
   );
 }
 
@@ -380,50 +364,94 @@ function ScriptToneStep({
   busy,
   onSelect,
   onEdit,
+  onRewritten,
+  onMessage,
 }: {
   blogClip: BlogClip;
   tones: ScriptTone[];
   busy: boolean;
   onSelect: (tone: ScriptTone) => void;
   onEdit: (tone: ScriptTone) => void;
+  onRewritten: (blogClip: BlogClip) => void;
+  onMessage: (message: string) => void;
 }) {
   const [active, setActive] = useState<ScriptTone>(tones[0]);
-  const script = blogClip.script_candidates[active] ?? "";
-  const chars = script.replace(/\s/g, "").length;
-  const seconds = Math.max(1, Math.round(chars / 4.5)); // 한국어 TTS 대략 4.5자/초
+  const [speechStyle, setSpeechStyle] = useState("");
+  const [rewriting, setRewriting] = useState(false);
+
+  async function handleRewrite() {
+    setRewriting(true);
+    try {
+      const updated = await authorizedRequest<BlogClip>(`/blog-clips/${blogClip.id}/rewrite-scripts`, {
+        method: "POST",
+        body: JSON.stringify({ speech_style: speechStyle || null }),
+      });
+      onRewritten(updated);
+    } catch (error) {
+      onMessage(error instanceof Error ? error.message : "대본을 다시 쓰지 못했습니다.");
+    } finally {
+      setRewriting(false);
+    }
+  }
 
   return (
     <section className="flow-card">
-      <h1>어떤 말투로 읽어줄까요?</h1>
-      <p className="flow-lead">말투만 고르면 나머지는 자동입니다. 나중에 바꿀 수 있어요.</p>
-
-      <div className="tone-switch" role="tablist" aria-label="말투">
-        {tones.map((tone) => (
-          <button
-            key={tone}
-            type="button"
-            role="tab"
-            aria-selected={active === tone}
-            className={`tone-switch-item ${active === tone ? "is-active" : ""}`}
-            onClick={() => setActive(tone)}
-          >
-            {SCRIPT_TONE_LABELS[tone]}
-          </button>
-        ))}
+      <div>
+        <p className="create-kicker">대본</p>
+        <h1>AI가 쓴 대본 3안 중 하나를 골라주세요</h1>
+        <p className="flow-lead tone-lead">
+          마음에 드는 안을 직접 골라주세요. 문장은 편집기에서 장면별로 고칠 수 있습니다.
+        </p>
       </div>
 
-      <div className="tone-preview">
-        <div className="tone-preview-meta">
-          <span>
-            읽는 시간 <strong>{seconds}초</strong>
-          </span>
-          <span>·</span>
-          <span>
-            글자 <strong>{chars}자</strong>
-          </span>
-          <span className="tone-preview-hint">{SCRIPT_TONE_HINTS[active]}</span>
+      <div className="tone-card-grid" role="radiogroup" aria-label="말투">
+        {tones.map((tone) => {
+          const script = blogClip.script_candidates[tone] ?? "";
+          const chars = script.replace(/\s/g, "").length;
+          const seconds = Math.max(1, Math.round(chars / 4.5)); // 한국어 TTS 대략 4.5자/초
+          const selected = active === tone;
+          return (
+            <button
+              key={tone}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              className={`tone-card ${selected ? "is-selected" : ""}`}
+              onClick={() => setActive(tone)}
+            >
+              <span className="tone-card-head">
+                <span className="tone-card-radio" aria-hidden="true" />
+                <strong>{SCRIPT_TONE_LABELS[tone]}</strong>
+                {tone === "hook" ? <span className="tone-card-badge">추천</span> : null}
+                <span className="tone-card-meta">
+                  약 {seconds}초 · {chars}자
+                </span>
+              </span>
+              <span className="tone-card-hint">{SCRIPT_TONE_HINTS[tone]}</span>
+              <p className="tone-card-script">{script}</p>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="tone-style-box">
+        <span className="candidates-options-label">말투</span>
+        <div className="tone-style-row">
+          <select
+            className="tone-style-select"
+            value={speechStyle}
+            disabled={rewriting || busy}
+            onChange={(event) => setSpeechStyle(event.target.value)}
+          >
+            <option value="">기본 말투</option>
+            <option value="calm_info">차분한 정보형</option>
+            <option value="friendly_review">친근한 리뷰어</option>
+            <option value="energetic_promo">활기찬 홍보형</option>
+          </select>
+          <button className="btn-outline" type="button" disabled={rewriting || busy} onClick={() => void handleRewrite()}>
+            {rewriting ? "다시 쓰는 중…" : "이 말투로 3안 다시 쓰기"}
+          </button>
         </div>
-        <p className="narration-script">{script}</p>
       </div>
 
       <div className="tone-actions">
@@ -431,7 +459,7 @@ function ScriptToneStep({
           장면 다듬기
         </button>
         <button className="btn-primary btn-lg" type="button" disabled={busy} onClick={() => onSelect(active)}>
-          {busy ? "준비 중…" : "이 말투로 영상 만들기"}
+          {busy ? "준비 중…" : "이 대본으로 계속"}
         </button>
       </div>
     </section>

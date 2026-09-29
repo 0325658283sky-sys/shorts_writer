@@ -1,4 +1,5 @@
-﻿import logging
+﻿import json
+import logging
 import shutil
 import sqlite3
 import uuid
@@ -14,7 +15,10 @@ from app.services.ffmpeg_service import (
     FFmpegSubtitleError,
     burn_subtitles_into_video,
     create_vertical_clip,
+    cut_keep_intervals,
+    detect_silence_keep_intervals,
     get_video_duration_seconds,
+    remap_events_through_keeps,
     replace_video_audio_with_narration,
 )
 from app.services.subtitle_utils import subtitle_events_for_segment, write_ass_file
@@ -159,6 +163,7 @@ def create_clip_from_highlight(
     highlight_id: int,
     *,
     visual_style: str | None = None,
+    remove_silence: bool = False,
 ) -> Clip:
     from app.services.visual_style_catalog import ALLOWED_VISUAL_STYLES, normalize_visual_style
 
@@ -199,6 +204,8 @@ def create_clip_from_highlight(
 
     try:
         create_vertical_clip(video.storage_path, str(output_path), start_time, end_time)
+        if remove_silence:
+            _apply_silence_removal(conn, clip_id, output_path)
     except (FFmpegNotAvailableError, FFmpegClipError, TimeoutError) as exc:
         _update_clip_status(conn, clip_id, "failed", None, str(exc))
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
@@ -211,6 +218,33 @@ def create_clip_from_highlight(
     if clip is None:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Clip status refresh failed.")
     return clip
+
+
+def _apply_silence_removal(conn: sqlite3.Connection, clip_id: int, output_path: Path) -> None:
+    """무음 구간을 잘라낸 결과로 output_path를 교체하고, 자막 재계산용 남길 구간을 저장한다. 잘라낼 게 없으면 그대로 둔다."""
+    total, keeps = detect_silence_keep_intervals(str(output_path))
+    kept_total = sum(end - start for start, end in keeps)
+    if not keeps or total - kept_total < 0.5:
+        return
+    trimmed_path = output_path.with_name(f"{output_path.stem}_nosilence.mp4")
+    cut_keep_intervals(str(output_path), str(trimmed_path), keeps)
+    output_path.unlink(missing_ok=True)
+    trimmed_path.replace(output_path)
+    conn.execute(
+        "UPDATE clips SET silence_cuts_json = ? WHERE id = ?",
+        (json.dumps([[round(s, 3), round(e, 3)] for s, e in keeps]), clip_id),
+    )
+    conn.commit()
+
+
+def _silence_keeps_for_clip(conn: sqlite3.Connection, clip_id: int) -> list[tuple[float, float]] | None:
+    row = conn.execute("SELECT silence_cuts_json FROM clips WHERE id = ?", (clip_id,)).fetchone()
+    if row is None or not row["silence_cuts_json"]:
+        return None
+    try:
+        return [(float(s), float(e)) for s, e in json.loads(row["silence_cuts_json"])]
+    except (ValueError, TypeError):
+        return None
 
 
 def _subtitle_events_for_clip(conn: sqlite3.Connection, clip: Clip) -> list[tuple[float, float, str]]:
@@ -230,6 +264,9 @@ def _subtitle_events_for_clip(conn: sqlite3.Connection, clip: Clip) -> list[tupl
     for segment in transcript_segments(transcript):
         events.extend(subtitle_events_for_segment(segment, clip_start, clip_end, clip_duration))
 
+    keeps = _silence_keeps_for_clip(conn, clip.id)
+    if keeps:
+        events = remap_events_through_keeps(events, keeps)
     if not events:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="No transcript segments overlap this clip range.")
     return events

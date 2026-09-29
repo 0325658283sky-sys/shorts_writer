@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>New Cut — 결과 리스트</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/static/pretendard.css">
+<style>
+  :root{
+    --ink:#16161A; --ink-soft:#6B6B75; --muted:#9C9CA6;
+    --surface:#FFFFFF; --surface-2:#FBFBFC; --page-bg:#F3F3F5;
+    --line:#E8E8EC; --line-strong:#E0E0E6;
+    --accent:#4B3BFF; --accent-strong:#3B2CE0; --accent-soft:#EFEDFF;
+    --radius:11px; --radius-control:8px; --radius-pill:999px;
+    --font: 'Pretendard','Noto Sans KR',sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--page-bg);font-family:var(--font);color:var(--ink)}
+  button{font-family:inherit;cursor:pointer;border:none}
+  textarea,input{font-family:inherit}
+
+  .app{width:1440px;max-width:100%;height:900px;background:var(--page-bg);display:flex;overflow:hidden}
+
+  /* 좌측: 후보 리스트. TODO(coding AI): 실제 생성 결과(개수·점수·정렬)로 대체,
+     아이템 클릭 시 가운데 미리보기 + 우측 패널 갱신, 선택 항목은 .selected 클래스 */
+  .candidates{width:300px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--line);display:flex;flex-direction:column}
+  .candidates-header{padding:20px 18px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line)}
+  .candidates-header h2{font-size:13.5px;font-weight:800;margin:0}
+  .candidates-header .sort{font-size:11.5px;color:var(--muted);font-weight:600}
+  .candidate-list{overflow:auto;padding:10px;display:flex;flex-direction:column;gap:8px;list-style:none;margin:0}
+  .candidate{display:flex;gap:10px;padding:9px;border-radius:var(--radius-control);width:100%;background:none;text-align:left}
+  .candidate.selected{background:var(--accent-soft);border:1.5px solid var(--accent)}
+  .candidate .thumb{width:44px;height:78px;border-radius:6px;flex-shrink:0}
+  .candidate .meta{flex-grow:1;min-width:0}
+  .candidate .cap{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink-soft)}
+  .candidate.selected .cap{font-weight:700;color:var(--ink)}
+  .candidate .dur{font-size:10.5px;color:var(--muted);margin-top:2px}
+  .candidate .score{font-size:12px;font-weight:700;color:var(--muted);flex-shrink:0}
+  .candidate.selected .score{font-weight:800;color:var(--accent-strong)}
+
+  /* 중앙: 미리보기 플레이어. TODO(coding AI): 정적 목업을 실제 video/canvas 재생기로 교체 */
+  .preview{flex-grow:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:var(--surface-2)}
+  .preview-actions{display:flex;gap:8px}
+  .preview-actions button{padding:8px 16px;border-radius:var(--radius-pill);font-size:12px;font-weight:700}
+  .preview-actions .primary{background:var(--ink);color:#fff}
+  .preview-actions .secondary{background:var(--surface);border:1px solid var(--line);font-weight:600}
+  .phone{width:246px;height:437px;border-radius:22px;background:#1B1B22;position:relative;overflow:hidden;box-shadow:0 22px 44px rgba(22,22,26,.2)}
+  .phone .badge-time{position:absolute;top:14px;left:14px;background:var(--ink);color:#fff;font-size:11px;font-weight:700;padding:4px 8px;border-radius:6px}
+  .phone .badge-score{position:absolute;top:14px;right:14px;background:var(--accent);color:#fff;font-size:11px;font-weight:800;padding:4px 8px;border-radius:6px}
+  .phone .caption{position:absolute;top:40%;left:16px;right:16px;color:#fff;font-weight:800;font-size:16px;line-height:1.3}
+  .phone .caption em{color:#FFD400;font-style:normal}
+  .phone .play{position:absolute;bottom:26px;left:16px;width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,.16);display:flex;align-items:center;justify-content:center}
+  .btn-download{background:var(--accent);color:#fff;border-radius:var(--radius-control);padding:14px 32px;font-weight:800;font-size:14px}
+
+  /* 우측: 가이드 + 제목/자막 편집 */
+  .side-panel{width:360px;flex-shrink:0;background:var(--surface);border-left:1px solid var(--line);padding:26px;overflow:auto;display:flex;flex-direction:column;gap:22px}
+  .guide-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .guide-header h3{font-size:13px;font-weight:800;margin:0}
+  .guide-header .score{font-size:12px;font-weight:800;color:var(--accent-strong)}
+  .guide-text{font-size:12.5px;line-height:1.6;color:var(--ink-soft);background:var(--surface-2);border:1px solid var(--line);border-radius:var(--radius-control);padding:12px}
+
+  .field h3{font-size:13px;font-weight:800;margin:0 0 8px}
+  .title-row{display:flex;gap:8px}
+  .title-row input{flex-grow:1;border:1px solid var(--line);border-radius:var(--radius-control);padding:11px 12px;font-size:12.5px}
+  .btn-regen{border:1px solid var(--line);border-radius:var(--radius-control);padding:0 12px;font-size:11.5px;font-weight:700;color:var(--ink-soft);background:#fff}
+
+  .subtitles{flex-grow:1;display:flex;flex-direction:column;min-height:0}
+  .subtitles textarea{flex-grow:1;overflow:auto;font-size:12.5px;line-height:1.7;color:var(--ink-soft);border:1px solid var(--line);border-radius:var(--radius-control);padding:12px;resize:none;background:#fff}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- 좌측 후보 리스트 -->
+  <aside class="candidates">
+    <div class="candidates-header">
+      <h2 id="candidates-count">생성된 쇼츠 6개</h2>
+      <span class="sort">점수 높은 순</span>
+    </div>
+    <ul class="candidate-list" id="candidate-list" role="listbox" aria-label="생성된 쇼츠 후보">
+      <li>
+        <button class="candidate selected" role="option" aria-selected="true" data-clip-id="1">
+          <span class="thumb" style="background:#20342E"></span>
+          <span class="meta">
+            <span class="cap">애들레이드에서 말차에 꽂히고 있다면?</span>
+            <span class="dur">0:28</span>
+          </span>
+          <span class="score">95점</span>
+        </button>
+      </li>
+      <li>
+        <button class="candidate" role="option" aria-selected="false" data-clip-id="2">
+          <span class="thumb" style="background:#2C2440"></span>
+          <span class="meta">
+            <span class="cap">디저트 가격이 상당히 괜찮은 이유</span>
+            <span class="dur">0:42</span>
+          </span>
+          <span class="score">91점</span>
+        </button>
+      </li>
+      <li>
+        <button class="candidate" role="option" aria-selected="false" data-clip-id="3">
+          <span class="thumb" style="background:#3A2418"></span>
+          <span class="meta">
+            <span class="cap">호지차 라떼 한 잔의 비밀</span>
+            <span class="dur">0:35</span>
+          </span>
+          <span class="score">88점</span>
+        </button>
+      </li>
+      <li>
+        <button class="candidate" role="option" aria-selected="false" data-clip-id="4">
+          <span class="thumb" style="background:#1E2A3A"></span>
+          <span class="meta">
+            <span class="cap">웨이팅 없이 들어가는 법</span>
+            <span class="dur">0:31</span>
+          </span>
+          <span class="score">84점</span>
+        </button>
+      </li>
+    </ul>
+  </aside>
+
+  <!-- 중앙 미리보기 -->
+  <section class="preview">
+    <div class="preview-actions">
+      <!-- TODO(coding AI): 다른 언어로 재생성 → 언어 선택 후 비동기 재생성 요청 -->
+      <button class="primary" id="btn-regenerate-lang" type="button">다른 언어로 재생성</button>
+      <button class="secondary" id="btn-open-editor" type="button">편집</button>
+    </div>
+    <!-- TODO(coding AI): 정적 목업 → 실제 video 엘리먼트/캔버스 렌더러로 교체, play 버튼에 재생/일시정지 토글 연결 -->
+    <div class="phone" id="video-preview">
+      <span class="badge-time">0:28</span>
+      <span class="badge-score">95점</span>
+      <div class="caption">애들레이드에서<br><em>말차</em>에 꽂히고 있다면?</div>
+      <button class="play" type="button" aria-label="재생">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7-11-7Z"/></svg>
+      </button>
+    </div>
+    <!-- TODO(coding AI): 선택된 클립을 실제 MP4로 인코딩/다운로드 -->
+    <button class="btn-download" id="btn-download-mp4" type="button">MP4 다운로드</button>
+  </section>
+
+  <!-- 우측: AI 가이드 + 제목/자막 편집 -->
+  <aside class="side-panel">
+
+    <div>
+      <div class="guide-header">
+        <h3>AI 품질 가이드</h3>
+        <span class="score" id="guide-score">95점</span>
+      </div>
+      <div class="guide-text" id="guide-text">
+        도입부 3초 안에 궁금증을 만드는 질문형 후킹이 강하고, 상품·가격 정보가 자막과 자연스럽게 연결돼요. 마무리에서 브랜드명을 다시 강조해 기억에 남습니다.
+      </div>
+    </div>
+
+    <div class="field">
+      <h3>제목</h3>
+      <div class="title-row">
+        <input type="text" id="input-title" value="애들레이드에서 말차에 꽂히고 있다면?">
+        <!-- TODO(coding AI): AI 제목 재생성 API 호출 -->
+        <button class="btn-regen" id="btn-regenerate-title" type="button">재생성</button>
+      </div>
+    </div>
+
+    <div class="field subtitles">
+      <h3>자막</h3>
+      <!-- TODO(coding AI): 편집 시 비디오 자막 트랙과 동기화되어야 함 -->
+      <textarea id="textarea-subtitles">애들레이드에서 말차에 꽂히고 있다면 여기부터 가보세요. 로컬들이 줄 서는 이유가 있었어요. 호지차 라떼부터 시작해서 코코넛 클라우드까지, 메뉴판만 봐도 고민되는 곳이에요.</textarea>
+    </div>
+  </aside>
+</div>
+</body>
+</html>

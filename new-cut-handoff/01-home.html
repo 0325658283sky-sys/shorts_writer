@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>New Cut — 홈</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/static/pretendard.css">
+<style>
+  :root{
+    --ink:#16161A; --ink-soft:#6B6B75; --muted:#9C9CA6;
+    --surface:#FFFFFF; --surface-2:#FBFBFC; --page-bg:#F3F3F5;
+    --line:#E8E8EC; --line-strong:#E0E0E6;
+    --accent:#4B3BFF; --accent-strong:#3B2CE0; --accent-soft:#EFEDFF;
+    --radius:11px; --radius-control:8px; --radius-pill:999px;
+    --font: 'Pretendard','Noto Sans KR',sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--page-bg);font-family:var(--font);color:var(--ink)}
+  button{font-family:inherit;cursor:pointer;border:none}
+  input{font-family:inherit}
+
+  /* --- layout: this mockup is fixed at a 1440px desktop canvas.
+     TODO(coding AI): design responsive breakpoints for tablet/mobile —
+     none were specified in the source mockup. --- */
+  .app{width:1440px;max-width:100%;height:900px;background:var(--page-bg);display:flex}
+
+  .rail{width:220px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--line);padding:24px 16px;display:flex;flex-direction:column;gap:4px}
+  .rail-logo{display:flex;align-items:center;gap:8px;padding:0 8px 22px}
+  .rail-logo .mark{width:26px;height:26px;border-radius:7px;background:var(--accent)}
+  .rail-logo .name{font-weight:800;font-size:15.5px}
+  .rail-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--radius-control);color:var(--ink-soft);font-weight:600;font-size:13.5px;text-decoration:none}
+  .rail-item.active{background:var(--accent-soft);color:var(--accent-strong);font-weight:700}
+  .rail-plan{margin-top:auto;padding:14px;border-radius:var(--radius);background:var(--surface-2);border:1px solid var(--line)}
+  .rail-plan .label{font-size:11.5px;font-weight:700;color:var(--muted)}
+  .rail-plan .credit{font-size:13px;font-weight:700;margin:6px 0}
+  .rail-plan .bar{width:100%;height:6px;border-radius:var(--radius-pill);background:var(--line);overflow:hidden}
+  .rail-plan .bar-fill{height:100%;background:var(--accent)}
+
+  .main{flex-grow:1;padding:36px 48px;overflow:hidden}
+  .main-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:26px}
+  .main-header h1{font-size:20px;font-weight:800;margin:0}
+  .avatar{width:36px;height:36px;border-radius:50%;background:var(--ink)}
+
+  .input-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:22px;box-shadow:0 1px 2px rgba(22,22,26,.06)}
+  .tabs{display:flex;gap:8px;margin-bottom:16px}
+  .tab{padding:9px 16px;border-radius:var(--radius-pill);background:var(--surface-2);border:1px solid var(--line);color:var(--ink-soft);font-size:13px;font-weight:600}
+  .tab.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .input-row{display:flex;gap:10px}
+  .input-field{flex-grow:1;display:flex;align-items:center;gap:10px;background:var(--surface-2);border:1px solid var(--line);border-radius:var(--radius-control);padding:14px 16px}
+  .input-field input{border:none;outline:none;background:transparent;flex-grow:1;font-size:14.5px;color:var(--ink)}
+  .btn-primary{background:var(--ink);color:#fff;border-radius:var(--radius-control);padding:0 26px;font-weight:800;font-size:14px;display:flex;align-items:center;gap:8px}
+  .credit-note{margin-top:10px;font-size:12px;color:var(--muted)}
+
+  .recent{margin-top:30px}
+  .recent h2{font-size:14px;font-weight:800;margin-bottom:14px}
+  .recent-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:14px}
+  .thumb{aspect-ratio:9/16;border-radius:var(--radius);position:relative;color:#fff;text-decoration:none;overflow:hidden}
+  .thumb .cap{position:absolute;bottom:10px;left:10px;right:10px;font-size:11px;font-weight:700}
+  .thumb-empty{aspect-ratio:9/16;border-radius:var(--radius);background:var(--surface);border:1.5px dashed var(--line-strong);display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:11.5px;font-weight:600;text-align:center;padding:10px}
+  .thumb-more{aspect-ratio:9/16;border-radius:var(--radius);background:var(--surface-2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px;font-weight:700;text-decoration:none}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- 좌측 내비게이션 -->
+  <nav class="rail">
+    <div class="rail-logo"><div class="mark"></div><span class="name">New Cut</span></div>
+    <a class="rail-item active" href="#" data-nav="projects">내 프로젝트</a>
+    <a class="rail-item" href="#" data-nav="templates">비디오 템플릿</a>
+    <a class="rail-item" href="#" data-nav="assets">에셋 저장소</a>
+    <!-- TODO(coding AI): 크레딧 수치는 로그인한 사용자의 실제 플랜/사용량 데이터로 바인딩 -->
+    <div class="rail-plan">
+      <div class="label">무료 플랜</div>
+      <div class="credit" id="credit-label">쇼츠 크레딧 18/30</div>
+      <div class="bar"><div class="bar-fill" id="credit-bar" style="width:60%"></div></div>
+    </div>
+  </nav>
+
+  <!-- 메인: 입력 -->
+  <main class="main">
+    <header class="main-header">
+      <h1>나만의 숏폼을 바로 제작해보세요</h1>
+      <div class="avatar" role="img" aria-label="사용자 프로필"></div>
+    </header>
+
+    <!-- 입력 카드: 4가지 소스 탭. TODO(coding AI): 탭 전환 시 입력 UI가 달라짐
+         (URL 입력 vs 파일 업로드 드롭존). 현재 마크업은 '유튜브 링크' 탭 상태만 구현됨. -->
+    <section class="input-card">
+      <div class="tabs" role="tablist" aria-label="입력 소스 선택">
+        <button class="tab active" role="tab" aria-selected="true" data-source="youtube">유튜브 링크</button>
+        <button class="tab" role="tab" aria-selected="false" data-source="blog">블로그 URL</button>
+        <button class="tab" role="tab" aria-selected="false" data-source="product">상품 URL</button>
+        <button class="tab" role="tab" aria-selected="false" data-source="upload">MP4 업로드</button>
+      </div>
+      <div class="input-row">
+        <label class="input-field">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M21.5 6.5c-.3-1.2-1.2-2.1-2.4-2.4C17 3.5 12 3.5 12 3.5s-5 0-7.1.6C3.7 4.4 2.8 5.3 2.5 6.5 2 8.6 2 12 2 12s0 3.4.5 5.5c.3 1.2 1.2 2.1 2.4 2.4 2.1.6 7.1.6 7.1.6s5 0 7.1-.6c1.2-.3 2.1-1.2 2.4-2.4.5-2.1.5-5.5.5-5.5s0-3.4-.5-5.5Z" stroke="#9C9CA6" stroke-width="1.6"/><path d="M10 15.2 15.5 12 10 8.8v6.4Z" fill="#9C9CA6"/></svg>
+          <span class="sr-only" style="position:absolute;left:-9999px">유튜브 링크 입력</span>
+          <input type="url" id="input-source-url" placeholder="youtube.com/watch?v=... 붙여넣기">
+        </label>
+        <!-- TODO(coding AI): 클릭 시 입력 검증 → 변환/생성 API 호출 → 03-progress.html 로 이동 -->
+        <button class="btn-primary" id="btn-convert-start" type="button">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3v3m0 12v3m9-9h-3M6 12H3m14.4-6.4-2 2M8.6 15.4l-2 2m10.8 0-2-2M8.6 8.6l-2-2" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/></svg>
+          변환 시작하기
+        </button>
+      </div>
+      <div class="credit-note">10분 영상 = 크레딧 1개 소모 · 남은 크레딧 18/30</div>
+    </section>
+
+    <!-- 최근 생성 영상. TODO(coding AI): 실제 프로젝트 목록 API로 대체,
+         목록이 4개 미만이면 빈 상태(점선 카드) 노출 -->
+    <section class="recent">
+      <h2>내 영상</h2>
+      <div class="recent-grid">
+        <a class="thumb" href="#" data-clip-id="1" style="background:#20342E"><span class="cap">애들레이드 말차 맛집</span></a>
+        <a class="thumb" href="#" data-clip-id="2" style="background:#2C2440"><span class="cap">3배 늘어난 이유</span></a>
+        <a class="thumb" href="#" data-clip-id="3" style="background:#3A2418"><span class="cap">방송국 난입 사건</span></a>
+        <div class="thumb-empty">아직 생성한<br>영상이 없어요</div>
+        <a class="thumb-more" href="#" data-nav="all-projects">전체 보기 →</a>
+      </div>
+    </section>
+  </main>
+</div>
+</body>
+</html>

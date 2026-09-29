@@ -1,0 +1,3 @@
+# 컨테이너에서 실행되는 스크립트는 CRLF 이면 "/bin/sh^M: bad interpreter"로 죽는다
+*.sh text eol=lf
+Dockerfile* text eol=lf

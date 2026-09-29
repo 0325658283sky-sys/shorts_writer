@@ -1,0 +1,16 @@
+# Docker build context 축소 — Dockerfile.frontend / Dockerfile.backend 공통(레포 루트 컨텍스트)
+**/.venv
+**/node_modules
+**/__pycache__
+**/*.pyc
+**/*.db
+**/dist
+.git
+.env
+**/.env
+backend/app/storage/uploads
+remotion/out
+remotion/public/clips
+design_handoff_*
+new-cut-handoff
+docs

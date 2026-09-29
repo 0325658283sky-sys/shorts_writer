@@ -176,3 +176,52 @@ def apply_stock_image_to_board(
         board_id,
         image_path=str(saved),
     )
+
+
+def add_stock_candidates_for_shortage(
+    conn: sqlite3.Connection,
+    user_id: int,
+    blog_clip_id: int,
+    need: int,
+) -> list[int]:
+    """awaiting_images 단계에서 사진이 모자랄 때 제목으로 스톡 사진을 찾아 후보로 추가하고, 새 후보 id를 돌려준다."""
+    from app.services.blog_service import list_blog_clip_image_candidates
+
+    blog_clip = get_blog_clip_for_user(conn, user_id, blog_clip_id)
+    if blog_clip is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Blog short not found.")
+    if blog_clip.status != "awaiting_images":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Blog short is not waiting for image selection.")
+    need = max(1, min(need, settings.blog_image_max_count))
+
+    query = (blog_clip.blog_title or "").strip()
+    if not query:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="스톡 사진을 찾을 검색어가 없습니다.")
+    result = search_stock_images(query, per_page=max(need * 2, 6))
+    photos = result["photos"]
+    if not photos:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="어울리는 스톡 사진을 찾지 못했어요.")
+
+    existing = list_blog_clip_image_candidates(conn, user_id, blog_clip_id)
+    next_index = max((item.order_index for item in existing), default=-1) + 1
+    new_ids: list[int] = []
+    for photo in photos:
+        if len(new_ids) >= need:
+            break
+        try:
+            saved = download_stock_image_to_clip(user_id, blog_clip_id, photo["download_url"])
+        except HTTPException:
+            continue
+        cursor = conn.execute(
+            """
+            INSERT INTO blog_clip_image_candidates (blog_clip_id, order_index, storage_path, source_url, selected)
+            VALUES (?, ?, ?, ?, 0)
+            """,
+            (blog_clip_id, next_index, str(saved), photo["download_url"]),
+        )
+        new_ids.append(int(cursor.lastrowid))
+        next_index += 1
+    conn.commit()
+    if len(new_ids) < need:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="스톡 사진을 충분히 가져오지 못했어요.")
+    return new_ids

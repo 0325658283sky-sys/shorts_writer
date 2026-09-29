@@ -87,6 +87,7 @@ def create_clip(
         current_user.id,
         request.highlight_id,
         visual_style=request.visual_style,
+        remove_silence=request.remove_silence,
     )
     return _to_clip_response(clip)
 

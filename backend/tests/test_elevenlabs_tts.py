@@ -1,0 +1,93 @@
+import pytest
+from fastapi import HTTPException
+
+from app.services import tts_service
+
+
+class _Resp:
+    def __init__(self, status_code=200, payload=None, content=b"mp3"):
+        self.status_code = status_code
+        self._payload = payload or {}
+        self.content = content
+        self.text = "err"
+
+    def json(self):
+        return self._payload
+
+
+@pytest.fixture(autouse=True)
+def _eleven_env(monkeypatch, tmp_path):
+    monkeypatch.setenv("TTS_PROVIDER", "elevenlabs")
+    monkeypatch.setenv("ELEVENLABS_API_KEY", "test-key")
+    monkeypatch.setattr(tts_service, "_refresh_tts_env", lambda: None)
+    monkeypatch.setattr(tts_service, "TTS_ROOT", tmp_path)
+    monkeypatch.setattr(tts_service, "_elevenlabs_voice_cache", None)
+
+
+def test_catalog_and_validate(monkeypatch):
+    payload = {
+        "voices": [
+            {
+                "voice_id": "v1",
+                "name": "Roger - Laid-Back, Casual, Resonant",
+                "labels": {"gender": "male", "age": "middle_aged", "accent": "american", "use_case": "conversational"},
+            },
+            {"voice_id": "v2", "name": "Rachel", "labels": {"gender": "female", "accent": "korean"}},
+            {"voice_id": "lib", "name": "Eunha", "category": "professional"},
+        ]
+    }
+    monkeypatch.setattr(tts_service.requests, "get", lambda *a, **k: _Resp(payload=payload))
+    catalog = tts_service.list_voice_catalog()
+    assert catalog[0] == {
+        "id": "v1",
+        "name": "로저",
+        "description": "남성 · 중년 · 미국 · 대화형 · 여유로운 · 편안한 · 울림 있는",
+    }
+    assert catalog[1] == {"id": "v2", "name": "Rachel", "description": "여성 · 한국어"}
+    assert tts_service.validate_voice_id("v1") == "v1"
+    assert tts_service.default_tts_voice() == "v1"
+    with pytest.raises(HTTPException):
+        tts_service.validate_voice_id("nope")
+
+
+def test_synthesize_clamps_speed_and_writes_file(monkeypatch):
+    payload = {"voices": [{"voice_id": "v1", "name": "Rachel"}]}
+    monkeypatch.setattr(tts_service.requests, "get", lambda *a, **k: _Resp(payload=payload))
+    captured = {}
+
+    def fake_post(url, **kwargs):
+        captured["url"] = url
+        captured["json"] = kwargs["json"]
+        return _Resp(content=b"audio-bytes")
+
+    monkeypatch.setattr(tts_service.requests, "post", fake_post)
+    path = tts_service.synthesize_openai_tts(1, 5, "안녕하세요", voice="v1", speed=2.0)
+    assert captured["url"].endswith("/v1/text-to-speech/v1")
+    assert captured["json"]["voice_settings"]["speed"] == 1.2
+    assert open(path, "rb").read() == b"audio-bytes"
+
+
+def test_invalid_key_maps_to_401(monkeypatch):
+    monkeypatch.setattr(tts_service.requests, "get", lambda *a, **k: _Resp(status_code=401))
+    with pytest.raises(HTTPException) as exc:
+        tts_service.list_voice_catalog()
+    assert exc.value.status_code == 401
+
+
+def test_library_voices_hidden_on_free_plan(monkeypatch):
+    payload = {"voices": [{"voice_id": "lib", "name": "Eunha", "category": "professional"}, {"voice_id": "p", "name": "Sarah", "category": "premade"}]}
+    monkeypatch.setattr(tts_service.requests, "get", lambda *a, **k: _Resp(payload=payload))
+    assert [v["id"] for v in tts_service.list_voice_catalog()] == ["p"]
+    monkeypatch.setattr(tts_service, "_elevenlabs_voice_cache", None)
+    monkeypatch.setenv("ELEVENLABS_ALLOW_LIBRARY_VOICES", "true")
+    assert [v["id"] for v in tts_service.list_voice_catalog()] == ["lib", "p"]
+
+
+def test_payment_required_message(monkeypatch):
+    monkeypatch.setattr(
+        tts_service.requests, "get", lambda *a, **k: _Resp(payload={"voices": [{"voice_id": "v1", "name": "Rachel"}]})
+    )
+    monkeypatch.setattr(tts_service.requests, "post", lambda *a, **k: _Resp(status_code=402))
+    with pytest.raises(HTTPException) as exc:
+        tts_service.synthesize_openai_tts(1, 1, "안녕", voice="v1")
+    assert exc.value.status_code == 402 and "유료" in exc.value.detail

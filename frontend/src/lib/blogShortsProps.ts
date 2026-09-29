@@ -187,6 +187,7 @@ export function buildBlogShortsProps(options: {
         words: estimateWordTimings(text || "", durationSec),
         backgroundColor: null,
         speaker: board.speaker,
+        textStyle: board.text_style ?? null,
       };
     }),
   };

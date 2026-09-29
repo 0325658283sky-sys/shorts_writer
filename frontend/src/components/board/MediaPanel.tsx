@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { authorizedBlob, authorizedRequest } from "../../api/client";
-import type { BlogClip, Board, StockSearchResponse, Voice } from "../../types";
+import { SHORTS_FONTS } from "../../lib/shortsFonts";
+import type { BlogClip, Board, BoardTextStyle, StockSearchResponse, Voice } from "../../types";
 import { BgmPanel } from "./BgmPanel";
 import { VisualStylePanel } from "../VisualStylePanel";
 import { useBoardImageUrl } from "./useBoardImageUrl";
 
-type MediaTab = "screen" | "voice" | "motion";
+type MediaTab = "text" | "narration" | "bgm" | "trim" | "style";
 
 function MediaThumb({
   blogClipId,
@@ -28,6 +29,172 @@ function MediaThumb({
   );
 }
 
+const TEXT_ACCENT_SWATCHES = ["#FFE500", "#FF5C5C", "#7CFF6B", "#FFFFFF"];
+const TEXT_ANIMATIONS: { id: "highlight" | "none"; label: string }[] = [
+  { id: "highlight", label: "글자 튀기기" },
+  { id: "none", label: "없음" },
+];
+
+/** ⑤ 편집기 "텍스트" 탭 — 선택한 장면의 자막 폰트·크기·강조색·등장 애니메이션.
+ *  비워 둔 항목은 ④ 템플릿/전체 스타일 값을 그대로 쓰고, "되돌리기"로 장면 값을 지운다. */
+function SceneTextStyleEditor({
+  style,
+  saving,
+  onChange,
+}: {
+  style: BoardTextStyle | null;
+  saving: boolean;
+  onChange: (textStyle: BoardTextStyle | null) => Promise<void>;
+}) {
+  const [sizeDraft, setSizeDraft] = useState(style?.fontSize ? String(style.fontSize) : "");
+  const [colorDraft, setColorDraft] = useState(style?.accentColor ?? "");
+  const [error, setError] = useState("");
+
+  async function apply(patch: Partial<BoardTextStyle>) {
+    const merged: BoardTextStyle = { ...(style ?? {}), ...patch };
+    const cleaned: BoardTextStyle = {};
+    if (merged.fontFamily) cleaned.fontFamily = merged.fontFamily;
+    if (merged.fontSize) cleaned.fontSize = merged.fontSize;
+    if (merged.accentColor) cleaned.accentColor = merged.accentColor;
+    if (merged.animation) cleaned.animation = merged.animation;
+    setError("");
+    try {
+      await onChange(Object.keys(cleaned).length > 0 ? cleaned : null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "저장에 실패했습니다.");
+    }
+  }
+
+  function commitSize() {
+    const trimmed = sizeDraft.trim();
+    if (!trimmed) {
+      if (style?.fontSize) void apply({ fontSize: null });
+      return;
+    }
+    const value = Number(trimmed);
+    if (!Number.isFinite(value) || value < 20 || value > 120) {
+      setError("크기는 20~120 사이 숫자로 입력하세요.");
+      setSizeDraft(style?.fontSize ? String(style.fontSize) : "");
+      return;
+    }
+    if (Math.round(value) !== style?.fontSize) void apply({ fontSize: Math.round(value) });
+  }
+
+  function commitColor() {
+    const trimmed = colorDraft.trim();
+    if (!trimmed) {
+      if (style?.accentColor) void apply({ accentColor: null });
+      return;
+    }
+    if (!/^#[0-9a-fA-F]{6}$/.test(trimmed)) {
+      setError("색상은 #RRGGBB 형식으로 입력하세요.");
+      setColorDraft(style?.accentColor ?? "");
+      return;
+    }
+    if (trimmed !== style?.accentColor) void apply({ accentColor: trimmed });
+  }
+
+  return (
+    <div className="scene-text-style">
+      <p className="muted">바꾸지 않은 항목은 ④ 템플릿 값을 따릅니다.</p>
+
+      <label className="voice-speed">
+        폰트
+        <select
+          value={style?.fontFamily ?? ""}
+          disabled={saving}
+          onChange={(event) => void apply({ fontFamily: event.target.value || null })}
+        >
+          <option value="">템플릿 기본</option>
+          {SHORTS_FONTS.map((font) => (
+            <option key={font.id} value={font.id}>
+              {font.label}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className="voice-speed">
+        크기(px)
+        <input
+          type="number"
+          min={20}
+          max={120}
+          step={2}
+          placeholder="템플릿 기본"
+          value={sizeDraft}
+          disabled={saving}
+          onChange={(event) => setSizeDraft(event.target.value)}
+          onBlur={commitSize}
+        />
+      </label>
+
+      <div>
+        <span className="scene-text-style-label">강조색</span>
+        <div className="scene-text-style-swatches">
+          {TEXT_ACCENT_SWATCHES.map((color) => (
+            <button
+              key={color}
+              type="button"
+              className={`scene-text-swatch${style?.accentColor?.toLowerCase() === color.toLowerCase() ? " is-active" : ""}`}
+              style={{ background: color }}
+              aria-label={`강조색 ${color}`}
+              disabled={saving}
+              onClick={() => {
+                setColorDraft(color);
+                void apply({ accentColor: color });
+              }}
+            />
+          ))}
+          <input
+            type="text"
+            className="scene-text-hex"
+            placeholder="#RRGGBB"
+            maxLength={7}
+            value={colorDraft}
+            disabled={saving}
+            onChange={(event) => setColorDraft(event.target.value)}
+            onBlur={commitColor}
+          />
+        </div>
+      </div>
+
+      <div>
+        <span className="scene-text-style-label">등장 애니메이션</span>
+        <div className="scene-text-style-swatches">
+          {TEXT_ANIMATIONS.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className={`small-button${style?.animation === item.id ? " is-active" : ""}`}
+              disabled={saving}
+              onClick={() => void apply({ animation: item.id })}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {error ? <p className="form-message">{error}</p> : null}
+      {style ? (
+        <button
+          type="button"
+          className="ghost-button"
+          disabled={saving}
+          onClick={() => {
+            setSizeDraft("");
+            setColorDraft("");
+            void onChange(null);
+          }}
+        >
+          이 장면 스타일 되돌리기
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
 export function MediaPanel({
   blogClipId,
   boards,
@@ -38,6 +205,8 @@ export function MediaPanel({
   ttsSpeed,
   onTtsSpeedChange,
   onAssignSpeaker,
+  onTextStyleChange,
+  savingTextStyle,
   onApplyVoiceToAll,
   assigningSpeaker,
   appliedVisualStyle,
@@ -75,6 +244,8 @@ export function MediaPanel({
   ttsSpeed: number;
   onTtsSpeedChange: (speed: number) => void;
   onAssignSpeaker: (voiceId: string | null) => Promise<void>;
+  onTextStyleChange: (textStyle: BoardTextStyle | null) => Promise<void>;
+  savingTextStyle: boolean;
   onApplyVoiceToAll: (voiceId: string) => Promise<void>;
   assigningSpeaker: boolean;
   appliedVisualStyle?: string | null;
@@ -106,7 +277,7 @@ export function MediaPanel({
   autoDuration: boolean;
   onAutoDurationChange: (value: boolean) => void;
 }) {
-  const [tab, setTab] = useState<MediaTab>("screen");
+  const [tab, setTab] = useState<MediaTab>("text");
   const [stockQuery, setStockQuery] = useState("");
   const [stockResults, setStockResults] = useState<StockSearchResponse | null>(null);
   const [stockSearching, setStockSearching] = useState(false);
@@ -136,7 +307,7 @@ export function MediaPanel({
   }, [ttsSpeed]);
 
   useEffect(() => {
-    if (tab !== "voice" || voices.length > 0 || voicesLoading) return;
+    if (tab !== "narration" || voices.length > 0 || voicesLoading) return;
     setVoicesLoading(true);
     setVoiceError("");
     void authorizedRequest<Voice[]>("/voices")
@@ -248,9 +419,11 @@ export function MediaPanel({
       <div className="media-tabs" role="tablist">
         {(
           [
-            ["screen", "화면"],
-            ["voice", "음성"],
-            ["motion", "모션"],
+            ["text", "텍스트"],
+            ["narration", "나레이션"],
+            ["bgm", "배경음악"],
+            ["trim", "구간편집"],
+            ["style", "전체 스타일"],
           ] as const
         ).map(([id, label]) => (
           <button key={id} className={`media-tab ${tab === id ? "active" : ""}`} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}>
@@ -259,83 +432,23 @@ export function MediaPanel({
         ))}
       </div>
 
-      {tab === "screen" ? (
+      {tab === "text" ? (
         <div className="media-tab-body">
           <p className="media-scope-label">이 장면</p>
-          <p className="muted">다운로드된 이미지로 선택 장면을 교체합니다.</p>
-          <div className="media-grid">
-            {uniqueImages.map((item) => (
-              <MediaThumb
-                key={item.imagePath}
-                blogClipId={blogClipId}
-                boardId={item.boardId}
-                imagePath={item.imagePath}
-                active={selectedBoard?.image_path === item.imagePath}
-                onSelect={() => onSwapImage(item.imagePath)}
-              />
-            ))}
-          </div>
-
-          <section className="stock-search" aria-label="스톡 이미지 검색">
-            <h3 className="stock-search-title">스톡 검색 (Pexels)</h3>
-            <form className="stock-search-form" onSubmit={(event) => void handleStockSearch(event)}>
-              <input
-                type="search"
-                value={stockQuery}
-                onChange={(event) => setStockQuery(event.target.value)}
-                placeholder="예: cafe, travel, food"
-                disabled={stockSearching}
-              />
-              <button className="small-button" type="submit" disabled={stockSearching || !stockQuery.trim()}>
-                {stockSearching ? "검색 중" : "검색"}
-              </button>
-            </form>
-            {stockError ? <p className="form-message">{stockError}</p> : null}
-            {stockResults && stockResults.photos.length > 0 ? (
-              <div className="stock-grid">
-                {stockResults.photos.map((photo) => (
-                  <button
-                    key={`${photo.id ?? photo.download_url}`}
-                    className="stock-thumb"
-                    type="button"
-                    disabled={!selectedBoard || applyingStock}
-                    title={photo.photographer ? `${photo.alt} — ${photo.photographer}` : photo.alt}
-                    onClick={() => void handleApplyStock(photo.download_url)}
-                  >
-                    <img src={photo.preview_url} alt={photo.alt || "stock"} loading="lazy" />
-                  </button>
-                ))}
-              </div>
-            ) : null}
-            {!selectedBoard ? <p className="muted">장면을 선택한 뒤 스톡 이미지를 적용하세요.</p> : null}
-            {applyingStock ? <p className="muted">이미지를 장면에 적용하는 중…</p> : null}
-          </section>
-
-          <p className="muted media-upload-note">로컬 업로드 — 곧 제공</p>
-          <p className="media-scope-label">영상 전체</p>
-          <VisualStylePanel
-            blogClipId={blogClipId}
-            appliedStyle={appliedVisualStyle}
-            styleTitle={styleTitle}
-            styleSubtitle={styleSubtitle}
-            styleOverlay={styleOverlay}
-            transitionSec={transitionSec}
-            transitionType={transitionType}
-            onApply={onApplyVisualStyle}
-            onStyleCopyChange={onStyleCopyChange}
-            onMotionChange={onMotionChange}
-            onTitlesGenerated={onTitlesGenerated}
-            onOverlayUpdated={onOverlayUpdated}
-            applying={applyingVisualStyle}
-            savingCopy={savingStyleCopy}
-            savingMotion={savingMotion}
-            onMessage={onMessage}
-            variant="screen"
-          />
+          {selectedBoard ? (
+            <SceneTextStyleEditor
+              key={selectedBoard.id}
+              style={selectedBoard.text_style ?? null}
+              saving={savingTextStyle}
+              onChange={onTextStyleChange}
+            />
+          ) : (
+            <p className="muted">장면을 선택한 뒤 자막 스타일을 바꾸세요. 바꾸지 않은 항목은 ④ 템플릿 값을 따릅니다.</p>
+          )}
         </div>
       ) : null}
 
-      {tab === "voice" ? (
+      {tab === "narration" ? (
         <div className="media-tab-body">
           <p className="media-scope-label">영상 전체</p>
           <label className="voice-speed">
@@ -404,6 +517,12 @@ export function MediaPanel({
               이 장면만 기본 보이스로
             </button>
           ) : null}
+        </div>
+      ) : null}
+
+      {tab === "bgm" ? (
+        <div className="media-tab-body">
+          <p className="media-scope-label">영상 전체</p>
           <BgmPanel
             selectedBoard={selectedBoard}
             bgmAssetId={bgmAssetId}
@@ -415,7 +534,7 @@ export function MediaPanel({
         </div>
       ) : null}
 
-      {tab === "motion" ? (
+      {tab === "trim" ? (
         <div className="media-tab-body">
           <p className="media-scope-label">이 장면</p>
           {selectedBoard ? (
@@ -435,6 +554,60 @@ export function MediaPanel({
             <p className="muted">장면을 선택한 뒤 길이를 조절하세요.</p>
           )}
 
+          <p className="muted">다운로드된 이미지로 선택 장면을 교체합니다.</p>
+          <div className="media-grid">
+            {uniqueImages.map((item) => (
+              <MediaThumb
+                key={item.imagePath}
+                blogClipId={blogClipId}
+                boardId={item.boardId}
+                imagePath={item.imagePath}
+                active={selectedBoard?.image_path === item.imagePath}
+                onSelect={() => onSwapImage(item.imagePath)}
+              />
+            ))}
+          </div>
+
+          <section className="stock-search" aria-label="스톡 이미지 검색">
+            <h3 className="stock-search-title">스톡 검색 (Pexels)</h3>
+            <form className="stock-search-form" onSubmit={(event) => void handleStockSearch(event)}>
+              <input
+                type="search"
+                value={stockQuery}
+                onChange={(event) => setStockQuery(event.target.value)}
+                placeholder="예: cafe, travel, food"
+                disabled={stockSearching}
+              />
+              <button className="small-button" type="submit" disabled={stockSearching || !stockQuery.trim()}>
+                {stockSearching ? "검색 중" : "검색"}
+              </button>
+            </form>
+            {stockError ? <p className="form-message">{stockError}</p> : null}
+            {stockResults && stockResults.photos.length > 0 ? (
+              <div className="stock-grid">
+                {stockResults.photos.map((photo) => (
+                  <button
+                    key={`${photo.id ?? photo.download_url}`}
+                    className="stock-thumb"
+                    type="button"
+                    disabled={!selectedBoard || applyingStock}
+                    title={photo.photographer ? `${photo.alt} — ${photo.photographer}` : photo.alt}
+                    onClick={() => void handleApplyStock(photo.download_url)}
+                  >
+                    <img src={photo.preview_url} alt={photo.alt || "stock"} loading="lazy" />
+                  </button>
+                ))}
+              </div>
+            ) : null}
+            {!selectedBoard ? <p className="muted">장면을 선택한 뒤 스톡 이미지를 적용하세요.</p> : null}
+            {applyingStock ? <p className="muted">이미지를 장면에 적용하는 중…</p> : null}
+          </section>
+          <p className="muted media-upload-note">로컬 업로드 — 곧 제공</p>
+        </div>
+      ) : null}
+
+      {tab === "style" ? (
+        <div className="media-tab-body">
           <p className="media-scope-label">영상 전체</p>
           <VisualStylePanel
             blogClipId={blogClipId}

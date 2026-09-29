@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+html,body{margin:0;background:#F3F3F5;font-family:"Pretendard Variable","Pretendard","Noto Sans KR",sans-serif;color:#16161A;-webkit-font-smoothing:antialiased}
+*{box-sizing:border-box}
+a{color:#2563EB}a:hover{color:#1D4ED8}
+button,input,select,textarea{font:inherit}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+</style>
+</helmet>
+
+<div data-screen-label="New Cut Studio" style="height:{{ rootH }};display:flex;overflow:hidden;background:#F3F3F5;color:#16161A;">
+
+  <!-- StudioShell rail -->
+  <aside style="display:flex;flex-direction:column;width:244px;flex-shrink:0;background:#fff;border-right:1px solid #E8E8EC;overflow-y:auto;">
+    <div style="display:flex;align-items:center;gap:10px;height:68px;padding:0 20px;border-bottom:1px solid #E8E8EC;">
+      <span style="display:flex;align-items:center;justify-content:center;flex:none;width:32px;height:32px;border-radius:9px;background:#2563EB;color:#fff;font-size:12px;font-weight:800;letter-spacing:-0.04em;">NC</span>
+      <span style="font-size:15px;font-weight:800;letter-spacing:-0.01em;">New Cut</span>
+    </div>
+    <div style="display:flex;gap:4px;margin:10px 10px 0;padding:3px;border-radius:9px;background:#F3F3F5;">
+      <span style="flex:1;display:inline-flex;align-items:center;justify-content:center;height:26px;border-radius:7px;font-size:11.5px;font-weight:600;color:#6B6B75;cursor:pointer;">블로그 글</span>
+      <span style="flex:1;display:inline-flex;align-items:center;justify-content:center;height:26px;border-radius:7px;font-size:11.5px;font-weight:700;color:#2563EB;background:#fff;box-shadow:0 1px 2px rgba(22,22,26,.06);">쇼츠</span>
+    </div>
+    <nav style="display:flex;flex:1;flex-direction:column;gap:4px;padding:16px;">
+      <button type="button" onClick="{{ reset }}" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:44px;margin-bottom:6px;border:0;border-radius:8px;background:#2563EB;color:#fff;font-size:14px;font-weight:700;cursor:pointer;" style-hover="background:#1D4ED8;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path></svg>
+        <span>＋ 새로 만들기</span>
+      </button>
+      <button type="button" style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border:0;border-radius:8px;background:transparent;color:#6B6B75;font-size:14px;font-weight:600;cursor:pointer;" style-hover="background:#F3F3F5;color:#16161A;">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4.2c.3 0 .58.12.79.34L11 8h8.5A1.5 1.5 0 0 1 21 9.5v8A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5v-10Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"></path></svg>
+        <span>프로젝트</span>
+        <span style="margin-left:auto;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:#2563EB;color:#fff;font-size:9.5px;font-weight:700;line-height:16px;text-align:center;">12</span>
+      </button>
+      <button type="button" style="display:flex;align-items:center;gap:4px;width:100%;padding:5px 8px 5px 34px;border:0;border-radius:7px;background:transparent;color:#9C9CA6;font-size:11.5px;text-align:left;cursor:pointer;">진행 중 <strong style="color:#6B6B75;font-weight:700;">2</strong></button>
+      <button type="button" style="display:flex;align-items:center;gap:4px;width:100%;padding:5px 8px 5px 34px;border:0;border-radius:7px;background:transparent;color:#9C9CA6;font-size:11.5px;text-align:left;cursor:pointer;">완성된 쇼츠 <strong style="color:#6B6B75;font-weight:700;">10</strong></button>
+    </nav>
+    <div style="padding:16px;border-top:1px solid #E8E8EC;display:flex;flex-direction:column;gap:8px;">
+      <div style="display:flex;flex-direction:column;gap:6px;padding:9px 8px;border:1px solid #E8E8EC;border-radius:8px;background:#FBFBFC;">
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="flex:none;width:44px;font-size:10.5px;color:#6B6B75;">쇼츠</span>
+          <span style="flex:1;height:4px;border-radius:999px;background:#E8E8EC;overflow:hidden;"><span style="display:block;height:100%;background:#2563EB;width:{{ usagePct }};"></span></span>
+          <span style="flex:none;font-size:10px;color:#9C9CA6;">{{ credits }}/20</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="flex:none;width:44px;font-size:10.5px;color:#6B6B75;">블로그 글</span>
+          <span style="flex:1;height:4px;border-radius:999px;background:#E8E8EC;overflow:hidden;"><span style="display:block;height:100%;width:35%;background:#94B4F4;"></span></span>
+          <span style="flex:none;font-size:10px;color:#9C9CA6;">39/60</span>
+        </div>
+        <span style="font-size:9.5px;color:#9C9CA6;">2026-09 기준 · 매월 초기화</span>
+      </div>
+      <button type="button" style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border:0;border-radius:8px;background:transparent;color:#6B6B75;font-size:14px;font-weight:600;cursor:pointer;" style-hover="background:#F3F3F5;color:#16161A;">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.7"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.830 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09A1.65 1.65 0 0 0 15 4.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.36.6.94.98 1.51 1H21a2 2 0 1 1 0 4h-.09c-.57.02-1.15.4-1.51 1Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"></path></svg>
+        <span>요금제 · 사용량</span>
+      </button>
+      <div style="display:flex;align-items:center;gap:8px;padding:4px;border-radius:8px;">
+        <span style="flex:none;width:26px;height:26px;border-radius:999px;background:#16161a;color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;">CO</span>
+        <div style="display:flex;flex-direction:column;min-width:0;gap:1px;">
+          <span style="font-size:11px;color:#6B6B75;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">cobi.k@gmail.com</span>
+          <span style="font-size:9px;font-weight:700;letter-spacing:.06em;color:#2563EB;">LITE</span>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- main -->
+  <div style="display:flex;min-width:0;flex:1;flex-direction:column;">
+    <header style="display:flex;flex-shrink:0;align-items:center;justify-content:space-between;gap:12px;height:52px;padding:0 20px;border-bottom:1px solid #E8E8EC;background:#fff;font-size:13.5px;font-weight:700;letter-spacing:-0.015em;">
+      <span style="min-width:0;flex:0 1 auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ pageTitle }}</span>
+      <sc-if value="{{ hasSource }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;align-items:center;gap:4px;flex-wrap:nowrap;justify-content:flex-end;overflow:hidden;flex:none;white-space:nowrap;">
+          <span style="font-size:11px;font-weight:600;color:#9C9CA6;margin-right:4px;">{{ srcBadge }} 흐름</span>
+          <sc-for list="{{ crumbs }}" as="c" hint-placeholder-count="5">
+            <span style="display:inline-flex;align-items:center;gap:4px;">
+              <span style="display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:999px;font-size:11px;font-weight:{{ c.weight }};color:{{ c.color }};background:{{ c.bg }};">{{ c.label }}</span>
+              <sc-if value="{{ c.arrow }}" hint-placeholder-val="{{ true }}"><span style="color:#C2C2CC;font-size:10px;">›</span></sc-if>
+            </span>
+          </sc-for>
+        </div>
+      </sc-if>
+    </header>
+
+    <div style="min-height:0;flex:1;overflow-y:auto;">
+      <div style="width:min(1100px,100%);margin:0 auto;padding:22px 24px 48px;display:grid;gap:18px;">
+
+        <!-- 예외 카드 (⑨-c 공통 규칙) -->
+        <sc-if value="{{ hasErr }}" hint-placeholder-val="{{ false }}">
+          <div style="border-radius:11px;border:1px solid {{ err.border }};background:{{ err.bg }};padding:14px 16px;display:flex;flex-direction:column;gap:8px;">
+            <p style="margin:0;font-size:13px;font-weight:700;color:{{ err.titleColor }};">{{ err.title }}</p>
+            <p style="margin:0;font-size:12px;line-height:1.6;color:{{ err.bodyColor }};">{{ err.body }} <strong>{{ err.credit }}</strong></p>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <sc-for list="{{ err.buttons }}" as="b" hint-placeholder-count="1">
+                <button type="button" onClick="{{ b.onClick }}" style="display:inline-flex;align-items:center;height:32px;padding:0 13px;border-radius:8px;background:{{ b.bg }};border:1px solid {{ b.border }};font-size:12px;font-weight:600;color:{{ b.color }};cursor:pointer;">{{ b.label }}</button>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+
+        <!-- ① 소스 입력 — CreateStudio 단일 입력 유지 -->
+        <sc-if value="{{ is.input }}" hint-placeholder-val="{{ true }}">
+          <section data-screen-label="① 소스 입력" style="display:grid;gap:18px;">
+            <div>
+              <p style="margin:0 0 8px;color:#1D4ED8;font-size:12px;font-weight:800;letter-spacing:.08em;">새 프로젝트</p>
+              <h2 style="margin:0 0 8px;font-size:34px;font-weight:700;letter-spacing:-0.03em;">링크 하나로 쇼츠 만들기</h2>
+              <p style="margin:0;max-width:46ch;color:#6B6B75;line-height:1.55;">블로그 글·상품 페이지·유튜브 링크를 붙여넣으면 종류를 알아서 인식합니다.</p>
+            </div>
+            <div style="display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start;padding:22px;border:1px solid #E8E8EC;border-radius:11px;background:#fff;box-shadow:0 1px 2px rgba(22,22,26,.06);">
+              <div style="flex:1 1 340px;min-width:0;display:flex;flex-direction:column;gap:14px;">
+
+                <sc-if value="{{ isMp4 }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                    <div style="flex:1 1 220px;min-width:0;display:flex;align-items:center;gap:8px;height:42px;padding:0 12px;border:1px solid #E8E8EC;border-radius:8px;background:#FBFBFC;">
+                      <span style="flex:none;display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:5px;background:#EAF1FE;color:#2563EB;font-size:10.5px;font-weight:700;">MP4 파일</span>
+                      <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;">interview_full_0915.mp4 (1.2 GB)</span>
+                      <button type="button" onClick="{{ clearUrl }}" style="flex:none;border:0;background:transparent;color:#6B6B75;font-size:12px;font-weight:600;padding:0 8px;min-height:30px;border-radius:8px;cursor:pointer;" style-hover="background:#F3F3F5;color:#16161A;">다른 파일</button>
+                    </div>
+                    <button type="button" onClick="{{ submit }}" disabled="{{ ctaDisabled }}" style="display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:0 20px;border:0;border-radius:10px;background:#2563EB;color:#fff;font-size:13.5px;font-weight:700;cursor:pointer;opacity:{{ ctaOpacity }};" style-hover="background:#1D4ED8;">쇼츠 만들기</button>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ notMp4 }}" hint-placeholder-val="{{ true }}">
+                  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                    <div style="flex:1 1 220px;min-width:0;display:flex;align-items:center;gap:8px;height:42px;padding:0 12px;border:1px solid {{ inputBorder }};border-radius:8px;background:#fff;box-shadow:{{ inputRing }};">
+                      <sc-if value="{{ hasSource }}" hint-placeholder-val="{{ false }}">
+                        <span style="flex:none;display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:5px;background:#EAF1FE;color:#2563EB;font-size:10.5px;font-weight:700;white-space:nowrap;">{{ srcBadge }}</span>
+                      </sc-if>
+                      <input type="text" value="{{ url }}" onChange="{{ onUrl }}" placeholder="blog.naver.com/… · smartstore.naver.com/… · youtube.com/…" aria-label="소스 URL" style="flex:1;min-width:0;height:100%;border:0;background:transparent;outline:none;font-size:13px;color:#16161A;">
+                    </div>
+                    <button type="button" onClick="{{ submit }}" disabled="{{ ctaDisabled }}" style="display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:0 20px;border:0;border-radius:10px;background:#2563EB;color:#fff;font-size:13.5px;font-weight:700;cursor:pointer;opacity:{{ ctaOpacity }};" style-hover="background:#1D4ED8;">쇼츠 만들기</button>
+                  </div>
+                </sc-if>
+
+                <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                  <p style="margin:0;font-size:12px;color:#9C9CA6;">영상 파일이 있나요? <button type="button" onClick="{{ pickMp4 }}" style="border:0;background:none;padding:0;color:#2563EB;text-decoration:underline;text-underline-offset:2px;cursor:pointer;font-size:12px;">MP4 파일 올리기</button></p>
+                  <span style="margin-left:auto;display:flex;align-items:center;gap:6px;font-size:11px;color:#9C9CA6;">예시로 넣어보기
+                    <sc-for list="{{ samples }}" as="s" hint-placeholder-count="3">
+                      <button type="button" onClick="{{ s.onClick }}" style="height:22px;padding:0 8px;border-radius:999px;border:1px solid #E8E8EC;background:#fff;font-size:11px;color:#6B6B75;cursor:pointer;" style-hover="border-color:#2563EB;color:#2563EB;">{{ s.label }}</button>
+                    </sc-for>
+                  </span>
+                </div>
+
+                <!-- 판별 결과 미리보기 (신규) -->
+                <sc-if value="{{ hasSource }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid #E8E8EC;border-radius:11px;background:#FBFBFC;">
+                    <span style="flex:none;width:{{ src.thumbW }};height:44px;border-radius:6px;background:{{ src.thumbBg }};"></span>
+                    <div style="min-width:0;flex:1;display:flex;flex-direction:column;gap:3px;">
+                      <span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:#0F7B52;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"></path></svg>{{ src.rec }}</span>
+                      <span style="font-size:13.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ src.title }}</span>
+                      <span style="font-size:11.5px;color:#9C9CA6;">{{ src.meta }}</span>
+                    </div>
+                  </div>
+                  <sc-if value="{{ src.warn }}" hint-placeholder-val="{{ false }}">
+                    <p style="margin:-6px 0 0;font-size:11.5px;color:#8A6410;">{{ src.warn }}</p>
+                  </sc-if>
+                </sc-if>
+
+                <div style="display:flex;flex-direction:column;gap:12px;">
+                  <div style="display:flex;flex-direction:column;gap:7px;">
+                    <span style="font-size:11px;font-weight:700;color:#9C9CA6;letter-spacing:.03em;">길이</span>
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                      <sc-for list="{{ lengthChips }}" as="ch" hint-placeholder-count="3">
+                        <button type="button" onClick="{{ ch.onClick }}" style="display:inline-flex;align-items:center;height:26px;padding:0 10px;border-radius:999px;border:1px solid {{ ch.border }};background:{{ ch.bg }};font-size:11.5px;color:{{ ch.color }};font-weight:{{ ch.weight }};cursor:pointer;">{{ ch.label }}</button>
+                      </sc-for>
+                    </div>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:8px;padding:9px 11px;border:1px solid #E8E8EC;border-radius:8px;background:#FBFBFC;font-size:12px;color:#6B6B75;">
+                    <span>{{ creditBoxLabel }}</span>
+                    <strong style="margin-left:auto;font-size:13px;color:#2563EB;">{{ creditBoxValue }}</strong>
+                    <span style="font-size:11.5px;color:#9C9CA6;">/ {{ credits }}회 남음</span>
+                  </div>
+                </div>
+
+                <ol style="display:flex;flex-wrap:wrap;gap:8px;margin:0;padding:0;list-style:none;">
+                  <sc-for list="{{ createSteps }}" as="st" hint-placeholder-count="3">
+                    <li style="display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px;background:#FBFBFC;color:#6B6B75;font-size:12px;font-weight:600;">
+                      <span style="width:18px;height:18px;border-radius:6px;display:grid;place-items:center;background:#EAF1FE;color:#1D4ED8;font-size:11px;">{{ st.n }}</span>{{ st.label }}
+                    </li>
+                  </sc-for>
+                </ol>
+              </div>
+
+              <div style="flex:0 0 132px;display:flex;flex-direction:column;gap:6px;">
+                <div style="position:relative;width:132px;height:234px;padding:12px;border-radius:10px;border:1px solid #E0E0E6;background:#16161A;overflow:hidden;display:flex;flex-direction:column;gap:6px;">
+                  <span style="align-self:flex-start;display:inline-flex;align-items:center;height:17px;padding:0 7px;border-radius:4px;background:#2563EB;color:#fff;font-size:9.5px;font-weight:800;white-space:nowrap;">{{ previewBadge }}</span>
+                  <p style="margin:0;font-size:15px;font-weight:800;line-height:1.25;color:#fff;">제목이 여기 표시돼요</p>
+                  <div style="margin-top:auto;height:70px;border-radius:6px;background:#6B6B75;"></div>
+                  <p style="margin:0;text-align:center;font-size:10.5px;font-weight:700;color:#16161A;background:#fff;border-radius:4px;padding:4px 6px;">자막이 이렇게 보여요</p>
+                </div>
+                <p style="margin:0;text-align:center;font-size:10.5px;color:#9C9CA6;line-height:1.4;">스타일은 다음 단계 템플릿에서 고릅니다</p>
+              </div>
+            </div>
+          </section>
+        </sc-if>
+
+        <!-- ①-b 분석 대기 -->
+        <sc-if value="{{ is.wait }}" hint-placeholder-val="{{ false }}">
+          <section data-screen-label="①-b 분석 대기" style="border-radius:11px;background:#16161A;padding:24px 26px;display:grid;grid-template-columns:minmax(0,1fr) 200px;gap:24px;align-items:center;">
+            <div style="display:flex;flex-direction:column;gap:18px;">
+              <div>
+                <p style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:.09em;color:#8B8B98;">쇼츠 만드는 중 · {{ srcBadge }}</p>
+                <h3 style="margin:0;font-size:22px;font-weight:700;line-height:1.35;color:#fff;">{{ src.waitTitle }}</h3>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:13px;">
+                <sc-for list="{{ waitSteps }}" as="w" hint-placeholder-count="4">
+                  <div style="display:flex;align-items:center;gap:10px;opacity:{{ w.opacity }};">
+                    <span style="width:22px;height:22px;border-radius:50%;background:{{ w.dot }};border:{{ w.ring }};display:inline-flex;align-items:center;justify-content:center;flex:none;color:#fff;font-size:11px;font-weight:800;">{{ w.icon }}</span>
+                    <span style="font-size:13.5px;font-weight:{{ w.weight }};color:{{ w.color }};">{{ w.label }}</span>
+                    <span style="margin-left:auto;font-size:11.5px;color:#63636f;">{{ w.time }}</span>
+                  </div>
+                </sc-for>
+              </div>
+              <div>
+                <div style="height:6px;border-radius:9999px;background:#26262f;overflow:hidden;"><span style="display:block;height:100%;background:#8b7cff;width:{{ waitPct }};"></span></div>
+                <p style="margin:8px 0 0;font-size:12px;color:#8b8b98;">{{ waitCaption }}</p>
+              </div>
+              <sc-if value="{{ showFound }}" hint-placeholder-val="{{ false }}">
+                <div style="border-radius:11px;background:#1a1a21;border:1px solid #26262f;padding:13px 15px;">
+                  <p style="margin:0 0 5px;font-size:11px;font-weight:700;color:#8b7cff;">{{ foundLabel }}</p>
+                  <p style="margin:0;font-size:13px;line-height:1.6;color:#c9c9d2;">{{ foundText }}</p>
+                </div>
+              </sc-if>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:10px;">
+              <div style="position:relative;aspect-ratio:9/16;border-radius:11px;background:#1a1a21;border:1px solid #26262f;overflow:hidden;">
+                <sc-if value="{{ showFoundThumb }}" hint-placeholder-val="{{ false }}">
+                  <span style="position:absolute;top:10px;left:10px;display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:5px;background:#8b7cff;color:#16161A;font-size:10.5px;font-weight:800;">92점</span>
+                  <span style="position:absolute;left:12px;right:12px;bottom:14px;font-size:12px;font-weight:700;color:#fff;line-height:1.4;">3배 늘어난 이유는 딱 하나였어요</span>
+                </sc-if>
+              </div>
+              <button type="button" onClick="{{ skipWait }}" style="display:inline-flex;align-items:center;justify-content:center;height:44px;border-radius:11px;border:1px solid #332c52;background:transparent;font-size:13px;font-weight:600;color:#8b8b98;cursor:pointer;">닫아도 계속 만듭니다</button>
+              <p style="margin:0;font-size:11px;line-height:1.5;color:#63636f;text-align:center;">{{ src.waitNote }}</p>
+            </div>
+          </section>
+        </sc-if>
+
+        <!-- ② 구간 후보 비교 (유튜브·MP4) -->
+        <sc-if value="{{ is.candidates }}" hint-placeholder-val="{{ false }}">
+          <section data-screen-label="② 구간 후보" style="background:#fff;border:1px solid #E8E8EC;border-radius:11px;padding:18px;box-shadow:0 1px 2px rgba(22,22,26,.06);display:grid;gap:16px;">
+            <div style="display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;">
+              <div>
+                <p style="margin:0 0 6px;color:#1D4ED8;font-size:12px;font-weight:800;letter-spacing:.08em;">구간 후보</p>
+                <h1 style="margin:0;font-size:15px;font-weight:700;letter-spacing:-0.03em;">하이라이트 후보 6개를 찾았어요</h1>
+                <p style="margin:4px 0 0;font-size:12px;color:#6B6B75;">점수와 이유를 보고 쓸 구간을 여러 개 고르세요. 고른 구간마다 쇼츠가 한 편씩 만들어집니다.</p>
+              </div>
+              <span style="margin-left:auto;font-size:12px;color:#9C9CA6;">원본 {{ src.origin }}</span>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;">
+              <sc-for list="{{ cands }}" as="c" hint-placeholder-count="6">
+                <button type="button" onClick="{{ c.onClick }}" style="position:relative;display:flex;flex-direction:column;gap:6px;padding:8px;border-radius:11px;border:1.5px solid {{ c.border }};background:{{ c.bg }};text-align:left;cursor:{{ c.cursor }};opacity:{{ c.opacity }};">
+                  <div style="position:relative;aspect-ratio:9/16;border-radius:8px;background:#16161A;">
+                    <span style="position:absolute;top:8px;left:8px;display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:5px;background:{{ c.scoreBg }};color:{{ c.scoreColor }};font-size:10.5px;font-weight:700;">{{ c.scoreLabel }}</span>
+                    <sc-if value="{{ c.selected }}" hint-placeholder-val="{{ false }}">
+                      <span style="position:absolute;top:8px;right:8px;width:18px;height:18px;border-radius:50%;background:#2563EB;color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;">✓</span>
+                    </sc-if>
+                    <span style="position:absolute;right:8px;bottom:8px;padding:2px 5px;border-radius:4px;background:rgba(0,0,0,.6);color:#fff;font-size:10.5px;font-weight:700;">{{ c.dur }}</span>
+                    <span style="position:absolute;left:8px;bottom:8px;font-size:10px;color:#8b8b98;">{{ c.at }}~</span>
+                  </div>
+                  <span style="font-size:12px;font-weight:600;color:#16161A;line-height:1.35;">{{ c.title }}</span>
+                  <span style="font-size:10.5px;color:{{ c.reasonColor }};line-height:1.35;">{{ c.reason }}</span>
+                </button>
+              </sc-for>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:10px;padding:14px;border:1px solid #E8E8EC;border-radius:11px;background:#FBFBFC;">
+              <span style="font-size:11px;font-weight:700;color:#9C9CA6;letter-spacing:.03em;">{{ srcBadge }} 옵션 · 고른 구간 전체에 적용</span>
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px 18px;">
+                <sc-for list="{{ videoOpts }}" as="o" hint-placeholder-count="3">
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+                    <div style="min-width:0;">
+                      <div style="font-size:12.5px;font-weight:700;">{{ o.title }}</div>
+                      <div style="font-size:11px;color:#9C9CA6;margin-top:2px;">{{ o.desc }}</div>
+                    </div>
+                    <button type="button" onClick="{{ o.onClick }}" aria-checked="{{ o.on }}" style="width:38px;height:22px;border-radius:999px;background:{{ o.track }};border:none;padding:2px;flex-shrink:0;display:flex;justify-content:{{ o.justify }};cursor:pointer;"><span style="display:block;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2);"></span></button>
+                  </div>
+                </sc-for>
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+                  <div style="min-width:0;">
+                    <div style="font-size:12.5px;font-weight:700;">음성</div>
+                    <div style="font-size:11px;color:#9C9CA6;margin-top:2px;">원본 목소리를 쓸지, AI 나레이션으로 덮을지</div>
+                  </div>
+                  <div style="display:flex;gap:4px;padding:3px;background:#F3F3F5;border-radius:9px;flex-shrink:0;">
+                    <sc-for list="{{ voiceSeg }}" as="v" hint-placeholder-count="2">
+                      <button type="button" onClick="{{ v.onClick }}" style="min-height:26px;padding:0 10px;border:0;border-radius:7px;font-size:12px;font-weight:{{ v.weight }};color:{{ v.color }};background:{{ v.bg }};box-shadow:{{ v.shadow }};cursor:pointer;">{{ v.label }}</button>
+                    </sc-for>
+                  </div>
+                </div>
+              </div>
+              <sc-if value="{{ src.cropNote }}" hint-placeholder-val="{{ false }}">
+                <p style="margin:0;font-size:11px;color:#9C9CA6;">{{ src.cropNote }}</p>
+              </sc-if>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;border-top:1px solid #E8E8EC;padding-top:14px;">
+              <button type="button" onClick="{{ back }}" style="border:0;background:transparent;color:#6B6B75;font-size:12px;font-weight:600;min-height:30px;padding:0 10px;border-radius:8px;cursor:pointer;" style-hover="background:#F3F3F5;color:#16161A;">← 다른 링크</button>
+              <span style="font-size:12.5px;color:#6B6B75;"><strong style="color:#16161A;">{{ selCount }}개</strong> 선택됨 — 선택한 후보마다 쇼츠가 하나씩 만들어집니다</span>
+              <div style="margin-left:auto;display:flex;align-items:center;gap:12px;">
+                <div style="display:flex;align-items:center;gap:8px;padding:9px 11px;border:1px solid {{ estBorder }};border-radius:8px;background:#FBFBFC;font-size:12px;color:#6B6B75;">
+                  <span>예상 차감</span><strong style="font-size:13px;color:#2563EB;">{{ selCount }}</strong><span style="font-size:11.5px;color:#9C9CA6;">/ {{ credits }}회 남음</span>
+                </div>
+                <button type="button" onClick="{{ next }}" disabled="{{ candDisabled }}" style="display:inline-flex;align-items:center;justify-content:center;height:44px;padding:0 20px;border:0;border-radius:10px;background:#2563EB;color:#fff;font-size:13.5px;font-weight:700;cursor:pointer;box-shadow:0 2px 6px rgba(37,99,235,.35);opacity:{{ candOpacity }};">선택한 구간으로 계속</button>
+              </div>
+              <sc-if value="{{ atLimit }}" hint-placeholder-val="{{ false }}">
+                <p style="flex-basis:100%;margin:0;text-align:right;font-size:11.5px;color:#8A6410;">남은 크레딧({{ credits }}회)만큼 골랐어요. 더 고르려면 선택을 빼거나 크레딧을 충전하세요.</p>
+              </sc-if>
+            </div>
+          </section>
+        </sc-if>
+
+        <!-- ③ 사진 선택 (블로그·상품) -->
+        <sc-if value="{{ is.photos }}" hint-placeholder-val="{{ false }}">
+          <section data-screen-label="③ 사진 선택" style="background:#fff;border:1px solid #E8E8EC;border-radius:11px;padding:18px;box-shadow:0 1px 2px rgba(22,22,26,.06);display:grid;gap:18px;">
+            <div style="display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;">
+              <div>
+                <p style="margin:0 0 6px;color:#1D4ED8;font-size:12px;font-weight:800;letter-spacing:.08em;">{{ photoKicker }}</p>
+                <h1 style="margin:0 0 4px;font-size:15px;font-weight:700;letter-spacing:-0.03em;">쇼츠에 쓸 사진을 골라주세요</h1>
+                <p style="margin:0;font-size:12px;color:#6B6B75;">고른 순서대로 장면이 됩니다. 최소 3장, 최대 8장까지 고를 수 있어요.</p>
+              </div>
+              <div style="margin-left:auto;display:flex;align-items:center;gap:8px;font-size:12.5px;color:#9C9CA6;white-space:nowrap;">
+                <strong style="font-size:14px;color:#2563EB;">{{ photoCount }}</strong> / 8장
+                <span style="width:72px;height:4px;border-radius:999px;background:#E8E8EC;overflow:hidden;"><span style="display:block;height:100%;background:#2563EB;width:{{ photoPct }};"></span></span>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:10px;">
+              <sc-for list="{{ photos }}" as="p" hint-placeholder-count="8">
+                <button type="button" onClick="{{ p.onClick }}" style="position:relative;aspect-ratio:9/16;padding:0;border:{{ p.border }};border-radius:8px;overflow:hidden;background:{{ p.tone }};cursor:{{ p.cursor }};opacity:{{ p.opacity }};">
+                  <sc-if value="{{ p.selected }}" hint-placeholder-val="{{ false }}">
+                    <span style="position:absolute;top:5px;left:5px;width:20px;height:20px;border-radius:50%;background:#2563EB;color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;">{{ p.order }}</span>
+                  </sc-if>
+                  <sc-if value="{{ p.stock }}" hint-placeholder-val="{{ false }}">
+                    <span style="position:absolute;left:5px;bottom:5px;padding:1px 5px;border-radius:4px;background:rgba(0,0,0,.55);color:#fff;font-size:9.5px;font-weight:700;">스톡</span>
+                  </sc-if>
+                </button>
+              </sc-for>
+            </div>
+            <sc-if value="{{ isBlog }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border:1px solid #E8E8EC;border-radius:11px;background:#FBFBFC;">
+                <div>
+                  <div style="font-size:12.5px;font-weight:700;">사진 부족 시 스톡 보충</div>
+                  <div style="font-size:11px;color:#9C9CA6;margin-top:2px;">글 사진이 3장보다 적으면 내용에 맞는 스톡 사진으로 부족한 만큼 채웁니다</div>
+                </div>
+                <button type="button" onClick="{{ toggleStock }}" style="width:38px;height:22px;border-radius:999px;background:{{ stockTrack }};border:none;padding:2px;flex-shrink:0;display:flex;justify-content:{{ stockJustify }};cursor:pointer;"><span style="display:block;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2);"></span></button>
+              </div>
+            </sc-if>
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;border-top:1px solid #E8E8EC;padding-top:14px;">
+              <button type="button" onClick="{{ back }}" style="border:0;background:transparent;color:#6B6B75;font-size:12px;font-weight:600;min-height:30px;padding:0 10px;border-radius:8px;cursor:pointer;" style-hover="background:#F3F3F5;color:#16161A;">← 다른 링크</button>
+              <span style="font-size:12px;color:{{ photoHintColor }};">{{ photoHint }}</span>
+              <button type="button" onClick="{{ next }}" disabled="{{ photoDisabled }}" style="margin-left:auto;display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:0 20px;border:0;border-radius:10px;background:#2563EB;color:#fff;font-size:13.5px;font-weight:700;cursor:pointer;opacity:{{ photoOpacity }};">{{ photoCta }}</button>
+            </div>
+          </section>
+        </sc-if>
+
+        <!-- 대본 3안 (블로그) -->
+        <sc-if value="{{ is.script }}" hint-placeholder-val="{{ false }}">
+          <section data-screen-label="대본 3안" style="background:#fff;border:1px solid #E8E8EC;border-radius:11px;padding:18px;box-shadow:0 1px 2px rgba(22,22,26,.06);display:grid;gap:18px;">
+            <div>
+              <p style="margin:0 0 6px;color:#1D4ED8;font-size:12px;font-weight:800;letter-spacing:.08em;">대본</p>
+              <h1 style="margin:0;font-size:15px;font-weight:700;letter-spacing:-0.03em;">AI가 쓴 대본 3안 중 하나를 골라주세요</h1>
+              <p style="margin:4px 0 0;font-size:12px;color:#6B6B75;">각 안을 눌러 나레이션을 미리 들어볼 수 있어요. 문장은 편집기에서 장면별로 고칠 수 있습니다.</p>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;">
+              <sc-for list="{{ scripts }}" as="s" hint-placeholder-count="3">
+                <div onClick="{{ s.onPick }}" style="display:flex;flex-direction:column;gap:10px;padding:16px;border-radius:11px;border:{{ s.border }};background:{{ s.bg }};cursor:pointer;">
+                  <div style="display:flex;align-items:center;gap:8px;">
+                    <span style="width:18px;height:18px;border-radius:50%;border:{{ s.radio }};background:#fff;flex:none;"></span>
+                    <strong style="font-size:13.5px;">{{ s.label }}</strong>
+                    <sc-if value="{{ s.rec }}" hint-placeholder-val="{{ false }}"><span style="display:inline-flex;align-items:center;height:18px;padding:0 6px;border-radius:5px;background:#EAF1FE;color:#2563EB;font-size:10px;font-weight:700;">추천</span></sc-if>
+                    <span style="margin-left:auto;font-size:11px;color:#9C9CA6;">{{ s.len }}</span>
+                  </div>
+                  <span style="font-size:11.5px;color:#9C9CA6;">{{ s.desc }}</span>
+                  <p style="margin:0;font-size:13px;line-height:1.75;color:#16161A;flex:1;">{{ s.text }}</p>
+                  <button type="button" onClick="{{ s.onPlay }}" style="align-self:flex-start;display:inline-flex;align-items:center;gap:6px;min-height:30px;padding:0 12px;border-radius:8px;border:1px solid #E0E0E6;background:#fff;color:#3A3A44;font-size:12px;font-weight:600;cursor:pointer;">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4v16l13-8z"></path></svg>{{ s.playLabel }}
+                  </button>
+                </div>
+              </sc-for>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;">
+              <div style="display:flex;flex-direction:column;gap:7px;padding:12px 14px;border:1px solid #E8E8EC;border-radius:11px;background:#FBFBFC;">
+                <span style="font-size:11px;font-weight:700;color:#9C9CA6;letter-spacing:.03em;">말투 · 블로그 생성기와 공유</span>
+                <select style="height:34px;padding:0 10px;border:1px solid #E8E8EC;border-radius:8px;background:#fff;font-size:12.5px;">
+                  <option>기본 말투</option><option>내 말투 · 동네 카페 리뷰어</option><option>내 말투 · 차분한 정보형</option>
+                </select>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:7px;padding:12px 14px;border:1px solid #E8E8EC;border-radius:11px;background:#FBFBFC;">
+                <span style="font-size:11px;font-weight:700;color:#9C9CA6;letter-spacing:.03em;">분량 · 글이 길어 나눌 수 있어요 (약 2,400자)</span>
+                <div style="display:flex;gap:4px;padding:3px;background:#F3F3F5;border-radius:9px;">
+                  <sc-for list="{{ seriesSeg }}" as="v" hint-placeholder-count="2">
+                    <button type="button" onClick="{{ v.onClick }}" style="flex:1;min-height:28px;border:0;border-radius:7px;font-size:12px;font-weight:{{ v.weight }};color:{{ v.color }};background:{{ v.bg }};box-shadow:{{ v.shadow }};cursor:pointer;">{{ v.label }}</button>
+                  </sc-for>
+                </div>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;border-top:1px solid #E8E8EC;padding-top:14px;">
+              <button type="button" onClick="{{ back }}" style="border:0;background:transparent;color:#6B6B75;font-size:12px;font-weight:600;min-height:30px;padding:0 10px;border-radius:8px;cursor:pointer;" style-hover="background:#F3F3F5;color:#16161A;">← 사진 다시 고르기</button>
+              <span style="font-size:12px;color:#9C9CA6;">{{ scriptFootNote }}</span>
+              <button type="button" onClick="{{ next }}" style="margin-left:auto;display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:0 20px;border:0;border-radius:10px;background:#2563EB;color:#fff;font-size:13.5px;font-weight:700;cursor:pointer;">이 대본으로 계속</button>
+            </div>
+          </section>
+        </sc-if>
+
+        <!-- 셀링포인트 3개 (상품, 신규) -->
+        <sc-if value="{{ is.selling }}" hint-placeholder-val="{{ false }}">
+          <section data-screen-label="셀링포인트" style="background:#fff;border:1px solid #E8E8EC;border-radius:11px;padding:18px;box-shadow:0 1px 2px rgba(22,22,26,.06);display:grid;gap:18px;">
+            <div>
+              <p style="margin:0 0 6px;color:#1D4ED8;font-size:12px;font-weight:800;letter-spacing:.08em;">셀링포인트</p>
+              <h1 style="margin:0;font-size:15px;font-weight:700;letter-spacing:-0.03em;">이 상품을 살 이유 3가지를 다듬어 주세요</h1>
+              <p style="margin:4px 0 0;font-size:12px;color:#6B6B75;">한 줄이 장면 하나가 되고, 나레이션도 이 문장으로 만들어집니다.</p>
+            </div>
+            <div style="display:grid;grid-template-columns:minmax(0,1fr) 180px;gap:20px;align-items:start;">
+              <div style="display:flex;flex-direction:column;gap:14px;">
+                <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid #E8E8EC;border-radius:11px;background:#FBFBFC;">
+                  <span style="flex:none;width:44px;height:44px;border-radius:6px;background:#D9D9DF;"></span>
+                  <div style="min-width:0;display:flex;flex-direction:column;gap:3px;">
+                    <span style="font-size:13.5px;font-weight:700;">무선 핸디 청소기 H7</span>
+                    <span style="font-size:12px;color:#6B6B75;"><strong style="color:#C2453C;">32%</strong> <strong style="color:#16161A;">39,900원</strong> <span style="text-decoration:line-through;color:#9C9CA6;">58,900원</span> · 리뷰 1,284개</span>
+                  </div>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:8px;">
+                  <sc-for list="{{ points }}" as="pt" hint-placeholder-count="3">
+                    <label style="display:flex;align-items:center;gap:10px;height:42px;padding:0 12px;border:1px solid #E8E8EC;border-radius:8px;background:#fff;">
+                      <span style="flex:none;width:20px;height:20px;border-radius:6px;display:grid;place-items:center;background:#EAF1FE;color:#1D4ED8;font-size:11px;font-weight:800;">{{ pt.n }}</span>
+                      <input type="text" value="{{ pt.value }}" onChange="{{ pt.onChange }}" style="flex:1;min-width:0;border:0;outline:none;background:transparent;font-size:13px;color:#16161A;">
+                      <span style="flex:none;font-size:10.5px;color:{{ pt.countColor }};">{{ pt.count }}/24</span>
+                    </label>
+                  </sc-for>
+                  <button type="button" onClick="{{ regenPoints }}" style="align-self:flex-start;display:inline-flex;align-items:center;min-height:30px;padding:0 12px;border:1px solid #E0E0E6;border-radius:8px;background:#fff;color:#3A3A44;font-size:12px;font-weight:600;cursor:pointer;">AI로 다시 뽑기</button>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:7px;">
+                  <span style="font-size:11px;font-weight:700;color:#9C9CA6;letter-spacing:.03em;">화면에 올릴 상품 정보</span>
+                  <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                    <sc-for list="{{ dataChips }}" as="ch" hint-placeholder-count="3">
+                      <button type="button" onClick="{{ ch.onClick }}" style="display:inline-flex;align-items:center;gap:5px;height:30px;padding:0 12px;border-radius:999px;border:1px solid {{ ch.border }};background:{{ ch.bg }};font-size:12px;color:{{ ch.color }};font-weight:{{ ch.weight }};cursor:pointer;">{{ ch.mark }} {{ ch.label }}</button>
+                    </sc-for>
+                  </div>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border:1px solid #E8E8EC;border-radius:11px;background:#FBFBFC;">
+                  <div>
+                    <div style="font-size:12.5px;font-weight:700;">설명란에 상품 링크 자동 첨부</div>
+                    <div style="font-size:11px;color:#9C9CA6;margin-top:2px;">완료 화면의 제목·설명에 구매 링크를 넣어 둡니다</div>
+                  </div>
+                  <button type="button" onClick="{{ toggleLink }}" style="width:38px;height:22px;border-radius:999px;background:{{ linkTrack }};border:none;padding:2px;flex-shrink:0;display:flex;justify-content:{{ linkJustify }};cursor:pointer;"><span style="display:block;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2);"></span></button>
+                </div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:6px;">
+                <div style="position:relative;aspect-ratio:9/16;border-radius:11px;background:linear-gradient(160deg,#16161A 0%,#6B6B75 100%);overflow:hidden;padding:12px;display:flex;flex-direction:column;justify-content:space-between;">
+                  <div style="display:flex;gap:4px;flex-wrap:wrap;">
+                    <sc-for list="{{ overlayBadges }}" as="ob" hint-placeholder-count="2">
+                      <span style="display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:5px;background:{{ ob.bg }};color:{{ ob.color }};font-size:10.5px;font-weight:800;">{{ ob.label }}</span>
+                    </sc-for>
+                  </div>
+                  <span style="align-self:center;max-width:92%;text-align:center;background:#FFE500;color:#16161A;font-size:11px;font-weight:800;padding:4px 8px;border-radius:4px;line-height:1.3;">{{ firstPoint }}</span>
+                </div>
+                <p style="margin:0;text-align:center;font-size:10.5px;color:#9C9CA6;">1번 장면 미리보기</p>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;border-top:1px solid #E8E8EC;padding-top:14px;">
+              <button type="button" onClick="{{ back }}" style="border:0;background:transparent;color:#6B6B75;font-size:12px;font-weight:600;min-height:30px;padding:0 10px;border-radius:8px;cursor:pointer;" style-hover="background:#F3F3F5;color:#16161A;">← 사진 다시 고르기</button>
+              <span style="font-size:12px;color:#9C9CA6;">셀링포인트 3개 · 장면 3개 + 끝 장면</span>
+              <button type="button" onClick="{{ next }}" style="margin-left:auto;display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:0 20px;border:0;border-radius:10px;background:#2563EB;color:#fff;font-size:13.5px;font-weight:700;cursor:pointer;">이 셀링포인트로 계속</button>
+            </div>
+          </section>
+        </sc-if>
+
+        <!-- ④ 템플릿 갤러리 (공유) -->
+        <sc-if value="{{ is.template }}" hint-placeholder-val="{{ false }}">
+          <section data-screen-label="④ 템플릿" style="background:#fff;border:1px solid #E8E8EC;border-radius:11px;padding:18px;box-shadow:0 1px 2px rgba(22,22,26,.06);display:grid;gap:14px;max-width:1040px;">
+            <div>
+              <p style="margin:0 0 6px;color:#1D4ED8;font-size:12px;font-weight:800;letter-spacing:.08em;">템플릿</p>
+              <h1 style="margin:0;font-size:15px;font-weight:700;letter-spacing:-0.03em;">자막 템플릿을 골라주세요</h1>
+              <p style="margin:4px 0 0;font-size:12px;color:#6B6B75;">{{ templateLead }}</p>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start;">
+              <div style="flex:1 1 420px;min-width:0;">
+                <div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:12px;">
+                  <sc-for list="{{ catChips }}" as="ch" hint-placeholder-count="5">
+                    <button type="button" onClick="{{ ch.onClick }}" style="height:30px;padding:0 14px;border:1px solid {{ ch.border }};border-radius:999px;background:{{ ch.bg }};color:{{ ch.color }};font-size:12.5px;font-weight:600;cursor:pointer;">{{ ch.label }}</button>
+                  </sc-for>
+                  <span style="margin-left:auto;font-size:11.5px;color:#9C9CA6;">{{ sortLabel }}</span>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:10px;">
+                  <sc-for list="{{ templates }}" as="t" hint-placeholder-count="8">
+                    <button type="button" onClick="{{ t.onClick }}" style="position:relative;display:flex;flex-direction:column;gap:6px;padding:{{ t.pad }};border:{{ t.border }};border-radius:11px;background:#fff;cursor:pointer;text-align:left;">
+                      <div style="display:flex;flex-direction:column;align-items:center;justify-content:{{ t.justify }};aspect-ratio:9/16;border-radius:8px;background:linear-gradient(160deg,#16161A 0%,#6B6B75 100%);padding:8px;overflow:hidden;">
+                        <span style="{{ t.capStyle }}">자막 예시</span>
+                      </div>
+                      <span style="font-size:11px;font-weight:600;color:#16161A;padding:0 2px 2px;">{{ t.name }}</span>
+                      <sc-if value="{{ t.selected }}" hint-placeholder-val="{{ false }}">
+                        <span style="position:absolute;top:8px;right:8px;width:18px;height:18px;border-radius:50%;background:#2563EB;color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;">✓</span>
+                      </sc-if>
+                      <sc-if value="{{ t.badge }}" hint-placeholder-val="{{ false }}">
+                        <span style="position:absolute;top:10px;left:10px;padding:2px 6px;border-radius:5px;background:#2563EB;color:#fff;font-size:9.5px;font-weight:700;">{{ t.badge }}</span>
+                      </sc-if>
+                    </button>
+                  </sc-for>
+                  <sc-if value="{{ showBrandSlot }}" hint-placeholder-val="{{ true }}">
+                    <div aria-disabled="true" style="position:relative;display:flex;flex-direction:column;gap:6px;padding:6px;border:1px solid #E8E8EC;border-radius:11px;background:#fff;opacity:.55;cursor:not-allowed;">
+                      <div style="display:flex;align-items:center;justify-content:center;aspect-ratio:9/16;border-radius:8px;background:#FBFBFC;border:1px dashed #E0E0E6;"><span style="font-size:13px;color:#9C9CA6;">+ 내 브랜드</span></div>
+                      <span style="font-size:11px;font-weight:600;padding:0 2px 2px;">내 브랜드 만들기</span>
+                      <span style="position:absolute;bottom:26px;left:8px;padding:2px 6px;border-radius:8px;background:#FBFBFC;border:1px solid #E8E8EC;color:#6B6B75;font-size:9.5px;font-weight:700;">준비 중</span>
+                    </div>
+                  </sc-if>
+                </div>
+              </div>
+              <div style="flex:1 1 240px;max-width:300px;display:flex;flex-direction:column;gap:8px;">
+                <p style="margin:0;font-size:12px;font-weight:600;color:#6B6B75;">미리보기 · {{ selTemplateName }}</p>
+                <div style="position:relative;border-radius:11px;overflow:hidden;background:#16161A;border:1px solid #E8E8EC;aspect-ratio:9/16;display:flex;flex-direction:column;align-items:center;justify-content:{{ prevJustify }};padding:22px 16px;">
+                  <div style="position:absolute;inset:0;background:linear-gradient(160deg,#26262f 0%,#6B6B75 100%);"></div>
+                  <sc-if value="{{ showPriceOverlay }}" hint-placeholder-val="{{ false }}">
+                    <div style="position:absolute;top:18px;left:16px;display:flex;gap:5px;">
+                      <span style="display:inline-flex;align-items:center;height:24px;padding:0 8px;border-radius:5px;background:#C2453C;color:#fff;font-size:12px;font-weight:800;">32%</span>
+                      <span style="display:inline-flex;align-items:center;height:24px;padding:0 8px;border-radius:5px;background:#FFE500;color:#16161A;font-size:12px;font-weight:800;">39,900원</span>
+                    </div>
+                  </sc-if>
+                  <span style="{{ prevCapStyle }}">{{ prevText }}</span>
+                </div>
+                <button type="button" onClick="{{ next }}" style="width:100%;height:44px;border:0;border-radius:10px;background:#2563EB;color:#fff;font-size:13.5px;font-weight:700;cursor:pointer;box-shadow:0 2px 6px rgba(37,99,235,.35);" style-hover="background:#1D4ED8;">이 템플릿으로 계속</button>
+                <button type="button" onClick="{{ next }}" style="width:100%;min-height:30px;border:0;background:transparent;color:#6B6B75;font-size:12px;font-weight:600;border-radius:8px;cursor:pointer;" style-hover="background:#F3F3F5;color:#16161A;">건너뛰기</button>
+                <p style="margin:2px 0 0;font-size:10.5px;line-height:1.5;color:#9C9CA6;">적용 순서: 템플릿 → 편집기 전체 스타일 → 장면별 값. 장면에서 바꾼 값은 언제든 되돌릴 수 있어요.</p>
+              </div>
+            </div>
+          </section>
+        </sc-if>
+
+        <!-- ⑥ 완료 · 업로드 (공유) -->
+        <sc-if value="{{ is.done }}" hint-placeholder-val="{{ false }}">
+          <section data-screen-label="⑥ 완료" style="width:100%;max-width:620px;justify-self:center;background:#fff;border:1px solid #E8E8EC;border-radius:11px;padding:18px;box-shadow:0 1px 2px rgba(22,22,26,.06);display:grid;gap:16px;">
+            <div style="display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;">
+              <div>
+                <p style="margin:0 0 6px;color:#0F7B52;font-size:12px;font-weight:800;letter-spacing:.08em;">완성</p>
+                <h1 style="margin:0;font-size:15px;font-weight:700;letter-spacing:-0.03em;">{{ doneTitle }}</h1>
+                <p style="margin:4px 0 0;font-size:12px;color:#6B6B75;">크레딧 {{ doneCost }}회 차감 · {{ creditsAfter }}회 남음</p>
+              </div>
+              <sc-if value="{{ multiDone }}" hint-placeholder-val="{{ false }}">
+                <button type="button" style="margin-left:auto;display:inline-flex;align-items:center;justify-content:center;height:44px;padding:0 20px;border:0;border-radius:10px;background:#2563EB;color:#fff;font-size:13.5px;font-weight:700;cursor:pointer;box-shadow:0 2px 6px rgba(37,99,235,.35);">{{ doneCost }}편 모두 다운로드</button>
+              </sc-if>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:10px;">
+              <sc-for list="{{ doneClips }}" as="d" hint-placeholder-count="1">
+                <div style="display:flex;gap:14px;align-items:center;padding:{{ d.pad }};border:{{ d.border }};border-radius:11px;">
+                  <div style="position:relative;flex:none;width:{{ d.w }};height:{{ d.h }};border-radius:8px;background:#16161A;overflow:hidden;display:flex;align-items:flex-end;justify-content:center;padding:6px;">
+                    <span style="{{ d.capStyle }}">{{ d.cap }}</span>
+                  </div>
+                  <div style="min-width:0;flex:1;display:flex;flex-direction:column;gap:4px;">
+                    <span style="font-size:13.5px;font-weight:700;">{{ d.title }}</span>
+                    <span style="font-size:11.5px;color:#9C9CA6;">{{ d.meta }}</span>
+                    <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">
+                      <button type="button" style="display:inline-flex;align-items:center;min-height:{{ d.btnH }};padding:0 14px;border:{{ d.dlBorder }};border-radius:8px;background:{{ d.dlBg }};color:{{ d.dlColor }};font-size:12px;font-weight:700;cursor:pointer;">MP4 다운로드</button>
+                      <button type="button" style="display:inline-flex;align-items:center;min-height:{{ d.btnH }};padding:0 14px;border:1px solid #E0E0E6;border-radius:8px;background:#fff;color:#3A3A44;font-size:12px;font-weight:600;cursor:pointer;">편집기에서 다듬기</button>
+                    </div>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+            <sc-if value="{{ showMeta }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-direction:column;gap:6px;padding:12px 14px;border:1px solid #E8E8EC;border-radius:11px;background:#FBFBFC;">
+                <span style="font-size:11px;font-weight:700;color:#9C9CA6;letter-spacing:.03em;">설명란</span>
+                <p style="margin:0;font-size:12.5px;line-height:1.6;color:#16161A;">흡입력·무게·배터리 3가지만 보면 됩니다. 지금 32% 할인 중.<br><a href="#" style="color:#2563EB;">smartstore.naver.com/homelab/products/881</a> <span style="color:#9C9CA6;">· 상품 링크 자동 첨부됨</span></p>
+              </div>
+            </sc-if>
+            <sc-if value="{{ showChannels }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;flex-direction:column;gap:8px;">
+                <span style="font-size:12.5px;font-weight:700;">저장 또는 바로 업로드</span>
+                <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #E8E8EC;border-radius:8px;">
+                  <span style="width:26px;height:26px;border-radius:6px;background:#F0F0F3;color:#6B6B75;font-size:10px;font-weight:800;display:grid;place-items:center;">YT</span>
+                  <span style="font-size:12.5px;font-weight:600;">유튜브 쇼츠</span>
+                  <span style="margin-left:auto;font-size:12px;color:#6B6B75;">오전 10시 예약</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #E8E8EC;border-radius:8px;">
+                  <span style="width:26px;height:26px;border-radius:6px;background:#F0F0F3;color:#6B6B75;font-size:10px;font-weight:800;display:grid;place-items:center;">IG</span>
+                  <span style="font-size:12.5px;font-weight:600;">인스타 릴스</span>
+                  <span style="margin-left:auto;font-size:12px;color:#6B6B75;">지금 업로드</span>
+                </div>
+                <div style="display:flex;align-items:center;justify-content:center;height:40px;border:1.5px dashed #E0E0E6;border-radius:8px;font-size:12px;font-weight:600;color:#9C9CA6;">+ 채널 연결하기</div>
+              </div>
+            </sc-if>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;border-top:1px solid #E8E8EC;padding-top:14px;">
+              <span style="font-size:11.5px;color:#9C9CA6;">스타일만 바꾸는 재생성은 크레딧이 들지 않습니다.</span>
+              <button type="button" onClick="{{ reset }}" style="margin-left:auto;display:inline-flex;align-items:center;min-height:30px;padding:0 14px;border:1px solid #E0E0E6;border-radius:8px;background:#fff;color:#3A3A44;font-size:12px;font-weight:600;cursor:pointer;">새로 만들기</button>
+              <button type="button" style="display:inline-flex;align-items:center;min-height:30px;padding:0 14px;border:0;border-radius:8px;background:transparent;color:#6B6B75;font-size:12px;font-weight:600;cursor:pointer;">내 쇼츠에서 보기 →</button>
+            </div>
+          </section>
+        </sc-if>
+
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;creditsRemaining&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:4,&quot;min&quot;:0,&quot;max&quot;:20,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;상태&quot;},&quot;errorDemo&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;none&quot;,&quot;options&quot;:[&quot;none&quot;,&quot;credit_out&quot;,&quot;private_video&quot;,&quot;image_short&quot;,&quot;render_fallback&quot;,&quot;copyright&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;상태&quot;},&quot;showChannels&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Feature flag&quot;}}">
+const ACC = '#2563EB';
+const SRC = {
+  youtube: { badge: '유튜브', rec: '유튜브 영상으로 인식됨', title: '사장님 인터뷰 풀버전 — 매출 3배 늘린 비결', meta: '24:10 · 동네가게TV · 공개 영상', thumbW: '64px', thumbBg: '#16161A', origin: '24:10 · "사장님 인터뷰 풀버전"',
+    waitTitle: '영상을 보고 하이라이트를 찾고 있습니다', total: 150, times: ['12초', '48초', '41초', '22초'],
+    steps: ['원본 영상 가져오기', '말소리 받아쓰기 · 2,410단어', '볼 만한 구간 고르기', '후보별 자막 붙이기'], waitNote: '다 되면 알림 보낼게요',
+    order: ['input', 'wait', 'candidates', 'template', 'done'], url: 'https://youtube.com/watch?v=k3Xa91' },
+  mp4: { badge: 'MP4 파일', rec: 'MP4 파일로 인식됨', title: 'interview_full_0915.mp4', meta: '1.2 GB · 18:42 · 가로 1920×1080', thumbW: '64px', thumbBg: '#16161A', origin: '18:42 · interview_full_0915.mp4',
+    waitTitle: '파일을 올리고 하이라이트를 찾고 있습니다', total: 160, times: ['40초', '46초', '38초', '20초'],
+    steps: ['파일 올리는 중', '말소리 받아쓰기', '볼 만한 구간 고르기', '후보별 자막 붙이기'], waitNote: '페이지를 떠나도 서버 작업은 계속돼요. 업로드가 끊기면 이어서 올립니다.',
+    cropNote: '가로 원본이라 9:16 크롭을 적용합니다. 원본이 이미 세로(9:16)면 크롭 단계를 건너뜁니다.',
+    order: ['input', 'wait', 'candidates', 'template', 'done'] },
+  blog: { badge: '블로그 글', rec: '블로그 글로 인식됨', title: '성수동 신상 카페 5곳 솔직 후기', meta: '사진 11장 · 약 2,400자 · blog.naver.com', thumbW: '44px', thumbBg: '#D9D9DF',
+    warn: '사진이 3장보다 적은 글은 만들 수 없어요 — 이 글은 11장이라 충분합니다.',
+    waitTitle: '글을 읽고 대본 3안을 쓰고 있습니다', total: 100, times: ['9초', '21초', '44초', '26초'],
+    steps: ['글 읽기', '쓸 만한 사진 찾기', '대본 3안 쓰기', '나레이션 듣기'], waitNote: '다 되면 알림 보낼게요',
+    order: ['input', 'wait', 'photos', 'script', 'template', 'done'], url: 'https://blog.naver.com/daily_cafe/2231' },
+  product: { badge: '상품 페이지', rec: '상품 페이지로 인식됨', title: '무선 핸디 청소기 H7', meta: '39,900원 · 32% 할인 · 리뷰 1,284개 · 스마트스토어', thumbW: '44px', thumbBg: '#D9D9DF',
+    waitTitle: '상품을 읽고 셀링포인트를 찾고 있습니다', total: 80, times: ['8초', '17초', '33초', '22초'],
+    steps: ['상품 정보 읽기', '상품 사진 모으기', '셀링포인트 찾기', '나레이션 듣기'], waitNote: '다 되면 알림 보낼게요',
+    order: ['input', 'wait', 'photos', 'selling', 'template', 'done'], url: 'https://smartstore.naver.com/homelab/products/881' },
+};
+const CRUMB = { input: '① 입력', wait: '①-b 분석', candidates: '② 후보', photos: '③ 사진', script: '대본', selling: '셀링포인트', template: '④ 템플릿', editor: '⑤ 편집', done: '⑥ 완료' };
+const CANDS = [
+  { id: 1, score: 92, title: '"3배 늘어난 이유는 딱 하나였어요"', reason: '감정 몰입도 높음 · 후킹 강한 시작', dur: '0:42', at: '08:12' },
+  { id: 2, score: 85, title: '"단골 이름부터 외웠습니다"', reason: '정보성 강함', dur: '0:38', at: '03:40' },
+  { id: 3, score: 78, title: '"재방문율 3가지 요소"', reason: '근거 중심 · 리스트형', dur: '0:51', at: '14:05' },
+  { id: 4, score: 74, title: '"첫 달 매출은 40만 원이었어요"', reason: '숫자 대비가 선명함', dur: '0:35', at: '01:22' },
+  { id: 5, score: 69, title: '"가격을 올렸더니 손님이 늘었다"', reason: '반전 구조 · 댓글 유도', dur: '0:47', at: '17:30' },
+  { id: 6, score: 61, title: '"다음 매장 계획"', reason: '마무리 멘트 · 화제성 낮음', dur: '0:29', at: '22:48' },
+];
+const TPL = [
+  { slug: 'impact_yellow', name: '임팩트 옐로우', group: '임팩트', box: 'box', accent: '#FFE500', pos: 'bottom' },
+  { slug: 'clean_minimal', name: '클린 미니멀', group: '미니멀', box: 'box', accent: '#4B3BFF', pos: 'bottom' },
+  { slug: 'news_caption', name: '뉴스 자막', group: '뉴스형', box: 'none', accent: '#FFFFFF', pos: 'bottom' },
+  { slug: 'white_box', name: '화이트 박스', group: '미니멀', box: 'box', accent: '#16161A', pos: 'bottom' },
+  { slug: 'viral_red', name: '바이럴 레드', group: '임팩트', box: 'none', accent: '#FF5C5C', pos: 'bottom' },
+  { slug: 'neon_green', name: '네온 그린', group: '임팩트', box: 'none', accent: '#7CFF6B', pos: 'bottom' },
+  { slug: 'caption_pill', name: '캡션 필', group: '미니멀', box: 'pill', accent: '#FFE500', pos: 'bottom' },
+  { slug: 'side_bar', name: '사이드 바', group: '미니멀', box: 'side_bar', accent: '#FFE500', pos: 'bottom' },
+  { slug: 'top_headline', name: '상단 헤드라인', group: '뉴스형', box: 'box', accent: '#7CFF6B', pos: 'top' },
+  { slug: 'outline_pop', name: '아웃라인', group: '뉴스형', box: 'outline', accent: '#4B3BFF', pos: 'bottom' },
+  { slug: 'gradient_bar', name: '그라디언트 바', group: '임팩트', box: 'gradient', accent: '#4B3BFF', pos: 'bottom' },
+  { slug: 'commerce_price', name: '커머스 가격형', group: '미니멀', box: 'box', accent: '#FFE500', pos: 'bottom' },
+];
+const SCRIPTS = [
+  { tone: 'summary', label: '핵심만', desc: '짧고 담백하게 정리', len: '약 24초', text: '성수동에 새로 연 카페 다섯 곳을 다녀왔어요. 분위기는 첫 번째, 커피는 세 번째, 디저트는 다섯 번째가 가장 좋았습니다. 주말엔 11시 전에 가야 줄을 안 서요.' },
+  { tone: 'hook', label: '임팩트 있게', desc: '앞 3초에 시선을 끄는 홍보형', len: '약 31초', text: '성수동 카페, 줄 서지 마세요. 다섯 곳 다 가본 결과 진짜 갈 곳은 두 곳뿐이었어요. 첫 번째는 창가 자리 하나로 끝납니다.' },
+  { tone: 'detailed', label: '친근하게', desc: '말 걸듯 자세히 설명', len: '약 44초', text: '이번 주에 성수동 신상 카페 다섯 곳을 직접 돌아봤어요. 첫 번째 집은 창가가 넓고 크림라떼가 6,500원이에요. 두 번째 집은 조용해서 작업하기 좋고요…' },
+];
+const PHOTO_TONES = ['#D9D9DF', '#CFCFD7', '#E3E3E8', '#C8C8D0', '#DEDEE4'];
+
+function capStyle(t, size) {
+  const base = { color: '#fff', fontWeight: 700, fontSize: size, padding: '4px 8px', lineHeight: 1.3, maxWidth: '92%', textAlign: 'center', position: 'relative', whiteSpace: size < 12 ? 'nowrap' : 'normal', overflow: 'hidden', textOverflow: 'ellipsis' };
+  const a = t.accent;
+  switch (t.box) {
+    case 'box': return { ...base, background: a, color: a === '#FFE500' || a === '#7CFF6B' ? '#16161A' : '#fff', borderRadius: 4 };
+    case 'pill': return { ...base, background: a, color: '#16161A', borderRadius: 999 };
+    case 'gradient': return { ...base, background: `linear-gradient(90deg, ${a}, transparent)`, borderRadius: 4 };
+    case 'side_bar': return { ...base, borderLeft: `4px solid ${a}`, background: 'rgba(0,0,0,0.55)', textAlign: 'left' };
+    case 'outline': return { ...base, border: `2px solid ${a}`, background: 'transparent', color: '#fff' };
+    default: return { ...base, background: 'transparent', color: a, textShadow: '0 1px 3px rgba(0,0,0,0.8)' };
+  }
+}
+function detect(v) {
+  v = (v || '').trim().toLowerCase();
+  if (!v) return null;
+  if (/youtube\.com|youtu\.be/.test(v)) return 'youtube';
+  if (/amazon\.|amzn\.|coupang\.|smartstore\.|brand\.naver\./.test(v)) return 'product';
+  if (/^https?:\/\//.test(v) || /\.[a-z]{2,}(\/|$)/.test(v)) return 'blog';
+  return null;
+}
+function fmt(s) { s = Math.max(0, Math.round(s)); const m = Math.floor(s / 60), r = s % 60; return m ? `${m}분 ${r}초` : `${r}초`; }
+const seg = (on) => ({ bg: on ? '#fff' : 'transparent', color: on ? '#16161A' : '#6B6B75', weight: on ? 700 : 600, shadow: on ? '0 1px 2px rgba(22,22,26,.06)' : 'none' });
+const sw = (on) => ({ track: on ? ACC : '#E8E8EC', justify: on ? 'flex-end' : 'flex-start' });
+
+class Component extends DCLogic {
+  state = { url: '', mp4: false, step: 'input', p: 0, len: 'medium', sel: [1, 2], photos: null, tone: 'hook', playing: null, series: 'one',
+    points: ['흡입력 22,000Pa — 유선급 파워', '1.1kg 초경량, 한 손으로 천장까지', '완충 60분, 원룸 전체 한 번에'],
+    chips: { price: true, discount: true, reviews: false }, link: true, stock: true, cat: '전체', tpl: null,
+    opts: { speaker: true, silence: true, crop: true }, voice: 'original' };
+
+  componentDidMount() {
+    const k = this.props.startSource, st = this.props.startStep;
+    if (!k || !SRC[k]) return;
+    this.setState({ url: k === 'mp4' ? '' : SRC[k].url, mp4: k === 'mp4', ...(this.props.startSel ? { sel: this.props.startSel } : {}) }, () => {
+      if (st === 'wait' && this.props.startP != null) this.setState({ step: 'wait', p: this.props.startP });
+      else if (st) this.go(st);
+    });
+  }
+  componentWillUnmount() { clearInterval(this.timer); }
+  source() { return this.state.mp4 ? 'mp4' : detect(this.state.url); }
+  go(step) {
+    clearInterval(this.timer);
+    this.setState({ step });
+    if (step === 'wait') {
+      this.setState({ p: 0 });
+      const start = Date.now();
+      this.timer = setInterval(() => {
+        const t = Date.now() - start;
+        this.setState({ p: Math.min(1, t / 5000) });
+        if (t >= 5600) { clearInterval(this.timer); this.next(); }
+      }, 60);
+    }
+  }
+  next = () => { const o = SRC[this.source()].order; const i = o.indexOf(this.state.step); if (i < o.length - 1) this.go(o[i + 1]); };
+  back = () => { const o = SRC[this.source()].order; let i = o.indexOf(this.state.step) - 1; if (o[i] === 'wait') i--; this.go(o[Math.max(0, i)]); };
+  reset = () => { clearInterval(this.timer); this.setState({ url: '', mp4: false, step: 'input', p: 0, sel: [1, 2], photos: null, tpl: null, cat: '전체' }); };
+
+  renderVals() {
+    const s = this.state;
+    const credits = Math.max(0, this.props.creditsRemaining ?? 4);
+    const errorDemo = this.props.errorDemo ?? 'none';
+    const key = this.source();
+    const src = key ? SRC[key] : { badge: '블로그 글' };
+    const isVideo = key === 'youtube' || key === 'mp4';
+    const step = s.step;
+    const is = { input: step === 'input', wait: step === 'wait', candidates: step === 'candidates', photos: step === 'photos', script: step === 'script', selling: step === 'selling', template: step === 'template', done: step === 'done' };
+
+    // crumbs
+    let crumbs = [];
+    if (key) {
+      const o = [...src.order]; o.splice(o.indexOf('done'), 0, 'editor');
+      const cur = o.indexOf(step);
+      crumbs = o.map((k, i) => {
+        const on = i === cur, past = i < cur;
+        return { label: CRUMB[k], arrow: i < o.length - 1, weight: on ? 700 : 600, color: on ? '#fff' : past ? '#2563EB' : k === 'editor' ? '#C2C2CC' : '#9C9CA6', bg: on ? '#16161A' : past ? '#EAF1FE' : 'transparent' };
+      });
+    }
+
+    // errors
+    const amber = { bg: '#FDF9EE', border: '#F0DFB4', titleColor: '#6B4E10', bodyColor: '#8A6410' };
+    const danger = { bg: '#FDF6F5', border: '#F0C9C5', titleColor: '#C2453C', bodyColor: '#A85049' };
+    const neutral = { bg: '#FBFBFC', border: '#E8E8EC', titleColor: '#16161A', bodyColor: '#6B6B75' };
+    const ob = (label, tone, onClick) => ({ label, onClick, bg: '#fff', border: tone.border === '#F0DFB4' ? '#E0D3AC' : tone.border === '#E8E8EC' ? '#E0E0E6' : tone.border, color: tone === neutral ? '#3A3A44' : tone.bodyColor === '#8A6410' ? '#8A6410' : '#C2453C' });
+    const pb = (label, bg, onClick) => ({ label, onClick, bg, border: bg, color: '#fff' });
+    const noop = () => {};
+    let err = null;
+    const creditOut = credits === 0 || errorDemo === 'credit_out';
+    if (is.input && creditOut) err = { ...neutral, title: '이번 달 크레딧을 다 쓰셨어요', body: '10월 1일에 20회로 초기화됩니다. 지금 만들려면 플랜을 올리거나 추가 크레딧을 구매하세요.', credit: '', buttons: [pb('플랜 올리기', ACC, noop), ob('크레딧 추가 구매', neutral, noop)] };
+    else if (is.input && errorDemo === 'private_video' && key === 'youtube') err = { ...danger, title: '이 영상은 가져올 수 없어요', body: '비공개이거나 삭제된 영상입니다. 공개 상태를 확인하거나, 영상 파일을 직접 올려 주세요.', credit: '크레딧은 차감되지 않았습니다.', buttons: [ob('다른 링크 넣기', danger, () => this.setState({ url: '' })), ob('파일로 올리기', danger, () => this.setState({ mp4: true }))] };
+    else if (is.photos && errorDemo === 'image_short') err = { ...danger, title: key === 'product' ? '이 상품에서는 사진을 충분히 못 찾았어요' : '이 글에서는 사진을 충분히 못 찾았어요', body: '쓸 수 있는 사진이 2장뿐이라 쇼츠를 만들 수 없어요(최소 3장). 사진이 더 많은 글이나 상품으로 다시 시도해 주세요.', credit: '크레딧은 차감되지 않았습니다.', buttons: [ob('다른 글·상품 URL 넣기', danger, this.reset)] };
+    else if (is.done && errorDemo === 'render_fallback') err = { ...amber, title: '간단 버전으로 만들어졌어요', body: '템플릿·폰트가 빠진 기본 화면으로 렌더됐습니다. 다시 만들면 고른 스타일이 적용됩니다.', credit: '크레딧은 차감되지 않았습니다.', buttons: [ob('스타일 적용해서 다시 만들기', amber, noop)] };
+    else if (is.done && errorDemo === 'copyright' && isVideo) err = { ...amber, title: '원본에 저작권 있는 음악이 있어요', body: '그대로 올리면 수익 창출이 막힐 수 있습니다. 배경음악을 빼거나 무료 음원으로 바꿔 드릴까요?', credit: '', buttons: [pb('무료 음원으로 교체', '#16161A', noop), ob('그대로 두기', amber, noop)] };
+    const blockInput = creditOut || (errorDemo === 'private_video' && key === 'youtube');
+
+    // input
+    const lengthChips = (isVideo ? [['short', '짧음 · ~25초'], ['medium', '보통 · 25–45초'], ['long', '길게 · 45초+']] : [['short', '짧게 (약 10–20초)'], ['long', '길게 (약 30–45초)']]).map(([k, label]) => {
+      const on = s.len === k || (!isVideo && k === 'short' && s.len !== 'long');
+      return { label, onClick: () => this.setState({ len: k }), border: on ? ACC : '#E8E8EC', bg: on ? '#EAF1FE' : '#fff', color: on ? ACC : '#6B6B75', weight: on ? 700 : 400 };
+    });
+    const createSteps = (isVideo ? ['구간 후보 여러 개 중 고르기', '템플릿 고르기', '편집 · 다운로드'] : key === 'product' ? ['상품 사진 고르기', '셀링포인트 3개 다듬기', '템플릿 고르기', '편집 · 다운로드'] : ['사진 고르기', '대본 3안 중 고르기', '템플릿 고르기', '편집 · 다운로드']).map((label, i) => ({ n: i + 1, label }));
+    const samples = [['유튜브', 'youtube'], ['블로그', 'blog'], ['상품', 'product']].map(([label, k]) => ({ label, onClick: () => this.setState({ url: SRC[k].url, mp4: false }) }));
+    const ctaDisabled = !key || blockInput;
+
+    // wait
+    const p = s.p, total = src.total || 100;
+    const active = Math.min(3, Math.floor(p * 4));
+    const waitSteps = (src.steps || []).map((label, i) => {
+      const done = p >= 1 || i < active, on = !done && i === active;
+      let l = label;
+      if (key === 'mp4' && i === 0) { const pct = done ? 100 : Math.round(p * 4 * 100); l = `파일 올리는 중 · ${pct}% (${(pct * 12.3).toFixed(0)} MB / 1.2 GB)`; }
+      return { label: on && i > 0 ? l.replace(/기$/, '는 중') : l, icon: done ? '✓' : on ? '•' : '', dot: done ? '#0F7B52' : on ? '#8b7cff' : 'transparent', ring: done || on ? 'none' : '1.5px solid #63636f', opacity: done || on ? 1 : 0.45, weight: on ? 600 : 400, color: done ? '#f2f2f5' : on ? '#fff' : '#8b8b98', time: done ? src.times[i] : '' };
+    });
+    const elapsed = p * total;
+    const showFound = (isVideo && p > 0.55) || (!isVideo && p > 0.35);
+
+    // candidates
+    const selCount = s.sel.length;
+    const atLimit = selCount >= credits;
+    const cands = CANDS.map((c, i) => {
+      const selected = s.sel.includes(c.id);
+      const blocked = !selected && atLimit;
+      return { ...c, selected, scoreLabel: i === 0 ? `${c.score}점 · 최고` : `${c.score}점`, scoreBg: i === 0 ? ACC : '#F0F0F3', scoreColor: i === 0 ? '#fff' : '#6B6B75',
+        border: selected ? ACC : '#E8E8EC', bg: selected ? '#EAF1FE' : '#fff', reasonColor: selected ? ACC : '#9C9CA6', opacity: blocked ? 0.4 : 1, cursor: blocked ? 'not-allowed' : 'pointer',
+        onClick: () => { if (blocked) return; this.setState({ sel: selected ? s.sel.filter((x) => x !== c.id) : [...s.sel, c.id] }); } };
+    });
+    const videoOpts = [
+      ['speaker', '화자 추적 확대', '말하는 사람을 따라 9:16 크롭 위치를 옮깁니다'],
+      ['silence', '무음 구간 제거', '0.6초 넘는 공백을 잘라 템포를 올립니다'],
+      ['crop', '9:16 위치 자동', '끄면 편집기에서 크롭 위치를 직접 조정합니다'],
+    ].map(([k, title, desc]) => ({ title, desc, on: s.opts[k], ...sw(s.opts[k]), onClick: () => this.setState({ opts: { ...s.opts, [k]: !s.opts[k] } }) }));
+    const voiceSeg = [['original', '원본 음성'], ['tts', 'AI 나레이션']].map(([k, label]) => ({ label, ...seg(s.voice === k), onClick: () => this.setState({ voice: k }) }));
+
+    // photos
+    const shortErr = errorDemo === 'image_short';
+    const nPhotos = shortErr ? 2 : key === 'product' ? 7 : 10;
+    const selPhotos = s.photos ?? (shortErr ? [0, 1] : key === 'product' ? [0, 1, 2, 3] : [0, 1, 2, 3, 4]);
+    const addStock = key === 'blog' && s.stock && shortErr;
+    const photoList = Array.from({ length: nPhotos + (addStock ? 1 : 0) }, (_, i) => i);
+    const photos = photoList.map((i) => {
+      const idx = selPhotos.indexOf(i), selected = idx >= 0, full = selPhotos.length >= 8;
+      const blocked = !selected && full;
+      return { selected, order: idx + 1, stock: i >= nPhotos, tone: PHOTO_TONES[i % 5], border: selected ? `2px solid ${ACC}` : '1px solid #E8E8EC', opacity: blocked ? 0.4 : 1, cursor: blocked ? 'not-allowed' : 'pointer',
+        onClick: () => { if (blocked) return; this.setState({ photos: selected ? selPhotos.filter((x) => x !== i) : [...selPhotos, i] }); } };
+    });
+    const selPhotosEff = addStock ? [...selPhotos, nPhotos].filter((v, i, a) => a.indexOf(v) === i) : selPhotos;
+    const photoCount = selPhotosEff.length;
+    const photoOk = photoCount >= 3 && !(shortErr && !addStock);
+    const photoHint = photoOk ? (photoCount >= 8 ? '8장을 모두 골랐어요. 더 넣으려면 하나를 빼세요.' : `사진 ${photoCount}장 → 장면 ${photoCount}개`) : '3장 이상 골라야 다음으로 갈 수 있어요.';
+
+    // script
+    const scripts = SCRIPTS.map((sc) => {
+      const on = s.tone === sc.tone, playing = s.playing === sc.tone;
+      return { ...sc, rec: sc.tone === 'hook', border: on ? `1.5px solid ${ACC}` : '1px solid #E8E8EC', bg: on ? '#F5F8FE' : '#fff', radio: on ? `5px solid ${ACC}` : '1.5px solid #C2C2CC',
+        playLabel: playing ? '듣는 중… 멈추기' : '나레이션 듣기', onPick: () => this.setState({ tone: sc.tone }),
+        onPlay: (e) => { e.stopPropagation(); this.setState({ tone: sc.tone, playing: playing ? null : sc.tone }); } };
+    });
+    const seriesSeg = [['one', '1편으로'], ['three', '시리즈 3편으로']].map(([k, label]) => ({ label, ...seg(s.series === k), onClick: () => this.setState({ series: k }) }));
+
+    // selling
+    const points = s.points.map((v, i) => ({ n: i + 1, value: v, count: v.length, countColor: v.length > 24 ? '#C2453C' : '#9C9CA6', onChange: (e) => { const pts = [...s.points]; pts[i] = e.target.value; this.setState({ points: pts }); } }));
+    const dataChips = [['price', '가격 39,900원'], ['discount', '할인율 32%'], ['reviews', '리뷰 1,284개']].map(([k, label]) => {
+      const on = s.chips[k];
+      return { label, mark: on ? '✓' : '+', border: on ? ACC : '#E8E8EC', bg: on ? '#EAF1FE' : '#fff', color: on ? ACC : '#6B6B75', weight: on ? 700 : 500, onClick: () => this.setState({ chips: { ...s.chips, [k]: !on } }) };
+    });
+    const overlayBadges = [s.chips.discount && { label: '32%', bg: '#C2453C', color: '#fff' }, s.chips.price && { label: '39,900원', bg: '#FFE500', color: '#16161A' }, s.chips.reviews && { label: '★ 리뷰 1,284', bg: '#fff', color: '#16161A' }].filter(Boolean);
+
+    // template
+    const defaultTpl = key === 'product' ? 'commerce_price' : 'impact_yellow';
+    const tplSlug = s.tpl ?? defaultTpl;
+    let ordered = TPL;
+    if (key === 'product') ordered = [TPL[11], ...TPL.slice(0, 11)];
+    const filtered = s.cat === '전체' ? ordered : s.cat === '브랜드 커스텀' ? [] : ordered.filter((t) => t.group === s.cat);
+    const templates = filtered.map((t) => {
+      const on = t.slug === tplSlug;
+      return { ...t, selected: on, capStyle: capStyle(t, 11), justify: t.pos === 'top' ? 'flex-start' : 'flex-end', border: on ? `2px solid ${ACC}` : '1px solid #E8E8EC', pad: on ? '5px' : '6px',
+        badge: key === 'product' && t.slug === 'commerce_price' ? '상품 추천' : '', onClick: () => this.setState({ tpl: t.slug }) };
+    });
+    const catChips = ['전체', '임팩트', '뉴스형', '미니멀', '브랜드 커스텀'].map((c) => {
+      const on = s.cat === c;
+      return { label: c === '전체' ? '전체 12' : c, border: on ? '#16161A' : '#E8E8EC', bg: on ? '#16161A' : '#fff', color: on ? '#fff' : '#6B6B75', onClick: () => this.setState({ cat: c }) };
+    });
+    const selT = TPL.find((t) => t.slug === tplSlug);
+    const prevText = isVideo ? '3배 늘어난 이유는 딱 하나였어요' : key === 'product' ? s.points[0] : '성수동 카페, 줄 서지 마세요';
+    const templateLead = isVideo ? `선택한 구간 ${selCount}편에 한 번에 적용돼요. 편별로 다르게 하려면 편집기에서 바꾸세요.` : '건너뛰어도 기존 스타일의 자막이 그대로 적용됩니다.';
+
+    // done
+    const doneCost = isVideo ? selCount : (key === 'blog' && s.series === 'three' ? 3 : 1);
+    const cs = capStyle(selT, 7);
+    let doneClips;
+    if (isVideo) {
+      doneClips = CANDS.filter((c) => s.sel.includes(c.id)).map((c, i) => ({ title: `${i + 1}편 · ${c.title}`, meta: `${c.dur} · 1080×1920 · ${selT.name}`, cap: c.title.replace(/"/g, ''), capStyle: cs, w: '54px', h: '96px', pad: '10px', border: '1px solid #E8E8EC', btnH: '30px', dlBorder: '1px solid #E0E0E6', dlBg: '#fff', dlColor: '#3A3A44' }));
+    } else {
+      const multi = doneCost > 1;
+      const base = key === 'product' ? { title: '무선 핸디 청소기 H7 — 살 이유 3가지', meta: `0:28 · 1080×1920 · ${selT.name}`, cap: s.points[0] } : { title: '성수동 카페, 줄 서지 마세요', meta: `0:31 · 1080×1920 · ${selT.name}`, cap: '줄 서지 마세요' };
+      const n = multi ? 3 : 1;
+      doneClips = Array.from({ length: n }, (_, i) => ({ ...base, title: multi ? `${i + 1}편 · ${base.title}` : base.title, capStyle: capStyle(selT, multi ? 7 : 9), w: multi ? '54px' : '96px', h: multi ? '96px' : '170px', pad: multi ? '10px' : '0', border: multi ? '1px solid #E8E8EC' : '0', btnH: multi ? '30px' : '44px', dlBorder: multi ? '1px solid #E0E0E6' : '0', dlBg: multi ? '#fff' : ACC, dlColor: multi ? '#3A3A44' : '#fff' }));
+    }
+    const multiDone = doneClips.length > 1;
+    const failed = errorDemo === 'render_fallback';
+
+    return {
+      rootH: this.props.embedHeight ?? '100vh',
+      is, src, crumbs, err, hasErr: !!err, credits, usagePct: `${Math.round(((20 - Math.min(20, credits)) / 20) * 100)}%`,
+      pageTitle: is.input ? '새로 만들기' : key ? (src.title.length > 26 ? src.title.slice(0, 26) + '…' : src.title) : '새로 만들기',
+      hasSource: !!key, srcBadge: src.badge, previewBadge: src.badge, url: s.url, isMp4: s.mp4, notMp4: !s.mp4,
+      onUrl: (e) => this.setState({ url: e.target.value, mp4: false }), clearUrl: () => this.setState({ mp4: false, url: '' }), pickMp4: () => this.setState({ mp4: true }),
+      samples, lengthChips, createSteps, inputBorder: key ? ACC : '#E8E8EC', inputRing: key ? '0 0 0 2px rgb(37 99 235 / 22%)' : 'none',
+      creditBoxLabel: isVideo ? '쇼츠 1편당 쓰는 크레딧 · 분석은 무료' : '이 쇼츠에 쓰는 크레딧', creditBoxValue: 1,
+      ctaDisabled, ctaOpacity: ctaDisabled ? 0.45 : 1, submit: () => { if (!ctaDisabled) this.go('wait'); },
+      waitSteps, waitPct: `${Math.round(p * 100)}%`, waitCaption: p >= 1 ? '다 됐어요 — 결과를 보여드릴게요' : `${fmt(elapsed)} 지남 · 약 ${fmt(total - elapsed)} 남음`,
+      showFound, showFoundThumb: isVideo && showFound, foundLabel: isVideo ? '먼저 찾은 구간' : '지금까지 찾은 것',
+      foundText: isVideo ? '"3배 늘어난 이유는 딱 하나였어요" — 08:12부터 42초' : key === 'product' ? '상품 사진 7장 · 가격 39,900원 (32% 할인) · 리뷰 1,284개' : '쓸 만한 사진 11장 · 소제목 5개',
+      skipWait: this.next,
+      cands, selCount, atLimit, candDisabled: selCount === 0, candOpacity: selCount === 0 ? 0.45 : 1, estBorder: atLimit ? '#F0DFB4' : '#E8E8EC', videoOpts, voiceSeg,
+      isBlog: key === 'blog', photos, photoCount, photoPct: `${Math.round((photoCount / 8) * 100)}%`, photoKicker: key === 'product' ? '상품 사진' : '사진',
+      photoHint, photoHintColor: photoOk ? '#9C9CA6' : '#8A6410', photoDisabled: !photoOk, photoOpacity: photoOk ? 1 : 0.45,
+      photoCta: key === 'product' ? '셀링포인트로' : '대본 고르기', toggleStock: () => this.setState({ stock: !s.stock }), stockTrack: sw(s.stock).track, stockJustify: sw(s.stock).justify,
+      scripts, seriesSeg, scriptFootNote: s.series === 'three' ? '시리즈 3편 · 크레딧 3회 (렌더 성공 시 차감)' : '크레딧 1회 (렌더 성공 시 차감)',
+      points, dataChips, overlayBadges, firstPoint: s.points[0], toggleLink: () => this.setState({ link: !s.link }), linkTrack: sw(s.link).track, linkJustify: sw(s.link).justify,
+      regenPoints: () => this.setState({ points: ['유선급 22,000Pa 흡입력', '무게 1.1kg, 손목이 편한 청소기', '한 번 충전으로 60분'] }),
+      templates, catChips, showBrandSlot: s.cat === '전체' || s.cat === '브랜드 커스텀', sortLabel: '많이 쓰는 순',
+      selTemplateName: selT.name, prevCapStyle: capStyle(selT, 16), prevJustify: selT.pos === 'top' ? 'flex-start' : 'flex-end', prevText,
+      showPriceOverlay: key === 'product' && (tplSlug === 'commerce_price' || s.chips.price), templateLead,
+      doneTitle: failed ? '쇼츠가 만들어졌어요 (간단 버전)' : multiDone ? `쇼츠 ${doneClips.length}편이 완성됐어요` : '쇼츠가 완성됐어요',
+      doneCost: failed ? 0 : doneCost, creditsAfter: failed ? credits : Math.max(0, credits - doneCost), doneClips, multiDone,
+      showMeta: key === 'product' && s.link, showChannels: !!this.props.showChannels,
+      next: this.next, back: this.back, reset: this.reset,
+    };
+  }
+}
+</script>
+</body>
+</html>

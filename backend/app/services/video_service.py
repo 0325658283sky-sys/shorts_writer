@@ -175,6 +175,16 @@ def _youtube_video_id(url: str) -> str | None:
     return None
 
 
+def _youtube_auth_options() -> dict:
+    cookie_file = (settings.youtube_cookies_file or "").strip()
+    if cookie_file:
+        return {"cookiefile": cookie_file}
+    browser = (settings.youtube_cookies_from_browser or "").strip()
+    if browser:
+        return {"cookiesfrombrowser": (browser,)}
+    return {}
+
+
 def preview_youtube_video(youtube_url: str) -> dict[str, str | int | None]:
     """Fetch title/thumbnail without downloading the video (AlphaCut-style confirm)."""
     url = _validate_youtube_url(youtube_url)
@@ -197,6 +207,7 @@ def preview_youtube_video(youtube_url: str) -> dict[str, str | int | None]:
         "noplaylist": True,
         "socket_timeout": 15,
         "retries": 1,
+        **_youtube_auth_options(),
     }
     try:
         with YoutubeDL(options) as ydl:
@@ -347,6 +358,7 @@ def import_youtube_video(conn: sqlite3.Connection, user_id: int, youtube_url: st
         "retries": 3,
         "fragment_retries": 3,
         "socket_timeout": 30,
+        **_youtube_auth_options(),
     }
     # YouTube 가 클라이언트별로 영상 주소를 403 으로 막는 일이 잦다. 기본 → 다른 클라이언트 순으로 시도.
     client_attempts: list[list[str] | None] = [None, ["tv"], ["web_safari"], ["mweb"], ["android_vr"]]

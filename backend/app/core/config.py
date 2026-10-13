@@ -9,6 +9,10 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60 * 24
     max_upload_mb: int = 2048
+    # YouTube 봇 차단("Sign in to confirm you're not a bot") 우회용. 둘 중 하나만 지정.
+    # youtube_cookies_file: Netscape 형식 cookies.txt 경로 / youtube_cookies_from_browser: chrome, edge, firefox 등
+    youtube_cookies_file: str | None = None
+    youtube_cookies_from_browser: str | None = None
     openai_api_key: str | None = None
     openai_transcription_model: str = "whisper-1"
     openai_highlight_model: str = "gpt-4o-mini"

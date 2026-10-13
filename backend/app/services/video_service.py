@@ -185,6 +185,19 @@ def _youtube_auth_options() -> dict:
     return {}
 
 
+# YouTube 는 데이터센터 IP 에 기본 클라이언트로 봇 확인(로그인 요구)을 걸거나 403 을 주는 일이 잦다.
+# 기본 → 다른 클라이언트 순으로 시도하면 쿠키 없이도 통과하는 경우가 많다.
+_YOUTUBE_CLIENT_ATTEMPTS: list[list[str] | None] = [None, ["android_vr"], ["tv"], ["web_safari"], ["mweb"]]
+
+
+def _is_retryable_youtube_error(exc: Exception) -> bool:
+    text = str(exc)
+    return any(
+        marker in text
+        for marker in ("403", "Forbidden", "Sign in to confirm", "not a bot", "needs to be reloaded", "format is not available")
+    )
+
+
 def preview_youtube_video(youtube_url: str) -> dict[str, str | int | None]:
     """Fetch title/thumbnail without downloading the video (AlphaCut-style confirm)."""
     url = _validate_youtube_url(youtube_url)
@@ -209,12 +222,28 @@ def preview_youtube_video(youtube_url: str) -> dict[str, str | int | None]:
         "retries": 1,
         **_youtube_auth_options(),
     }
+    info = None
+    channel_avatar = None
+    last_error: Exception | None = None
     try:
-        with YoutubeDL(options) as ydl:
-            info = ydl.extract_info(url, download=False)
-            # Do NOT fetch channel page here — yt-dlp channel extract can hang for minutes
-            # and blocks the confirm UI. Avatar is resolved lazily elsewhere (or skipped).
-            channel_avatar = _channel_avatar_from_video_info(info if isinstance(info, dict) else {})
+        for clients in _YOUTUBE_CLIENT_ATTEMPTS:
+            attempt = dict(options)
+            if clients:
+                attempt["extractor_args"] = {"youtube": {"player_client": clients}}
+            try:
+                with YoutubeDL(attempt) as ydl:
+                    info = ydl.extract_info(url, download=False)
+                    # Do NOT fetch channel page here — yt-dlp channel extract can hang for minutes
+                    # and blocks the confirm UI. Avatar is resolved lazily elsewhere (or skipped).
+                    channel_avatar = _channel_avatar_from_video_info(info if isinstance(info, dict) else {})
+                last_error = None
+                break
+            except DownloadError as exc:
+                last_error = exc
+                if not _is_retryable_youtube_error(exc):
+                    break
+        if last_error is not None:
+            raise last_error
     except DownloadError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -361,7 +390,7 @@ def import_youtube_video(conn: sqlite3.Connection, user_id: int, youtube_url: st
         **_youtube_auth_options(),
     }
     # YouTube 가 클라이언트별로 영상 주소를 403 으로 막는 일이 잦다. 기본 → 다른 클라이언트 순으로 시도.
-    client_attempts: list[list[str] | None] = [None, ["tv"], ["web_safari"], ["mweb"], ["android_vr"]]
+    client_attempts = _YOUTUBE_CLIENT_ATTEMPTS
     info = None
     last_error: Exception | None = None
     for clients in client_attempts:
@@ -377,7 +406,7 @@ def import_youtube_video(conn: sqlite3.Connection, user_id: int, youtube_url: st
             break
         except DownloadError as exc:
             last_error = exc
-            if "403" not in str(exc) and "Forbidden" not in str(exc):
+            if not _is_retryable_youtube_error(exc):
                 break
         except Exception as exc:
             destination.unlink(missing_ok=True)

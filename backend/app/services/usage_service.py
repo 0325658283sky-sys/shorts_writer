@@ -39,6 +39,12 @@ PLAN_POLICIES = {
 }
 
 
+# Re-cutting runs the model again, so it costs what the first cut did.
+# Named rather than inlined because the UI prints it inside the button label
+# (docs/FLOW_REDESIGN.md §3) and the two must not drift.
+REANALYZE_CREDIT_COST = 1
+
+
 def current_usage_month() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m")
 
@@ -95,6 +101,7 @@ def sync_user_usage_policy(conn: sqlite3.Connection, user_id: int) -> dict:
         "monthly_usage": monthly_usage,
         "usage_limit": policy["monthly_video_limit"],
         "remaining": max(policy["monthly_video_limit"] - monthly_usage, 0),
+        "reanalyze_cost": REANALYZE_CREDIT_COST,
         "usage_month": stored_month,
         "max_video_minutes": policy["max_video_minutes"],
     }
@@ -114,6 +121,32 @@ def assert_can_analyze_video(conn: sqlite3.Connection, user_id: int, duration_se
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Video is {duration_minutes:.1f} minutes. {usage['plan_name']} plan supports up to {usage['max_video_minutes']} minutes per video.",
         )
+    return usage
+
+
+def release_monthly_usage(conn: sqlite3.Connection, user_id: int, amount: int = 1) -> dict:
+    """Give back usage that was charged for work which then failed.
+
+    The charge is taken before the work so that a user over their limit is
+    refused rather than handed something they cannot pay for. That ordering
+    means a failure has to be released again, or the user paid for nothing
+    (FLOW_REDESIGN §11, "실패한 작업은 자동 환원").
+
+    Clamped at zero: a double release must not hand out free conversions.
+    """
+    usage = sync_user_usage_policy(conn, user_id)
+    next_usage = max(usage["monthly_usage"] - max(0, amount), 0)
+    conn.execute(
+        """
+        UPDATE users
+        SET monthly_usage = ?, usage_limit = ?, usage_month = ?
+        WHERE id = ?
+        """,
+        (next_usage, usage["usage_limit"], usage["usage_month"], user_id),
+    )
+    conn.commit()
+    usage["monthly_usage"] = next_usage
+    usage["remaining"] = max(usage["usage_limit"] - next_usage, 0)
     return usage
 
 

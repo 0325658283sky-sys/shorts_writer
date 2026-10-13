@@ -73,6 +73,10 @@ export type Video = {
   error_message: string | null;
   created_at: string;
   updated_at: string;
+  /** What the analyser decided this video is — one of the template genres. */
+  genre?: string | null;
+  /** One sentence: what we decided, why, and under which settings. */
+  genre_judgement?: string | null;
 };
 
 export type VideoStatusResponse = Pick<Video, "id" | "status" | "audio_path" | "error_message" | "updated_at">;
@@ -91,6 +95,27 @@ export type Usage = {
   posts_used?: number | null;
   posts_limit?: number | null;
   ditodio_linked?: boolean;
+  /** Credits one re-analysis costs. Printed inside the button label. */
+  reanalyze_cost?: number | null;
+};
+
+/** GET /videos/credit-quote — what this source costs, before converting. */
+export type CreditQuote = {
+  duration_seconds: number | null;
+  credits: number | null;
+  tier_label: string | null;
+  supported: boolean;
+  reason: string | null;
+};
+
+/** POST /videos/{id}/reanalyze — a re-cut, which replaces the old clips. */
+export type ReanalyzeResult = {
+  video_id: number;
+  genre: string | null;
+  genre_judgement: string | null;
+  highlights: Highlight[];
+  discarded_clips: number;
+  credits_remaining: number;
 };
 
 export type Plan = {

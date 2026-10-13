@@ -7,6 +7,7 @@ from pathlib import Path
 
 from fastapi import HTTPException, status
 
+from app.services.timing import timed
 from app.db.models import Clip
 from app.services.ffmpeg_service import (
     FFmpegClipError,
@@ -14,6 +15,7 @@ from app.services.ffmpeg_service import (
     FFmpegNarrationError,
     FFmpegSubtitleError,
     burn_subtitles_into_video,
+    create_source_clip,
     create_vertical_clip,
     cut_keep_intervals,
     detect_silence_keep_intervals,
@@ -157,6 +159,7 @@ def _update_clip_subtitle(
     conn.commit()
 
 
+@timed("create_clip_from_highlight")
 def create_clip_from_highlight(
     conn: sqlite3.Connection,
     user_id: int,
@@ -203,7 +206,14 @@ def create_clip_from_highlight(
     _update_clip_status(conn, clip_id, "processing", None, None)
 
     try:
-        create_vertical_clip(video.storage_path, str(output_path), start_time, end_time)
+        from app.services.template_catalog import SYSTEM_TEMPLATES_BY_SLUG
+
+        if raw_style in SYSTEM_TEMPLATES_BY_SLUG:
+            # v1 템플릿은 렌더러가 영상 영역에 맞춰 직접 자른다. 먼저 9:16으로
+            # 자르면 두 번 잘려 작은 조각만 남는다.
+            create_source_clip(video.storage_path, str(output_path), start_time, end_time)
+        else:
+            create_vertical_clip(video.storage_path, str(output_path), start_time, end_time)
         if remove_silence:
             _apply_silence_removal(conn, clip_id, output_path)
     except (FFmpegNotAvailableError, FFmpegClipError, TimeoutError) as exc:
@@ -218,6 +228,39 @@ def create_clip_from_highlight(
     if clip is None:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Clip status refresh failed.")
     return clip
+
+
+def discard_clips_for_video(conn: sqlite3.Connection, user_id: int, video_id: int) -> int:
+    """Remove this video's clips and the files they rendered to.
+
+    Called when the video is re-cut: the clips were cut from highlights that
+    no longer exist, so keeping them would leave rows pointing at deleted
+    highlights and give the user clips the judgement bar no longer describes.
+
+    File deletion is best-effort — a leftover file on disk is a smaller
+    problem than a failed re-analysis the user already paid for.
+    """
+    rows = conn.execute(
+        """
+        SELECT output_path, subtitle_path, subtitled_output_path,
+               narration_audio_path, narrated_output_path, templated_output_path
+        FROM clips WHERE user_id = ? AND video_id = ?
+        """,
+        (user_id, video_id),
+    ).fetchall()
+
+    for row in rows:
+        for value in tuple(row):
+            if not value:
+                continue
+            try:
+                Path(str(value)).unlink(missing_ok=True)
+            except OSError:
+                logger.warning("Could not remove a clip file: %s", value, exc_info=True)
+
+    conn.execute("DELETE FROM clips WHERE user_id = ? AND video_id = ?", (user_id, video_id))
+    conn.commit()
+    return len(rows)
 
 
 def _apply_silence_removal(conn: sqlite3.Connection, clip_id: int, output_path: Path) -> None:
@@ -272,6 +315,7 @@ def _subtitle_events_for_clip(conn: sqlite3.Connection, clip: Clip) -> list[tupl
     return events
 
 
+@timed("create_subtitled_clip")
 def create_subtitled_clip(conn: sqlite3.Connection, user_id: int, clip_id: int, style: str) -> Clip:
     if style not in ALLOWED_SUBTITLE_STYLES:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Subtitle style must be basic, bold, or shorts.")
@@ -473,6 +517,7 @@ def clip_download_path(clip: Clip) -> Path:
     return path
 
 
+@timed("render_clip_with_template")
 def render_clip_with_template(
     conn: sqlite3.Connection,
     user_id: int,
@@ -486,6 +531,7 @@ def render_clip_with_template(
     video_title: str | None = None,
     burn_subtitles: bool = True,
     subtitle_style: str = "bold",
+    template_overrides: dict | None = None,
 ) -> Clip:
     """Wrap YouTube clip MP4 in Remotion BlogShorts chrome and save templated_output_path."""
     from app.services.remotion_props_service import _caption_template_payload, remotion_public_dir
@@ -507,25 +553,43 @@ def render_clip_with_template(
             detail="Completed clip is required before template render.",
         )
 
-    raw_style = (visual_style or clip.visual_style or DEFAULT_CLIP_VISUAL_STYLE).strip().lower()
-    if raw_style not in ALLOWED_VISUAL_STYLES:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unknown visual_style.")
-    style_slug = normalize_visual_style(raw_style)
+    from app.services.template_catalog import SYSTEM_TEMPLATES_BY_SLUG
 
-    # Best-effort ASS burn so timed captions ride inside the wrapped video.
+    raw_style = (visual_style or clip.visual_style or DEFAULT_CLIP_VISUAL_STYLE).strip().lower()
+    # Two vocabularies share this field: the legacy visual_style slugs and the
+    # schema-v1 template slugs. A v1 slug renders through template_bridge,
+    # which reproduces its motion, colours, ratio and canvas and borrows the
+    # nearest chrome — see template_bridge's module docstring for the gap.
+    is_v1_template = raw_style in SYSTEM_TEMPLATES_BY_SLUG
+    if not is_v1_template and raw_style not in ALLOWED_VISUAL_STYLES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unknown visual_style.")
+    style_slug = raw_style if is_v1_template else normalize_visual_style(raw_style)
+
+    # A v1 template declares a caption motion, and a motion cannot be applied
+    # to text that is already pixels. Those renders get timed caption lines
+    # (built below) and no burn; the legacy styles, which have no motion to
+    # lose, keep burning so their existing output does not change.
+    burn = burn_subtitles and not is_v1_template
+
     working = clip
-    if burn_subtitles and not clip.subtitled_output_path:
+    if burn and not clip.subtitled_output_path:
         try:
             working = create_subtitled_clip(conn, user_id, clip_id, subtitle_style)
         except HTTPException as exc:
             logger.warning("YouTube template: subtitle burn skipped clip=%s: %s", clip_id, exc.detail)
 
-    source = Path(
-        working.narrated_output_path
-        or working.subtitled_output_path
-        or working.output_path
-        or ""
-    )
+    # v1 draws its own captions, so it needs the video without any burned in.
+    # A clip rendered earlier under a legacy style still has a subtitled file
+    # on disk, and using it would show the same words twice in two styles.
+    if is_v1_template:
+        source = Path(working.narrated_output_path or working.output_path or "")
+    else:
+        source = Path(
+            working.narrated_output_path
+            or working.subtitled_output_path
+            or working.output_path
+            or ""
+        )
     if not source.is_file():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Clip video file was not found.")
 
@@ -554,6 +618,33 @@ def render_clip_with_template(
     )
     caption_text = hook_subtitle or hook_title or ""
 
+    # Captions that follow the speech, for the motion engine. Only the v1 path
+    # uses them: the legacy path has them burned into the video already, and
+    # drawing them twice would stack two copies of the same words.
+    caption_lines: list[dict] = []
+    if is_v1_template and highlight is not None:
+        from app.services.caption_timeline import caption_lines_for_clip
+        from app.services.transcription_service import (
+            get_transcript_for_video,
+            transcript_segments,
+        )
+
+        try:
+            transcript = get_transcript_for_video(conn, working.video_id)
+            if transcript is not None and transcript.text:
+                caption_lines = caption_lines_for_clip(
+                    transcript_segments(transcript),
+                    float(highlight["start_time"]),
+                    float(highlight["end_time"]),
+                    max_chars=11,
+                )
+        except Exception:
+            # A clip with no captions is still a clip. Failing the render over
+            # the caption track would lose the whole thing.
+            logger.warning(
+                "Could not build caption lines for clip=%s", working.id, exc_info=True
+            )
+
     public_dir = remotion_public_dir()
     materialize_dir = public_dir / "clips" / f"yt-{working.id}"
     materialize_dir.mkdir(parents=True, exist_ok=True)
@@ -565,8 +656,28 @@ def render_clip_with_template(
         # Keep remote URL — Remotion Img can fetch https during render.
         avatar_rel = channel_avatar_url.strip()
 
-    style_payload = remotion_style_payload(style_slug)
-    overlay = merge_style_overlay(style_slug, default_style_overlay(style_slug))
+    if is_v1_template:
+        from app.services.template_bridge import (
+            template_to_remotion_style,
+            template_to_style_overlay,
+        )
+        from app.services.template_catalog import get_system_template
+
+        v1_template = get_system_template(style_slug)
+        if template_overrides:
+            # 모양 settings only (FLOW_REDESIGN §3): applied for this render,
+            # not stored on the clip, so swapping template later starts from
+            # the system template again rather than from someone's leftovers.
+            from app.services.template_schema import apply_overrides
+
+            v1_template = apply_overrides(v1_template, template_overrides)
+        style_payload = template_to_remotion_style(v1_template)
+        overlay = template_to_style_overlay(v1_template)
+        # 영상 영역은 템플릿이 정한 위치를 그대로 쓴다(없으면 렌더러 기본값).
+        style_payload["mediaRect"] = dict(v1_template["layout"]["mediaRect"])
+    else:
+        style_payload = remotion_style_payload(style_slug)
+        overlay = merge_style_overlay(style_slug, default_style_overlay(style_slug))
     caption_template = _caption_template_payload(conn, working.subtitle_template_id)
     props = {
         "blogClipId": working.id,
@@ -591,6 +702,7 @@ def render_clip_with_template(
                 "videoUrl": f"clips/yt-{working.id}/source.mp4",
                 "animated": False,
                 "text": caption_text,
+                "captionLines": caption_lines,
                 "durationSec": duration_sec,
                 "backgroundColor": style_payload.get("canvasBg"),
             }

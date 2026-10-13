@@ -6,6 +6,7 @@ from urllib.parse import urlparse
 
 from fastapi import HTTPException, UploadFile, status
 
+from app.services.timing import timed
 from app.core.config import settings
 from app.db.models import Video
 from app.services.ffmpeg_service import (
@@ -25,6 +26,14 @@ ALLOWED_CONTENT_TYPES = {"video/mp4", "application/mp4", "video/x-m4v"}
 YOUTUBE_HOSTS = {"youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be", "www.youtu.be"}
 
 
+def _optional(row: sqlite3.Row, column: str):
+    """Read a column that older rows may predate, without blowing up."""
+    try:
+        return row[column]
+    except (IndexError, KeyError):
+        return None
+
+
 def _row_to_video(row: sqlite3.Row) -> Video:
     return Video(
         id=row["id"],
@@ -39,6 +48,8 @@ def _row_to_video(row: sqlite3.Row) -> Video:
         error_message=row["error_message"],
         created_at=row["created_at"],
         updated_at=row["updated_at"],
+        genre=_optional(row, "genre"),
+        genre_judgement=_optional(row, "genre_judgement"),
     )
 
 
@@ -306,6 +317,7 @@ def _extract_channel_avatar(ydl: object, info: dict) -> str | None:
     return str(thumb) if thumb else None
 
 
+@timed("import_youtube_video")
 def import_youtube_video(conn: sqlite3.Connection, user_id: int, youtube_url: str) -> Video:
     url = _validate_youtube_url(youtube_url)
     try:
@@ -323,26 +335,49 @@ def import_youtube_video(conn: sqlite3.Connection, user_id: int, youtube_url: st
     destination = user_dir / stored_filename
     max_bytes = settings.max_upload_mb * 1024 * 1024
 
-    options = {
-        "format": "bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/best",
+    base_options = {
+        # mp4/m4a 로만 한정하면 403 이 나기 쉬운 스트림만 남는다. 확장자 제한을 풀고
+        # 1080p 이하 최선을 받아 ffmpeg 로 mp4 로 합친다.
+        "format": "bv*[height<=1080]+ba/b[height<=1080]/bv*+ba/b",
         "merge_output_format": "mp4",
         "outtmpl": str(destination.with_suffix(".%(ext)s")),
         "noplaylist": True,
         "quiet": True,
         "no_warnings": True,
-        "retries": 2,
-        "fragment_retries": 2,
+        "retries": 3,
+        "fragment_retries": 3,
+        "socket_timeout": 30,
     }
+    # YouTube 가 클라이언트별로 영상 주소를 403 으로 막는 일이 잦다. 기본 → 다른 클라이언트 순으로 시도.
+    client_attempts: list[list[str] | None] = [None, ["tv"], ["web_safari"], ["mweb"], ["android_vr"]]
+    info = None
+    last_error: Exception | None = None
+    for clients in client_attempts:
+        options = dict(base_options)
+        if clients:
+            options["extractor_args"] = {"youtube": {"player_client": clients}}
+        for leftover in user_dir.glob(f"{destination.stem}.*"):
+            leftover.unlink(missing_ok=True)
+        try:
+            with YoutubeDL(options) as ydl:
+                info = ydl.extract_info(url, download=True)
+            last_error = None
+            break
+        except DownloadError as exc:
+            last_error = exc
+            if "403" not in str(exc) and "Forbidden" not in str(exc):
+                break
+        except Exception as exc:
+            destination.unlink(missing_ok=True)
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unexpected YouTube import failure.") from exc
 
-    try:
-        with YoutubeDL(options) as ydl:
-            info = ydl.extract_info(url, download=True)
-    except DownloadError as exc:
-        destination.unlink(missing_ok=True)
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"YouTube download failed: {str(exc)[-500:]}") from exc
-    except Exception as exc:
-        destination.unlink(missing_ok=True)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unexpected YouTube import failure.") from exc
+    if last_error is not None:
+        for leftover in user_dir.glob(f"{destination.stem}.*"):
+            leftover.unlink(missing_ok=True)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"YouTube download failed: {str(last_error)[-500:]}",
+        ) from last_error
 
     if not destination.exists():
         candidates = sorted(user_dir.glob(f"{destination.stem}.*"))
@@ -411,6 +446,7 @@ def update_video_status(
     conn.commit()
 
 
+@timed("analyze_video_audio")
 def analyze_video_audio(conn: sqlite3.Connection, user_id: int, video_id: int) -> Video:
     video = get_video_for_user(conn, user_id, video_id)
     if video is None:

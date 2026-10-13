@@ -3,8 +3,23 @@
  * - remotion/schemas/blog-shorts-props.schema.json
  * - backend BlogShortsPropsResponse / remotion_props_service.py
  */
+import type { CaptionMotion } from "./captionMotion";
+
 export type CaptionWordTiming = {
   text: string;
+  startSec: number;
+  endSec: number;
+};
+
+/** 한 장면 안에서 시간에 따라 바뀌는 자막 한 줄.
+ *
+ * 블로그 장면은 장면당 자막 하나로 충분하지만, 영상 클립은 사람이 계속
+ * 말하므로 자막이 말을 따라가야 한다. `startSec`/`endSec`는 장면 시작
+ * 기준이고, 비어 있는 구간에는 자막이 없다.
+ */
+export type CaptionLine = {
+  text: string;
+  words?: CaptionWordTiming[];
   startSec: number;
   endSec: number;
 };
@@ -35,6 +50,11 @@ export type BlogBoardProps = {
   durationSec: number;
   /** Estimated or precise per-word timings for kinetic captions. */
   words?: CaptionWordTiming[];
+  /**
+   * Captions that change during this board. When present they replace
+   * `text`/`words`, which stay for the one-caption-per-board case.
+   */
+  captionLines?: CaptionLine[];
   backgroundColor?: string | null;
   speaker?: string | null;
 };
@@ -64,6 +84,9 @@ export type StyleOverlayLayer = {
   align: OverlayAlign;
   maxWidth: number;
   visible: boolean;
+  /** 글자 바깥 외곽선(px). 0이면 없음 */
+  strokeWidth?: number;
+  strokeColor?: string;
 };
 
 export type ShortsFontId =
@@ -73,7 +96,12 @@ export type ShortsFontId =
   | "suit"
   | "jalnan";
 
-export type CaptionAnimation = "none" | "highlight";
+/**
+ * Caption motion. The 12 presets live in ./captionMotion.
+ * "highlight" is the legacy value stored before the motion table existed;
+ * it renders as "pop", which is what the old renderer actually did.
+ */
+export type CaptionAnimation = CaptionMotion | "highlight";
 
 /** ④ 템플릿 갤러리 (design_handoff_newcut_v2) — subtitle_templates의 새 필드.
  * 있으면 캡션 위치/모양/강조색/폰트를 이 값으로 덮어쓰고, 없으면 기존
@@ -115,6 +143,8 @@ export type BlogShortsStyleProps = {
   transitionType: TransitionType;
   kenBurns: boolean;
   captionAnimation?: CaptionAnimation;
+  /** 템플릿이 정한 영상 영역(0~1, 1080x1920 기준). 있으면 레이아웃 기본값보다 우선 */
+  mediaRect?: { x: number; y: number; w: number; h: number } | null;
 };
 
 export type BlogShortsProps = {

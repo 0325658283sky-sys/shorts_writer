@@ -1,4 +1,6 @@
-import { useState, type FormEvent } from "react";
+import { TemplatesPage } from "./TemplatesPage";
+import { buildProjectListItems } from "../lib/projectAdapters";
+import { useState, type FormEvent, useMemo } from "react";
 import type { StudioTab } from "../lib/appRoute";
 import type {
   BlogClip,
@@ -54,7 +56,8 @@ export function Dashboard({
   highlightingId,
   onUpload,
   onSelectedFileChange,
-  onPreviewYoutube,
+  onStartYoutube,
+  onAutoPreviewYoutube,
   onConfirmYoutubeImport,
   onCancelYoutubePreview,
   onYoutubeUrlChange,
@@ -127,7 +130,8 @@ export function Dashboard({
   highlightingId: number | null;
   onUpload: (event: FormEvent<HTMLFormElement>) => void;
   onSelectedFileChange: (file: File | null) => void;
-  onPreviewYoutube: (event: FormEvent<HTMLFormElement>) => void;
+  onStartYoutube: (url: string) => void;
+  onAutoPreviewYoutube: (url: string) => void;
   onConfirmYoutubeImport: (visualStyle: VisualStyleSlug | string) => void;
   onCancelYoutubePreview: () => void;
   onYoutubeUrlChange: (value: string) => void;
@@ -165,6 +169,13 @@ export function Dashboard({
   onYoutubeLengthBandChange: (value: import("../constants").YoutubeLengthBand) => void;
 }) {
   const [source, setSource] = useState<CreateSource>("blog");
+  const recentItems = useMemo(
+    () =>
+      buildProjectListItems({ projects, blogClips, videos, clips })
+        .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : a.updatedAt > b.updatedAt ? -1 : 0))
+        .slice(0, 4),
+    [projects, blogClips, videos, clips],
+  );
 
   return (
     <div className="studio-main">
@@ -191,7 +202,8 @@ export function Dashboard({
               onBlogScriptModelChange={onBlogScriptModelChange}
               onCreateBlogShort={onCreateBlogShort}
               onYoutubeUrlChange={onYoutubeUrlChange}
-              onPreviewYoutube={onPreviewYoutube}
+              onStartYoutube={onStartYoutube}
+              onAutoPreviewYoutube={onAutoPreviewYoutube}
               onSelectedFileChange={onSelectedFileChange}
               onUpload={onUpload}
               youtubePreview={youtubePreview}
@@ -203,12 +215,10 @@ export function Dashboard({
               onYoutubeShortsCountChange={onYoutubeShortsCountChange}
               onYoutubeLengthBandChange={onYoutubeLengthBandChange}
               usage={usage}
+              recentItems={recentItems}
+              onGoToProjects={() => onStudioNavChange("projects")}
+              message={uploadMessage}
             />
-            {uploadMessage ? (
-              <p className="studio-toast" role="status">
-                {uploadMessage}
-              </p>
-            ) : null}
           </>
         ) : null}
         {studioNav === "projects" ? (
@@ -260,6 +270,7 @@ export function Dashboard({
             />
           </>
         ) : null}
+        {studioNav === "templates" ? <TemplatesPage /> : null}
         {studioNav === "usage" ? <MembershipPage usage={usage} /> : null}
     </div>
   );

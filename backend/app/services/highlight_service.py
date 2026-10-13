@@ -1,4 +1,5 @@
 ﻿import json
+import logging
 import sqlite3
 from pathlib import Path
 from typing import Any
@@ -6,6 +7,7 @@ from typing import Any
 from fastapi import HTTPException, status
 from openai import APIConnectionError, APIStatusError, OpenAI, OpenAIError, RateLimitError
 
+from app.services.timing import timed
 from app.core.config import settings
 from app.db.models import Highlight
 from app.services.ffmpeg_service import FFmpegExtractionError, FFmpegNotAvailableError, extract_video_frame_jpeg
@@ -15,6 +17,8 @@ from app.services.video_service import STORAGE_ROOT, get_video_for_user
 THUMB_ROOT = STORAGE_ROOT / "highlight_thumbs"
 
 ALLOWED_CONTENT_TYPES = {"정보형", "꿀팁형", "후킹형", "감정형", "논쟁형", "웃긴 장면"}
+
+logger = logging.getLogger(__name__)
 
 
 def _row_to_highlight(row: sqlite3.Row) -> Highlight:
@@ -293,7 +297,42 @@ def _parse_highlight_json(
     return sorted(parsed, key=lambda value: value["score"], reverse=True)[:5]
 
 
-def _generate_highlights_with_openai(video_title: str, transcript_text: str, segments: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _genre_completer(client: OpenAI):
+    """Adapter so genre_service can ask the model without owning a client."""
+
+    def complete(system_prompt: str, user_prompt: str) -> str | None:
+        response = client.chat.completions.create(
+            model=settings.openai_highlight_model,
+            response_format={"type": "json_object"},
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+        )
+        return response.choices[0].message.content if response.choices else None
+
+    return complete
+
+
+def infer_video_genre(video_title: str, transcript_text: str, channel: str | None = None):
+    """Work out the genre before choosing highlights. Never raises."""
+    from app.services.genre_service import heuristic_genre, infer_genre
+
+    if not settings.openai_api_key:
+        return heuristic_genre(video_title, channel, transcript_text)
+    try:
+        client = OpenAI(api_key=settings.openai_api_key)
+    except Exception:
+        return heuristic_genre(video_title, channel, transcript_text)
+    return infer_genre(video_title, channel, transcript_text, complete=_genre_completer(client))
+
+
+def _generate_highlights_with_openai(
+    video_title: str,
+    transcript_text: str,
+    segments: list[dict[str, Any]],
+    genre_guess: Any = None,
+) -> list[dict[str, Any]]:
     if not settings.openai_api_key:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="OPENAI_API_KEY is not configured.")
 
@@ -313,6 +352,15 @@ def _generate_highlights_with_openai(video_title: str, transcript_text: str, seg
         "Use Korean titles and reasons. content_type must be one of: 정보형, 꿀팁형, 후킹형, 감정형, 논쟁형, 웃긴 장면. "
         "score must be 0 to 100."
     )
+    if genre_guess is not None:
+        from app.services.genre_service import highlight_prompt_clause
+
+        # What counts as a good moment differs by genre: a laugh is the point
+        # in a variety clip and noise in a lecture.
+        system_prompt += (
+            f"\nThis video reads as: {genre_guess.genre}. "
+            f"{highlight_prompt_clause(genre_guess)}"
+        )
     user_prompt = (
         "Analyze this transcript and choose the best shorts candidates. "
         f"Remember: every clip's (end_time - start_time) must be >= {min_s} seconds and <= {max_s} seconds. "
@@ -344,6 +392,7 @@ def _generate_highlights_with_openai(video_title: str, transcript_text: str, seg
     return _parse_highlight_json(raw_text, min_s=min_s, max_s=max_s, media_end=media_end)
 
 
+@timed("get_or_create_highlights")
 def get_or_create_highlights(conn: sqlite3.Connection, user_id: int, video_id: int) -> list[Highlight]:
     video = get_video_for_user(conn, user_id, video_id)
     if video is None:
@@ -361,8 +410,11 @@ def get_or_create_highlights(conn: sqlite3.Connection, user_id: int, video_id: i
         )
 
     segments = transcript_segments(transcript)
+    genre_guess = infer_video_genre(video.original_filename, transcript.text or "")
     try:
-        highlight_payload = _generate_highlights_with_openai(video.original_filename, transcript.text, segments)
+        highlight_payload = _generate_highlights_with_openai(
+            video.original_filename, transcript.text, segments, genre_guess
+        )
     except HTTPException as exc:
         # Recover from empty/invalid GPT windows using transcript heuristics.
         if exc.status_code not in {502, 500}:
@@ -376,4 +428,90 @@ def get_or_create_highlights(conn: sqlite3.Connection, user_id: int, video_id: i
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="하이라이트 후보를 찾지 못했습니다. 영상이 너무 짧거나 대본 내용이 부족할 수 있습니다.",
         )
-    return _save_highlights(conn, video_id, highlight_payload)
+    saved = _save_highlights(conn, video_id, highlight_payload)
+    _store_genre_judgement(conn, video_id, genre_guess, len(saved))
+    return saved
+
+
+def regenerate_highlights(
+    conn: sqlite3.Connection,
+    user_id: int,
+    video_id: int,
+    *,
+    genre: str | None = None,
+) -> list[Highlight]:
+    """Cut the video again, optionally under a genre the user picked.
+
+    Unlike ``get_or_create_highlights`` this never returns what is already
+    stored — being asked to find something different is the whole point. The
+    existing clips go first, because they were cut from highlights that are
+    about to be replaced.
+
+    The caller charges for this before calling: it re-runs the model.
+    """
+    from app.services.clip_service import discard_clips_for_video
+    from app.services.genre_service import forced_genre
+
+    video = get_video_for_user(conn, user_id, video_id)
+    if video is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Video not found.")
+
+    transcript = get_transcript_for_video(conn, video_id)
+    if transcript is None or transcript.status != "transcribed" or not transcript.text:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="다시 찾기 전에 음성 인식(전사)이 끝나 있어야 해요.",
+        )
+
+    segments = transcript_segments(transcript)
+    genre_guess = (
+        forced_genre(genre)
+        if genre
+        else infer_video_genre(video.original_filename, transcript.text or "")
+    )
+
+    try:
+        highlight_payload = _generate_highlights_with_openai(
+            video.original_filename, transcript.text, segments, genre_guess
+        )
+    except HTTPException as exc:
+        if exc.status_code not in {502, 500}:
+            raise
+        highlight_payload = []
+
+    if not highlight_payload:
+        highlight_payload = _fallback_highlights_from_segments(segments, transcript.text or "")
+    if not highlight_payload:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="다시 찾아봤지만 쓸 만한 구간이 없었어요. 장르를 바꿔서 한 번 더 해보세요.",
+        )
+
+    discard_clips_for_video(conn, user_id, video_id)
+    saved = _save_highlights(conn, video_id, highlight_payload)
+    _store_genre_judgement(conn, video_id, genre_guess, len(saved))
+    return saved
+
+
+def _store_genre_judgement(
+    conn: sqlite3.Connection, video_id: int, genre_guess: Any, clip_count: int
+) -> None:
+    """Record what we decided and why, next to the clips it produced.
+
+    Stored rather than recomputed on read: the judgement has to match the
+    clips that were actually cut, and a later re-inference could disagree
+    with them. Best-effort — a video whose judgement could not be written
+    still has its highlights, and the result screen just shows no bar.
+    """
+    if genre_guess is None:
+        return
+    try:
+        from app.services.genre_service import judgement_sentence
+
+        conn.execute(
+            "UPDATE videos SET genre = ?, genre_judgement = ? WHERE id = ?",
+            (genre_guess.genre, judgement_sentence(genre_guess, clip_count), video_id),
+        )
+        conn.commit()
+    except Exception:  # pragma: no cover - never fail a conversion over this
+        logger.warning("Could not store the genre judgement.", exc_info=True)

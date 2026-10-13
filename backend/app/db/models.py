@@ -26,6 +26,8 @@ class Video:
     error_message: str | None
     created_at: str
     updated_at: str
+    genre: str | None = None
+    genre_judgement: str | None = None
 
 
 @dataclass(frozen=True)

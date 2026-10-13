@@ -122,6 +122,7 @@ def render_clip_template(
         video_title=request.video_title,
         burn_subtitles=request.burn_subtitles,
         subtitle_style=request.subtitle_style,
+        template_overrides=request.template_overrides,
     )
     return _to_clip_response(clip)
 

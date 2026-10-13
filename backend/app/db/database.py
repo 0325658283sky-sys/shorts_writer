@@ -95,6 +95,19 @@ def _create_videos_table(conn: sqlite3.Connection, table_name: str = "videos") -
     )
 
 
+def _ensure_video_genre_columns(conn: sqlite3.Connection) -> None:
+    """What the analyser decided this video is, and the sentence explaining it.
+
+    Stored rather than recomputed: the judgement must match the clips that
+    were actually cut, and a later re-inference could disagree with them.
+    """
+    columns = _sqlite_columns(conn, "videos")
+    if "genre" not in columns:
+        conn.execute("ALTER TABLE videos ADD COLUMN genre TEXT")
+    if "genre_judgement" not in columns:
+        conn.execute("ALTER TABLE videos ADD COLUMN genre_judgement TEXT")
+
+
 def _migrate_videos_table(conn: sqlite3.Connection) -> None:
     row = conn.execute("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'videos'").fetchone()
     if row is None:
@@ -765,6 +778,7 @@ def init_db() -> None:
         )
         _migrate_users_table(conn)
         _migrate_videos_table(conn)
+        _ensure_video_genre_columns(conn)
         _create_transcripts_table(conn)
         _create_highlights_table(conn)
         _create_clips_table(conn)

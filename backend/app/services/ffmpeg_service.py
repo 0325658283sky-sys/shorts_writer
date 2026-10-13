@@ -140,6 +140,37 @@ def create_vertical_clip(source_path: str, output_path: str, start_time: float, 
         raise FFmpegClipError(error[-1000:])
 
 
+def create_source_clip(source_path: str, output_path: str, start_time: float, end_time: float) -> None:
+    """원본 비율 그대로 구간만 자른다.
+
+    템플릿 렌더러가 자기 영상 영역에 맞춰 한 번만 자르게 하려는 것이다.
+    여기서 9:16으로 먼저 자르면 렌더러가 또 잘라 작은 조각만 남는다.
+    가로가 1920을 넘으면만 줄이고, 화질 손실을 줄이려 crf를 낮게 둔다.
+    """
+    ensure_ffmpeg_available()
+    source = Path(source_path)
+    destination = Path(output_path)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+
+    duration = max(0.1, end_time - start_time)
+    command = [
+        "ffmpeg", "-y",
+        "-ss", f"{start_time:.3f}",
+        "-i", str(source),
+        "-t", f"{duration:.3f}",
+        "-vf", "scale='min(1920,iw)':-2",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
+        "-c:a", "aac", "-b:a", "128k",
+        "-movflags", "+faststart",
+        str(destination),
+    ]
+    result = subprocess.run(command, capture_output=True, text=True, timeout=60 * 30)
+    if result.returncode != 0:
+        destination.unlink(missing_ok=True)
+        error = (result.stderr or result.stdout or "FFmpeg clip generation failed.").strip()
+        raise FFmpegClipError(error[-1000:])
+
+
 def _is_gif_path(path: Path) -> bool:
     return path.suffix.lower() == ".gif"
 

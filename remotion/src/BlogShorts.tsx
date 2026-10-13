@@ -13,6 +13,11 @@ import {
   useVideoConfig,
 } from "remotion";
 import { ensureShortsFontsLoaded, normalizeShortsFontId, shortsFontCss } from "./fonts";
+import {
+  normalizeMotion,
+  wordMotionStyle,
+  wordStateAt,
+} from "./captionMotion";
 import type {
   BlogBoardProps,
   BlogShortsProps,
@@ -230,6 +235,7 @@ function resolveStyle(props: BlogShortsProps): BlogShortsStyleProps {
     transitionType: props.style.transitionType ?? props.transitionType ?? fallback.transitionType,
     kenBurns: props.style.kenBurns ?? fallback.kenBurns,
     captionAnimation: props.style.captionAnimation ?? fallback.captionAnimation ?? "highlight",
+    mediaRect: props.style.mediaRect ?? null,
   };
 }
 
@@ -268,7 +274,10 @@ function mergeOverlay(slug: string, custom?: StyleOverlayProps | null) {
   const out = {
     titleFont: normalizeShortsFontId(custom?.titleFont),
     captionFont: normalizeShortsFontId(custom?.captionFont),
-    captionAnimation: (custom?.captionAnimation === "none" ? "none" : "highlight") as CaptionAnimation,
+    captionAnimation: normalizeMotion(
+      custom?.captionAnimation === "highlight" ? "pop" : custom?.captionAnimation,
+      "pop",
+    ),
     title: { ...base.title },
     subtitle: { ...base.subtitle },
     caption: { ...base.caption },
@@ -317,6 +326,18 @@ function layerBoxStyle(layer: StyleOverlayLayer): React.CSSProperties {
     justifyContent: justify,
     zIndex: 6,
     pointerEvents: "none",
+  };
+}
+
+/** 글자 바깥으로 두르는 외곽선. paintOrder로 글자 안쪽을 먹지 않게 한다. */
+function outlineStyle(layer: StyleOverlayLayer): React.CSSProperties {
+  const w = layer.strokeWidth ?? 0;
+  // 한글은 단어 중간에서 줄바꿈되지 않게 한다("요/약" 방지).
+  if (w <= 0) return { wordBreak: "keep-all" };
+  return {
+    wordBreak: "keep-all",
+    WebkitTextStroke: `${w * 2}px ${layer.strokeColor || "#000000"}`,
+    paintOrder: "stroke fill",
   };
 }
 
@@ -369,6 +390,7 @@ function TitleLayers({
               textAlign: textAlign(overlay.title),
               whiteSpace: "pre-wrap",
               width: "100%",
+              ...outlineStyle(overlay.title),
             }}
           >
             <AccentTitle text={title} accent={accent} baseColor={overlay.title.color} />
@@ -388,6 +410,7 @@ function TitleLayers({
               textAlign: textAlign(overlay.subtitle),
               whiteSpace: "pre-wrap",
               width: "100%",
+              ...outlineStyle(overlay.subtitle),
             }}
           >
             {subtitle}
@@ -667,16 +690,6 @@ function CaptionBlock({
   );
 }
 
-function activeWordIndex(words: CaptionWordTiming[], timeSec: number): number {
-  if (!words.length) return -1;
-  for (let index = 0; index < words.length; index += 1) {
-    const word = words[index];
-    if (timeSec >= word.startSec && timeSec < word.endSec) return index;
-  }
-  if (timeSec >= words[words.length - 1].endSec) return words.length - 1;
-  return 0;
-}
-
 function KineticCaptionBlock({
   text,
   words,
@@ -722,8 +735,14 @@ function KineticCaptionBlock({
   }
 
   const timeSec = frame / fps;
-  const active = activeWordIndex(timed, timeSec);
-  const highlight = caption === "white_pill" ? "#E85D04" : "#FFE566";
+  const motion = normalizeMotion(
+    captionAnimation === "highlight" ? "pop" : captionAnimation,
+    "pop",
+  );
+  const baseColor = layer.color;
+  const highlightColor =
+    accentColor || (caption === "white_pill" ? "#E85D04" : "#FFE566");
+  const highlightTextColor = readableTextColor(highlightColor);
 
   return (
     <CaptionBlock
@@ -735,24 +754,29 @@ function KineticCaptionBlock({
       captionOpacity={captionOpacity}
     >
       {timed.map((word, index) => {
-        const isActive = index === active;
-        const local = Math.max(0, frame - Math.round(word.startSec * fps));
-        const pop = isActive
-          ? spring({
-              frame: local,
-              fps,
-              config: { damping: 14, stiffness: 180, mass: 0.35 },
-            })
-          : 0;
-        const scale = interpolate(pop, [0, 1], [1, 1.08], { extrapolateRight: "clamp" });
+        const state = wordStateAt(timeSec, word.startSec, word.endSec);
+        const enter =
+          state === "future"
+            ? 0
+            : spring({
+                frame: Math.max(0, frame - Math.round(word.startSec * fps)),
+                fps,
+                config: { damping: 14, stiffness: 180, mass: 0.35 },
+              });
         return (
           <span
             key={`${word.startSec}-${index}`}
             style={{
               display: "inline-block",
-              color: isActive ? highlight : undefined,
-              transform: `scale(${scale})`,
               transformOrigin: "center bottom",
+              ...wordMotionStyle({
+                motion,
+                state,
+                enter,
+                baseColor,
+                highlightColor,
+                highlightTextColor,
+              }),
             }}
           >
             {word.text}
@@ -943,7 +967,13 @@ function mediaBandRect(style: BlogShortsStyleProps): {
   let mediaLeft = 0;
   let mediaRight = 0;
 
-  if (style.layout === "letterbox") {
+  if (style.mediaRect) {
+    const r = style.mediaRect;
+    mediaTop = Math.round(r.y * BLOG_SHORTS_HEIGHT);
+    mediaHeight = Math.round(r.h * BLOG_SHORTS_HEIGHT);
+    mediaLeft = Math.round(r.x * BLOG_SHORTS_WIDTH);
+    mediaRight = Math.max(0, BLOG_SHORTS_WIDTH - mediaLeft - Math.round(r.w * BLOG_SHORTS_WIDTH));
+  } else if (style.layout === "letterbox") {
     mediaTop = 500;
     mediaHeight = 680;
   } else if (style.layout === "header_stack") {
@@ -1059,7 +1089,7 @@ function StableChrome({
   // Transparent shell so media slides underneath remain visible.
   return (
     <AbsoluteFill style={{ overflow: "hidden", pointerEvents: "none" }}>
-      <StyleHeaderBand header={style.header} />
+      {style.mediaRect ? null : <StyleHeaderBand header={style.header} />}
       {!suppressText ? (
         <TitleLayers
           title={styleTitle}
@@ -1116,11 +1146,61 @@ function BoardCaption({
   suppressText?: boolean;
   captionTemplate?: CaptionTemplateProps | null;
 }) {
-  if (suppressText || !(board.text || "").trim()) return null;
+  // Before any early return — a hook cannot sit behind a condition.
+  const { fps } = useVideoConfig();
+  const lines = board.captionLines ?? [];
+  if (suppressText) return null;
+  if (!lines.length && !(board.text || "").trim()) return null;
 
   const resolved = resolveCaptionFromTemplate(overlay, style, captionTemplate);
   const override = board.textStyle ?? null;
   const layer = override?.fontSize ? { ...resolved.layer, fontSize: override.fontSize } : resolved.layer;
+
+  const animation =
+    override?.animation ?? overlay.captionAnimation ?? style.captionAnimation ?? "highlight";
+
+  // Speech-following captions: one nested Sequence per line, so a line is
+  // mounted only inside its own window and its motion restarts with it.
+  // The media Sequence is a sibling, so the video plays straight through.
+  if (lines.length) {
+    return (
+      <>
+        {lines.map((line, index) => {
+          const from = Math.max(0, Math.round(line.startSec * fps));
+          const until = Math.round(line.endSec * fps);
+          const duration = Math.max(1, until - from);
+          // Inside the Sequence, frame 0 is this line's start — so the word
+          // timings, which are board-relative like startSec, have to move
+          // with it or every line after the first highlights nothing.
+          const lineRelativeWords = line.words?.map((word) => ({
+            ...word,
+            startSec: word.startSec - line.startSec,
+            endSec: word.endSec - line.startSec,
+          }));
+          return (
+            <Sequence
+              key={`line-${index}-${from}`}
+              from={from}
+              durationInFrames={duration}
+              name={`caption-line-${index}`}
+            >
+              <KineticCaptionBlock
+                text={line.text}
+                words={lineRelativeWords}
+                caption={resolved.caption}
+                layer={layer}
+                captionFontId={override?.fontFamily || resolved.captionFontId}
+                accentColor={override?.accentColor || resolved.accentColor}
+                captionY={0}
+                captionOpacity={1}
+                captionAnimation={animation}
+              />
+            </Sequence>
+          );
+        })}
+      </>
+    );
+  }
 
   // Hard-cut captions — never share fade/slide with media transitions.
   return (
@@ -1133,7 +1213,7 @@ function BoardCaption({
       accentColor={override?.accentColor || resolved.accentColor}
       captionY={0}
       captionOpacity={1}
-      captionAnimation={override?.animation ?? overlay.captionAnimation ?? style.captionAnimation ?? "highlight"}
+      captionAnimation={animation}
     />
   );
 }

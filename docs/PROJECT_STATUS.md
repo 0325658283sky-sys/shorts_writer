@@ -872,6 +872,12 @@ Visual    DONE. Style gallery + editable style_title/style_subtitle headers
 
 Decisions already made (do not re-litigate these without a new reason):
 
+> **2026-10-12 갱신 — 아래 두 건은 번복되었다.** `docs/FLOW_REDESIGN.md`를 먼저 읽을 것.
+> (1) 영상 클리핑 경로도 **Remotion으로 통합**한다 (FFmpeg 유지 결정 폐기).
+> (2) 영상 클리핑 경로는 **스텝 위자드를 쓰지 않는다** — 넣고 바로 변환.
+> 위자드(W1~W5)는 **블로그 경로 전용**으로 유지하며, 영상 경로에 재사용하지 않는다.
+
+
 - **Same repo, same database.** `boards`/`projects` tables added alongside
   the existing `videos`/`clips`/`blog_clips` tables — not a separate project.
   The existing auth/plan/usage/OpenAI/FFmpeg service layers are reused, not

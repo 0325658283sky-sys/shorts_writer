@@ -1,6 +1,6 @@
 /** Lightweight hash routes so refresh/back keep studio tabs, Shorts, and video clip flows. */
 
-export type StudioTab = "create" | "projects" | "usage";
+export type StudioTab = "create" | "projects" | "templates" | "usage";
 
 /** Blog shorts use `flow`/`edit`. YouTube/MP4 guided flow uses `videoFlow`/`clipEdit`. */
 export type AppRoute =
@@ -10,7 +10,7 @@ export type AppRoute =
   | { kind: "videoFlow"; videoId: number }
   | { kind: "clipEdit"; clipId: number };
 
-const STUDIO_TABS: StudioTab[] = ["create", "projects", "usage"];
+const STUDIO_TABS: StudioTab[] = ["create", "projects", "templates", "usage"];
 
 export function isStudioTab(value: string | null | undefined): value is StudioTab {
   return value != null && (STUDIO_TABS as string[]).includes(value);

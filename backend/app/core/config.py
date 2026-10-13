@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     jwt_secret_key: str = "change-this-local-dev-secret"
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60 * 24
-    max_upload_mb: int = 500
+    max_upload_mb: int = 2048
     openai_api_key: str | None = None
     openai_transcription_model: str = "whisper-1"
     openai_highlight_model: str = "gpt-4o-mini"

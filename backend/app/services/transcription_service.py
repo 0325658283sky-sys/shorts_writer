@@ -8,6 +8,7 @@ from typing import Any
 from fastapi import HTTPException, status
 from openai import APIConnectionError, APIStatusError, OpenAI, OpenAIError, RateLimitError
 
+from app.services.timing import timed
 from app.core.config import settings
 from app.db.models import Transcript, Video
 from app.services.video_service import get_video_for_user, update_video_status
@@ -215,6 +216,7 @@ def _transcribe_audio_file(audio_path: str) -> tuple[str, list[dict[str, Any]]]:
     return " ".join(combined_text).strip(), combined_segments
 
 
+@timed("transcribe_video")
 def transcribe_video(conn: sqlite3.Connection, user_id: int, video_id: int) -> Transcript:
     video = get_video_for_user(conn, user_id, video_id)
     if video is None:

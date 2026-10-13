@@ -5,6 +5,7 @@ import { BlogClipFlow } from "./components/BlogClipFlow";
 import { BoardEditor } from "./components/board/BoardEditor";
 import { Dashboard } from "./components/Dashboard";
 import { FlowCrumbs, type FlowCrumbState } from "./components/FlowCrumbs";
+import { WaitScreen } from "./components/WaitScreen";
 import { StudioShell } from "./components/StudioShell";
 import { type YoutubePreview } from "./components/YoutubeConfirmStep";
 import { YoutubeClipFlow } from "./components/YoutubeClipFlow";
@@ -34,6 +35,7 @@ import type {
   Highlight,
   Plan,
   ProjectRecord,
+  ReanalyzeResult,
   NarrationLanguage,
   ScriptModel,
   ScriptTone,
@@ -83,6 +85,9 @@ export function App() {
   const [videos, setVideos] = useState<Video[]>([]);
   const [usage, setUsage] = useState<Usage | null>(null);
   const [flowCrumb, setFlowCrumb] = useState<FlowCrumbState | null>(null);
+  // 유튜브를 서버가 내려받는 동안에도 홈에 머물지 않고 곧바로 "변환 중" 화면을 보여준다.
+  const [importingYoutube, setImportingYoutube] = useState<{ title: string; thumbnail: string | null } | null>(null);
+  const importCancelledRef = useRef(false);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [transcripts, setTranscripts] = useState<Record<number, Transcript>>({});
   const [highlights, setHighlights] = useState<Record<number, Highlight[]>>({});
@@ -134,6 +139,8 @@ export function App() {
   const [highlightingId, setHighlightingId] = useState<number | null>(null);
   const [creatingClipId, setCreatingClipId] = useState<number | null>(null);
   const [subtitlingClipId, setSubtitlingClipId] = useState<number | null>(null);
+  const [swappingTemplateClipId, setSwappingTemplateClipId] = useState<number | null>(null);
+  const [reanalyzingVideoId, setReanalyzingVideoId] = useState<number | null>(null);
   const [downloadingClipId, setDownloadingClipId] = useState<number | null>(null);
   const [narratingClipId, setNarratingClipId] = useState<number | null>(null);
   const [generatingMetadataId, setGeneratingMetadataId] = useState<number | null>(null);
@@ -146,6 +153,25 @@ export function App() {
     editingYoutubeClipId == null
       ? null
       : Object.values(clips).find((item) => item.id === editingYoutubeClipId) ?? null;
+  // 프로젝트 목록·새로고침으로 편집기를 바로 열면 후보(점수·근거)가 비어 있다. 그때 채운다.
+  const editorVideoId = editingYoutubeClip?.video_id ?? null;
+  const editorHasHighlights = editorVideoId != null && (highlights[editorVideoId]?.length ?? 0) > 0;
+  useEffect(() => {
+    if (editorVideoId == null || editorHasHighlights) return;
+    let cancelled = false;
+    const loadEditorHighlights = async () => {
+      try {
+        const items = await authorizedRequest<Highlight[]>(`/videos/${editorVideoId}/highlights`);
+        if (!cancelled) setHighlights((current) => ({ ...current, [editorVideoId]: items }));
+      } catch {
+        /* 점수·근거만 비어 보일 뿐 편집은 된다 */
+      }
+    };
+    void loadEditorHighlights();
+    return () => {
+      cancelled = true;
+    };
+  }, [editorVideoId, editorHasHighlights]);
   const editingYoutubeVideo =
     editingYoutubeClip == null ? null : videos.find((item) => item.id === editingYoutubeClip.video_id) ?? null;
   const editingYoutubeMeta =
@@ -584,27 +610,55 @@ export function App() {
   }
 
 
-  async function handlePreviewYoutube(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!youtubeUrl.trim()) {
-      setUploadMessage("먼저 유튜브 URL을 입력해주세요.");
-      return;
+  /** Fetches the title/thumbnail for a URL. Returns null when it is not a video.
+   *
+   * Used two ways: silently while the user types, to show what was
+   * recognised, and again on submit if that silent fetch has not landed.
+   * `quiet` keeps the typing case from writing status messages the user
+   * never asked for.
+   */
+  async function fetchYoutubePreview(url: string, quiet = false): Promise<YoutubePreview | null> {
+    const trimmed = url.trim();
+    if (!trimmed) {
+      if (!quiet) setUploadMessage("먼저 유튜브 URL을 입력해주세요.");
+      return null;
     }
     setIsPreviewingYoutube(true);
-    setUploadMessage("");
+    if (!quiet) setUploadMessage("");
     try {
       const preview = await authorizedRequest<YoutubePreview>("/videos/youtube-preview", {
         method: "POST",
-        body: JSON.stringify({ url: youtubeUrl.trim() }),
+        body: JSON.stringify({ url: trimmed }),
       });
       setYoutubePreview(preview);
-      setUploadMessage("영상을 확인한 뒤 템플릿을 고르고 생성하기를 눌러주세요.");
+      return preview;
     } catch (error) {
       setYoutubePreview(null);
-      setUploadMessage(error instanceof Error ? error.message : "유튜브 미리보기에 실패했습니다.");
+      if (!quiet) {
+        setUploadMessage(error instanceof Error ? error.message : "유튜브 미리보기에 실패했습니다.");
+      }
+      return null;
     } finally {
       setIsPreviewingYoutube(false);
     }
+  }
+
+  /** Recognition only — no message, no gate. The user keeps typing. */
+  function handleAutoPreviewYoutube(url: string) {
+    void fetchYoutubePreview(url, true);
+  }
+
+  /** The single primary action for a YouTube link: paste, press once, convert. */
+  async function handleStartYoutube(url: string) {
+    const trimmed = url.trim();
+    if (!trimmed) {
+      setUploadMessage("먼저 유튜브 URL을 입력해주세요.");
+      return;
+    }
+    const ready =
+      youtubePreview?.url === trimmed ? youtubePreview : await fetchYoutubePreview(trimmed);
+    if (!ready) return;
+    await handleConfirmYoutubeImport(preferredYoutubeVisualStyle ?? "yt_profile", ready);
   }
 
   function handleCancelYoutubePreview() {
@@ -612,16 +666,22 @@ export function App() {
     setUploadMessage("");
   }
 
-  async function handleConfirmYoutubeImport(visualStyle: VisualStyleSlug | string) {
-    if (!youtubePreview?.url) {
+  async function handleConfirmYoutubeImport(
+    visualStyle: VisualStyleSlug | string,
+    /** Passed by handleStartYoutube: a preview just fetched, not yet in state. */
+    knownPreview?: YoutubePreview | null,
+  ) {
+    const previewSnapshot = knownPreview ?? youtubePreview;
+    if (!previewSnapshot?.url) {
       setUploadMessage("먼저 유튜브 영상을 확인해 주세요.");
       return;
     }
     setIsImportingYoutube(true);
     setUploadMessage("");
+    importCancelledRef.current = false;
+    setImportingYoutube({ title: previewSnapshot.title || "유튜브 영상", thumbnail: previewSnapshot.thumbnail_url ?? null });
     const styleSlug = String(visualStyle);
     setPreferredYoutubeVisualStyle(styleSlug);
-    const previewSnapshot = youtubePreview;
     try {
       const video = await authorizedRequest<Video>("/videos/import-youtube", {
         method: "POST",
@@ -642,6 +702,7 @@ export function App() {
       setUploadMessage("유튜브 영상을 가져왔습니다. AI가 편집점을 잡아 쇼츠를 생성합니다.");
       setVideos((current) => (current.some((item) => item.id === video.id) ? current : [video, ...current]));
       await Promise.all([loadVideos(), loadUsage(), loadPlans(), loadProjects()]);
+      if (importCancelledRef.current) return;
       setFocusVideoId(video.id);
       setFocusBlogClipId(null);
       setFocusYoutubeVideoId(video.id);
@@ -649,6 +710,7 @@ export function App() {
       setUploadMessage(error instanceof Error ? error.message : "유튜브 영상 가져오기에 실패했습니다.");
     } finally {
       setIsImportingYoutube(false);
+      setImportingYoutube(null);
     }
   }
 
@@ -1024,6 +1086,47 @@ export function App() {
     }
   }
 
+  /** Re-cut a video. Charged, and it discards the clips already cut from it.
+   *
+   * Asks first, because both of those are things the user cannot undo — and
+   * names the number of clips that will go, since the count is the part they
+   * will actually miss.
+   */
+  async function handleReanalyze(videoId: number) {
+    const losing = Object.values(clips).filter((clip) => clip.video_id === videoId).length;
+    const cost = usage?.reanalyze_cost ?? 1;
+    const warning = losing
+      ? `지금까지 만든 쇼츠 ${losing}개가 사라지고 ${cost} 크레딧이 차감돼요. 다시 찾을까요?`
+      : `${cost} 크레딧이 차감돼요. 다시 찾을까요?`;
+    if (!window.confirm(warning)) return;
+
+    setReanalyzingVideoId(videoId);
+    setUploadMessage("구간을 다시 찾는 중…");
+    try {
+      const result = await authorizedRequest<ReanalyzeResult>(`/videos/${videoId}/reanalyze`, {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+      setHighlights((current) => ({ ...current, [videoId]: result.highlights }));
+      setVideos((current) =>
+        current.map((item) =>
+          item.id === videoId
+            ? { ...item, genre: result.genre, genre_judgement: result.genre_judgement }
+            : item,
+        ),
+      );
+      setEditingYoutubeClipId(null);
+      await Promise.all([loadClips(), loadUsage(), loadVideos(), loadProjects()]);
+      setUploadMessage(
+        `구간 ${result.highlights.length}개를 다시 찾았어요. 남은 크레딧 ${result.credits_remaining}회.`,
+      );
+    } catch (error) {
+      setUploadMessage(error instanceof Error ? error.message : "다시 찾기에 실패했습니다.");
+    } finally {
+      setReanalyzingVideoId(null);
+    }
+  }
+
   async function handleCreateClip(highlightId: number, removeSilence = false): Promise<Clip | null> {
     setCreatingClipId(highlightId);
     setUploadMessage("");
@@ -1057,11 +1160,65 @@ export function App() {
     }
   }
 
-  async function handleBurnSubtitles(clip: Clip, styleOverride?: SubtitleStyle): Promise<Clip | null> {
+  /** Overrides on top of the chosen template, for the clip being edited.
+   *
+   * Held here rather than on the clip: they are 모양 settings applied at
+   * render time (§3), so picking a different template starts from that
+   * template's own values instead of inheriting the last one's tweaks.
+   */
+  const [templateOverrides, setTemplateOverrides] = useState<Record<string, string>>({});
+
+  async function handleSwapTemplate(
+    clip: Clip,
+    visualStyle: string,
+    overrides?: Record<string, string>,
+  ): Promise<Clip | null> {
+    // Re-render only: the highlight (where the clip was cut) is untouched, so
+    // this costs no credits and can be repeated. docs/FLOW_REDESIGN.md §3.
+    const meta = youtubeProjectMetaByVideoId[clip.video_id];
+    setSwappingTemplateClipId(clip.id);
+    setUploadMessage("");
+    try {
+      const updated = await authorizedRequest<Clip>(`/clips/${clip.id}/render-template`, {
+        method: "POST",
+        body: JSON.stringify({
+          visual_style: visualStyle,
+          channel_name: meta?.channel ?? null,
+          channel_avatar_url: meta?.channel_avatar_url ?? null,
+          video_title: meta?.title ?? null,
+          burn_subtitles: true,
+          subtitle_style: subtitleStyles[clip.id] ?? "shorts",
+          // Sparse by design: only the controls the user actually moved. The
+          // backend ignores anything it cannot render (EDITABLE_PATHS).
+          template_overrides: overrides ?? templateOverrides,
+        }),
+      });
+      setClips((current) => ({ ...current, [updated.highlight_id]: updated }));
+      setPreferredYoutubeVisualStyle(visualStyle);
+      setYoutubeProjectMetaByVideoId((current) => {
+        const existing = current[clip.video_id];
+        if (!existing) return current;
+        return { ...current, [clip.video_id]: { ...existing, visualStyle } };
+      });
+      setUploadMessage("템플릿을 바꿨어요.");
+      return updated;
+    } catch (error) {
+      setUploadMessage(error instanceof Error ? error.message : "템플릿을 바꾸지 못했습니다.");
+      return null;
+    } finally {
+      setSwappingTemplateClipId(null);
+    }
+  }
+
+  async function handleBurnSubtitles(
+    clip: Clip,
+    styleOverride?: SubtitleStyle,
+    visualStyleOverride?: string,
+  ): Promise<Clip | null> {
     const style = styleOverride ?? subtitleStyles[clip.id] ?? "bold";
     const meta = youtubeProjectMetaByVideoId[clip.video_id];
     const visualStyle =
-      meta?.visualStyle || preferredYoutubeVisualStyle || clip.visual_style || "yt_profile";
+      visualStyleOverride || meta?.visualStyle || preferredYoutubeVisualStyle || clip.visual_style || "yt_profile";
     setSubtitlingClipId(clip.id);
     setUploadMessage("");
     try {
@@ -1079,6 +1236,14 @@ export function App() {
       });
       setClips((current) => ({ ...current, [updated.highlight_id]: updated }));
       setSubtitleStyles((current) => ({ ...current, [updated.id]: style }));
+      if (visualStyleOverride) {
+        setPreferredYoutubeVisualStyle(visualStyleOverride);
+        setYoutubeProjectMetaByVideoId((current) => {
+          const existing = current[clip.video_id];
+          if (!existing) return current;
+          return { ...current, [clip.video_id]: { ...existing, visualStyle: visualStyleOverride } };
+        });
+      }
       setUploadMessage("템플릿이 적용된 쇼츠가 준비되었습니다.");
       return updated;
     } catch (error) {
@@ -1207,7 +1372,7 @@ export function App() {
     const isBoardEditor = Boolean(editingBlogClip && editingBlogClip.status === "awaiting_boards");
     const isYoutubeEditor = Boolean(editingYoutubeClip);
     const isEditor = isBoardEditor || isYoutubeEditor;
-    const isFlow = !isEditor && Boolean(focusYoutubeVideo || focusBlogClip);
+    const isFlow = !isEditor && Boolean(focusYoutubeVideo || focusBlogClip || importingYoutube);
     const bodyMode = isEditor ? "editor" : isFlow ? "flow" : "page";
     const title = isYoutubeEditor
       ? "쇼츠 세부 편집"
@@ -1219,6 +1384,8 @@ export function App() {
             ? focusYoutubeMeta?.title || focusYoutubeVideo.original_filename || "영상"
             : studioNav === "projects"
               ? "프로젝트"
+              : studioNav === "templates"
+                ? "템플릿"
               : studioNav === "usage"
                 ? "요금 · 사용량"
                 : "만들기";
@@ -1250,7 +1417,10 @@ export function App() {
           narratingClipId={narratingClipId}
           subtitlingClipId={subtitlingClipId}
           onSelectClip={(clipId) => setEditingYoutubeClipId(clipId)}
-          onClose={() => setEditingYoutubeClipId(null)}
+          onClose={() => {
+            setEditingYoutubeClipId(null);
+            handleBackToStudio();
+          }}
           onBurnSubtitles={handleBurnSubtitles}
           onApplyNarration={handleApplyNarration}
           onGenerateMetadata={handleGenerateMetadata}
@@ -1258,6 +1428,17 @@ export function App() {
           onCopyText={handleCopyText}
           onStyleChange={(clipId, style) => setSubtitleStyles((current) => ({ ...current, [clipId]: style }))}
           onTtsModeChange={(clipId, mode) => setTtsModes((current) => ({ ...current, [clipId]: mode }))}
+          onSwapTemplate={handleSwapTemplate}
+          templateOverrides={templateOverrides}
+          onTemplateOverridesChange={setTemplateOverrides}
+          swappingTemplate={swappingTemplateClipId === editingYoutubeClip.id}
+          genreJudgement={
+            videos.find((item) => item.id === editingYoutubeClip.video_id)?.genre_judgement ?? null
+          }
+          usage={usage}
+          onReanalyze={() => void handleReanalyze(editingYoutubeClip.video_id)}
+          reanalyzing={reanalyzingVideoId === editingYoutubeClip.video_id}
+          reanalyzeCost={usage?.reanalyze_cost ?? 1}
           onMessage={setUploadMessage}
         />
       );
@@ -1271,6 +1452,25 @@ export function App() {
             setBlogClips((current) => current.map((item) => (item.id === updated.id ? updated : item)));
           }}
           onMessage={setUploadMessage}
+        />
+      );
+    } else if (importingYoutube && !focusYoutubeVideo && !focusBlogClip) {
+      body = (
+        <WaitScreen
+          sourceLabel="유튜브"
+          title="영상을 가져오고 있습니다"
+          steps={["원본 영상 가져오기", "말소리 받아쓰기", "볼 만한 구간 고르기", "후보별 자막 붙이기"]}
+          activeIndex={0}
+          percent={8}
+          caption="영상을 내려받는 중이에요"
+          remainSec={null}
+          source={{ thumbnail: importingYoutube.thumbnail, title: importingYoutube.title, meta: "유튜브" }}
+          note="다 되면 알림 보낼게요"
+          onLeave={() => {
+            importCancelledRef.current = true;
+            setImportingYoutube(null);
+            handleBackToStudio();
+          }}
         />
       );
     } else if (focusYoutubeVideo) {
@@ -1368,7 +1568,8 @@ export function App() {
           highlightingId={highlightingId}
           onUpload={handleUpload}
           onSelectedFileChange={setSelectedFile}
-          onPreviewYoutube={handlePreviewYoutube}
+          onStartYoutube={handleStartYoutube}
+          onAutoPreviewYoutube={handleAutoPreviewYoutube}
           onConfirmYoutubeImport={handleConfirmYoutubeImport}
           onCancelYoutubePreview={handleCancelYoutubePreview}
           onYoutubeUrlChange={setYoutubeUrl}
@@ -1419,6 +1620,8 @@ export function App() {
         email={user.email}
         planLabel={usage?.plan_name ?? usage?.plan}
         bodyMode={bodyMode}
+        hideTopbar={isYoutubeEditor}
+        dark={Boolean(importingYoutube && !focusYoutubeVideo) || (isFlow && flowCrumb?.step === "wait")}
         titleAside={
           isEditor && editingBlogClip ? (
             <span className={`status-badge status-${editingBlogClip.status}`}>

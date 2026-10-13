@@ -63,38 +63,148 @@
 }
 
 :root {
-  --font-display: "Pretendard", "Noto Sans KR", "Apple SD Gothic Neo", sans-serif;
-  --font-body: "Pretendard", "Noto Sans KR", "Apple SD Gothic Neo", ui-sans-serif, system-ui, sans-serif;
+  /* ====================================================================
+     New Cut 디자인 시스템 — 17 색상 토큰, 2 테마.
+     원본: 디자인 시스템 아티팩트 project/tokens.json
 
-  /* ---- blog_writer 팔레트로 교체 ---- */
-  --ink: #16161A;            /* 기존 #15171f */
-  --ink-soft: #6B6B75;       /* 기존 #5b6170 → blog_writer --muted */
-  --muted: #9C9CA6;          /* 기존 #8b91a1 → blog_writer --faint */
-  --surface: #FFFFFF;        /* 동일 */
-  --surface-2: #FBFBFC;      /* 기존 #f4f5f8 → blog_writer --surface-2 */
-  --page-bg: #F3F3F5;        /* 기존 #f0f1f5 → blog_writer --background */
-  --line: #E8E8EC;           /* 기존 #e6e8ef → blog_writer --border */
-  --line-strong: #E0E0E6;    /* 기존 #d8dbe5 → blog_writer --border-strong */
-  --accent: #4B3BFF;         /* 기존 #6d5ef5 → blog_writer --accent */
-  --accent-strong: #3B2CE0;  /* 기존 #5746e5 → blog_writer --accent-hover */
-  --accent-soft: #EFEDFF;    /* 기존 #eeebff → blog_writer --accent-soft (거의 동일) */
-  --accent-2: #fb7185;       /* 유지 — New Cut 전용 보조색(경고/하이라이트 등), blog_writer엔 대응값 없음 */
-  --warm: #fb7185;           /* 유지 */
-  --danger: #C2453C;         /* 기존 #d64545 → blog_writer badge danger 계열과 통일 */
+     --ncut-* 가 시스템의 이름이고, 아래쪽 별칭(--ink, --accent …)은
+     기존 화면 36개가 이미 쓰고 있는 이름이다. 값을 여기서 한 번만
+     갈아끼우면 전체가 함께 넘어간다. 새로 쓰는 코드는 --ncut-* 를 쓴다.
+     ==================================================================== */
 
-  /* ---- 라운드/밀도: blog_writer는 조밀한 SaaS 톤. 카드/컨트롤 분리 도입 ---- */
-  --radius: 11px;            /* 기존 16px → blog_writer --radius-card */
-  --radius-control: 8px;     /* 신규 — 버튼/인풋/뱃지용, blog_writer --radius-control */
-  --radius-pill: 999px;      /* 유지 — 프로그레스바 등 실제로 pill이어야 하는 요소용으로 좁혀서 사용 */
+  /* 면 */
+  --ncut-canvas: #f7f7f9;          /* 앱 바탕 — 목록·설정 화면의 가장 뒤 */
+  --ncut-surface: #ffffff;         /* 카드, 패널 */
+  --ncut-surface-raised: #ffffff;  /* 메뉴, 드롭다운, 모달 — shadow와 함께 */
+  --ncut-surface-sunken: #edeef2;  /* 타임라인 바닥, 레터박스, 입력 웰 */
+  --ncut-scrim: #15171ca8;         /* 모달 뒤 막 */
 
-  --shadow: 0 1px 2px rgba(22, 22, 26, 0.06);   /* 기존 0 8px 24px(과한 플로팅 섀도) → 훨씬 절제된 값 */
-  --focus-ring: 0 0 0 2px rgb(75 59 255 / 22%); /* --accent 기준으로 재계산 */
-  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='M1.5 1.75L6 6.25L10.5 1.75' stroke='%2316161A' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  /* 선 */
+  --ncut-border: #dfe1e8;          /* 장식용 구분선 — 대비 하한 없음 */
+  --ncut-border-strong: #767c8d;   /* 의미를 가진 테두리 — 입력·체크박스 (3:1) */
 
-  font-family: var(--font-body);
-  color: var(--ink);
-  background: var(--page-bg);
-  color-scheme: light;
+  /* 글자 */
+  --ncut-ink: #15171c;             /* 본문·제목 (12:1 이상) */
+  --ncut-ink-muted: #565b6b;       /* 보조 설명, 라벨 (6:1 이상) */
+  --ncut-ink-faint: #6b7083;       /* placeholder, 메타, 아이콘 (4.5:1) */
+
+  /* 액센트 — 앰버. 인디고에서 바뀐 자리다 */
+  --ncut-accent: #e07b12;          /* 기본 버튼, 플레이헤드, 진행 바 */
+  --ncut-accent-ink: #9a5208;      /* 앰버 글자·아이콘을 밝은 면에 (5:1) */
+  --ncut-accent-soft: #fdf0dd;     /* 선택·적용 중인 행의 옅은 바탕 */
+  --ncut-on-accent: #1a1206;       /* accent 면 위의 글자 (6:1) — 흰색 아님 */
+
+  /* 상태 — 빨강-초록 축을 피해 청록/주홍 */
+  --ncut-positive: #0f766e;
+  --ncut-critical: #c4342b;
+  --ncut-focus: #e07b12;
+
+  /* 글꼴 */
+  --ncut-sans: "IBM Plex Sans KR", Pretendard, -apple-system, "Apple SD Gothic Neo",
+    "Malgun Gothic", sans-serif;
+  --ncut-mono: "IBM Plex Mono", SFMono-Regular, Consolas, monospace;
+
+  /* 간격 — 4px 배수. 조밀한 작업 도구이므로 16px 이하가 기본 */
+  --ncut-space-1: 4px;
+  --ncut-space-2: 8px;
+  --ncut-space-3: 12px;
+  --ncut-space-4: 16px;
+  --ncut-space-6: 24px;
+  --ncut-space-8: 32px;
+  --ncut-space-12: 48px;
+
+  /* 라운드 */
+  --ncut-radius-xs: 4px;           /* 칩, 배지 */
+  --ncut-radius-sm: 6px;           /* 버튼, 입력, 셀렉트 */
+  --ncut-radius-md: 10px;          /* 카드, 패널, 모달 */
+  --ncut-radius-lg: 16px;          /* 9:16 프리뷰, 썸네일 */
+  --ncut-radius-full: 999px;
+
+  /* 그림자 — border와 함께 쓰지 않고 둘 중 하나만 */
+  --ncut-shadow-card: 0 1px 2px rgba(21, 23, 28, 0.06);
+  --ncut-shadow-menu: 0 6px 20px rgba(21, 23, 28, 0.12);
+  --ncut-shadow-modal: 0 18px 48px rgba(21, 23, 28, 0.18);
+
+  /* ---- 기존 이름의 별칭. 새 코드에서는 쓰지 않는다 ---- */
+  --font-display: var(--ncut-sans);
+  --font-body: var(--ncut-sans);
+  --font-mono: var(--ncut-mono);
+
+  --ink: var(--ncut-ink);
+  --ink-soft: var(--ncut-ink-muted);
+  --muted: var(--ncut-ink-faint);
+  --surface: var(--ncut-surface);
+  --surface-2: var(--ncut-canvas);
+  --page-bg: var(--ncut-canvas);
+  --line: var(--ncut-border);
+  --line-strong: var(--ncut-border-strong);
+  --accent: var(--ncut-accent);
+  --accent-strong: var(--ncut-accent-ink);
+  --accent-soft: var(--ncut-accent-soft);
+  --on-accent: var(--ncut-on-accent);
+  /* 시스템에는 보조 액센트가 없다. 둘 다 상태색으로 보내 색상 축을
+     하나로 유지한다 — 앰버 하나에 청록/주홍 상태색. */
+  --accent-2: var(--ncut-positive);
+  --warm: var(--ncut-critical);
+  --danger: var(--ncut-critical);
+
+  --radius: var(--ncut-radius-md);
+  --radius-control: var(--ncut-radius-sm);
+  --radius-pill: var(--ncut-radius-full);
+
+  --shadow: var(--ncut-shadow-card);
+  --focus-ring: 0 0 0 2px rgb(224 123 18 / 35%);
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='M1.5 1.75L6 6.25L10.5 1.75' stroke='%2315171c' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+
+  font-family: var(--ncut-sans);
+  color: var(--ncut-ink);
+}
+
+/* ======================================================================
+   어두운 테마 — 토글이 아니라 **화면의 성격**이 테마를 정한다
+   (FLOW_REDESIGN §7). 작업 화면(홈 입력부, 변환 중, 편집기)에만
+   data-surface="dark" 를 붙인다. 9:16 프리뷰 주변이 밝으면 영상의
+   실제 밝기를 판단할 수 없기 때문에 에디터는 밝게 그리지 않는다.
+   ====================================================================== */
+[data-surface="dark"] {
+  --ncut-canvas: #0e1014;
+  --ncut-surface: #181b22;
+  --ncut-surface-raised: #21252e;
+  --ncut-surface-sunken: #0a0c0f;
+  --ncut-scrim: #00000ab8;
+
+  --ncut-border: #2b303b;
+  --ncut-border-strong: #656b7e;
+
+  --ncut-ink: #edeef2;
+  --ncut-ink-muted: #9aa0b0;
+  --ncut-ink-faint: #828899;
+
+  --ncut-accent: #f2a33c;
+  --ncut-accent-ink: #f2a33c;
+  --ncut-accent-soft: #2e2416;
+  --ncut-on-accent: #1a1206;
+
+  --ncut-positive: #3fa99b;
+  --ncut-critical: #f0665c;
+  --ncut-focus: #f2a33c;
+
+  --ncut-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --ncut-shadow-menu: 0 6px 20px rgba(0, 0, 0, 0.55);
+  --ncut-shadow-modal: 0 18px 48px rgba(0, 0, 0, 0.65);
+
+  --focus-ring: 0 0 0 2px rgb(242 163 60 / 40%);
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='M1.5 1.75L6 6.25L10.5 1.75' stroke='%23edeef2' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+
+  color: var(--ncut-ink);
+  background: var(--ncut-canvas);
+}
+
+/* 숫자는 모노스페이스에 tabular-nums — 목록에서 자릿수가 세로로 맞아야
+   비교된다 (FLOW_REDESIGN §8). 타임코드·크레딧·점수·길이에 붙인다. */
+.ncut-num {
+  font-family: var(--ncut-mono);
+  font-variant-numeric: tabular-nums;
 }
 
 * {
@@ -128,6 +238,16 @@ h2,
 h3,
 p {
   margin-top: 0;
+}
+
+/* 제목 굵기는 600 — 디자인 시스템이 싣는 가장 두꺼운 두께다. 브라우저
+   기본값 700을 그대로 두면 IBM Plex Sans KR에 그 두께가 없어 Pretendard
+   Bold로 대체되거나 합성 볼드가 그려진다. */
+h1,
+h2,
+h3,
+h4 {
+  font-weight: 600;
 }
 
 p {
@@ -171,7 +291,7 @@ p {
 .btn-primary {
   border: 0;
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   box-shadow: 0 1px 2px rgba(75, 59, 255, 0.4);
 }
 
@@ -228,8 +348,8 @@ p {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(circle at 20% 30%, rgb(75 59 255 / 14%), transparent 35%),
-    radial-gradient(circle at 70% 60%, rgb(251 113 133 / 12%), transparent 40%);
+    radial-gradient(circle at 20% 30%, rgb(224 123 18 / 10%), transparent 38%),
+    radial-gradient(circle at 70% 60%, rgb(224 123 18 / 6%), transparent 42%);
   pointer-events: none;
   animation: atmosphere-drift 12s ease-in-out infinite alternate;
 }
@@ -392,7 +512,7 @@ select:disabled {
   border-radius: 10px;
   padding: 0 18px;
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   font-size: 13.5px;
   font-weight: 600;
   cursor: pointer;
@@ -495,14 +615,6 @@ select:disabled {
   color: var(--ink);
 }
 
-.studio-shell {
-  /* 보라색 테마 포인트 컬러로 오버라이드 (이 서브트리 한정) */
-  --accent: #7C3AED;
-  --accent-strong: #6D28D9;
-  --accent-soft: #F3ECFF;
-  --focus-ring: 0 0 0 2px rgb(124 58 237 / 22%);
-}
-
 .studio-rail {
   display: flex;
   flex-direction: column;
@@ -531,7 +643,7 @@ select:disabled {
   height: 32px;
   border-radius: 9px;
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   font-size: 12px;
   font-weight: 800;
   letter-spacing: -0.04em;
@@ -607,7 +719,7 @@ select:disabled {
   border: 0;
   border-radius: var(--radius-control);
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   font: inherit;
   font-size: 14px;
   font-weight: 700;
@@ -664,7 +776,7 @@ select:disabled {
   padding: 0 4px;
   border-radius: 999px;
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   font-size: 9.5px;
   font-weight: 700;
   line-height: 16px;
@@ -973,6 +1085,7 @@ select:disabled {
 }
 
 .studio-shell-body.is-page {
+  overflow-x: hidden;
   overflow-y: auto;
 }
 
@@ -1151,7 +1264,7 @@ button.usage-chip {
 
 .membership-title {
   margin: 0;
-  font-family: "Paperlogy", var(--font-display);
+  font-family: var(--ncut-sans);
   font-size: 22px;
   font-weight: 800;
   letter-spacing: -0.02em;
@@ -1231,7 +1344,7 @@ button.usage-chip {
 
 .membership-card-labels h2 {
   margin: 0;
-  font-family: "Paperlogy", var(--font-display);
+  font-family: var(--ncut-sans);
   font-size: 16px;
   font-weight: 800;
 }
@@ -1245,7 +1358,7 @@ button.usage-chip {
   font-size: 10.5px;
   font-weight: 700;
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 .membership-card.is-featured .membership-badge {
@@ -1270,7 +1383,7 @@ button.usage-chip {
 }
 
 .membership-price strong {
-  font-family: "Paperlogy", var(--font-display);
+  font-family: var(--ncut-sans);
   font-size: 28px;
   font-weight: 800;
   letter-spacing: -0.02em;
@@ -1534,7 +1647,7 @@ button.usage-chip {
 .projects-search input:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgb(75 59 255 / 16%);
+  box-shadow: 0 0 0 3px rgb(224 123 18 / 16%);
 }
 
 .projects-grid {
@@ -1641,7 +1754,7 @@ button.usage-chip {
 .projects-card-actions .small-button:not(.ghost-small) {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 .projects-card-actions .small-button.ghost-small {
@@ -2066,7 +2179,7 @@ button.usage-chip {
 .project-row:hover {
   border-color: var(--accent);
   transform: translateY(-1px);
-  box-shadow: 0 10px 28px rgb(75 59 255 / 10%);
+  box-shadow: 0 10px 28px rgb(224 123 18 / 10%);
 }
 
 .project-row-copy {
@@ -2167,12 +2280,12 @@ button.flow-stepper-item.is-clickable:hover {
 .flow-stepper-item.is-current {
   background: #fff;
   color: var(--ink);
-  box-shadow: 0 4px 12px rgb(75 59 255 / 10%);
+  box-shadow: 0 4px 12px rgb(224 123 18 / 10%);
 }
 
 .flow-stepper-item.is-current .flow-step-dot {
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 .flow-stepper-item.is-done {
@@ -2815,7 +2928,7 @@ button.flow-stepper-item.is-clickable:hover {
 
 .style-card.is-selected {
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgb(75 59 255 / 28%);
+  box-shadow: 0 0 0 2px rgb(224 123 18 / 28%);
 }
 
 .style-card-badge {
@@ -2826,7 +2939,7 @@ button.flow-stepper-item.is-clickable:hover {
   padding: 3px 8px;
   border-radius: 999px;
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   font-size: 11px;
   font-weight: 700;
 }
@@ -2840,7 +2953,7 @@ button.flow-stepper-item.is-clickable:hover {
   height: 22px;
   border-radius: 50%;
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   display: grid;
   place-items: center;
   font-size: 12px;
@@ -2852,6 +2965,104 @@ button.flow-stepper-item.is-clickable:hover {
   border-radius: 12px;
   overflow: hidden;
   background: #1a1d22;
+}
+
+/* Template swap tile: no preview video yet, so the tile is drawn from the
+   template's own colours — enough to tell eighteen of them apart. */
+.style-card-swatch {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 6px;
+  box-sizing: border-box;
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 1.1;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+}
+
+/* 템플릿 세부 조정 — 교체 스트립 바로 아래. 같은 "모양" 묶음이라
+   테두리로 분리하지 않고 얇은 구분선만 둔다. */
+.ws-tuner {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 8px;
+}
+
+.ws-tuner-color input[type="color"] {
+  width: 44px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: none;
+  cursor: pointer;
+}
+
+.ws-tuner-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 2px;
+}
+
+.ws-tuner-dropped {
+  color: #8a6410;
+}
+
+/* The analyser's account of what it cut and why — docs/FLOW_REDESIGN.md §4.
+   Tinted rather than plain so it reads as the system talking, not a label. */
+.ws-judgement {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 20px;
+  background: #fdf0dd;
+  border-bottom: 1px solid #f0d9b4;
+  color: #9a5208;
+}
+
+.ws-judgement p {
+  flex: 1 1 320px;
+  min-width: 0;
+  margin: 0;
+  font-size: 13px;
+  line-height: 20px;
+  color: #15171c;
+}
+
+.ws-judgement-redo {
+  flex: none;
+  white-space: nowrap;
+}
+
+.ws-template-swap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 14px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.ws-template-swap-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ws-template-swap-free {
+  font-size: 11px;
+  font-weight: 500;
+  color: #0f766e;
+  background: #e6f2f0;
+  border-radius: 4px;
+  padding: 1px 6px;
 }
 
 .style-card-preview img,
@@ -3192,7 +3403,7 @@ button.flow-stepper-item.is-clickable:hover {
   height: 20px;
   border-radius: 50%;
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   font-size: 11px;
   font-weight: 800;
   display: flex;
@@ -3299,7 +3510,7 @@ button.flow-stepper-item.is-clickable:hover {
 
 .candidate-score.is-top {
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 .candidate-check {
@@ -3310,7 +3521,7 @@ button.flow-stepper-item.is-clickable:hover {
   height: 18px;
   border-radius: 50%;
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   font-size: 11px;
   display: flex;
   align-items: center;
@@ -3612,9 +3823,88 @@ button.flow-stepper-item.is-clickable:hover {
   gap: 16px;
   padding: 24px;
   background:
-    radial-gradient(700px 360px at 10% 0%, rgb(75 59 255 / 12%), transparent 55%),
-    radial-gradient(500px 280px at 90% 0%, rgb(251 113 133 / 8%), transparent 50%),
-    var(--page-bg);
+    radial-gradient(700px 360px at 10% 0%, rgb(224 123 18 / 9%), transparent 55%),
+    radial-gradient(500px 280px at 90% 0%, rgb(224 123 18 / 5%), transparent 50%),
+    var(--ncut-canvas);
+}
+
+/* ======================================================================
+   편집기는 작업 화면이므로 어둡다 (FLOW_REDESIGN §7). 토큰은 루트의
+   data-surface="dark" 가 이미 뒤집었으므로, 여기서는 밝은 값이 박혀 있던
+   자리만 토큰으로 되돌린다.
+   ====================================================================== */
+.board-editor[data-surface="dark"] .board-editor-header,
+.board-editor[data-surface="dark"] .media-panel,
+.board-editor[data-surface="dark"] .yt-workspace-list {
+  background: var(--ncut-surface);
+  border-color: var(--ncut-border);
+  color: var(--ncut-ink);
+}
+
+.board-editor[data-surface="dark"] .yt-workspace-card {
+  background: var(--ncut-surface-raised);
+  border-color: var(--ncut-border);
+  color: var(--ncut-ink);
+}
+
+.board-editor[data-surface="dark"] .yt-workspace-card.is-selected {
+  border-color: var(--ncut-accent);
+  background: var(--ncut-accent-soft);
+}
+
+/* 프리뷰 뒤는 가장 어두운 면 — 영상의 실제 밝기를 판단해야 하는 자리다. */
+.board-editor[data-surface="dark"] .yt-workspace-preview,
+.board-editor[data-surface="dark"] .yt-profile-phone {
+  background: var(--ncut-surface-sunken);
+}
+
+.board-editor[data-surface="dark"] .media-tab {
+  color: var(--ncut-ink-muted);
+}
+
+.board-editor[data-surface="dark"] .media-tab.active {
+  color: var(--ncut-accent-ink);
+  border-color: var(--ncut-accent);
+}
+
+.board-editor[data-surface="dark"] .style-card {
+  background: var(--ncut-surface-raised);
+  border-color: var(--ncut-border);
+  color: var(--ncut-ink);
+}
+
+.board-editor[data-surface="dark"] .style-card.is-selected {
+  border-color: var(--ncut-accent);
+}
+
+.board-editor[data-surface="dark"] select,
+.board-editor[data-surface="dark"] input[type="text"],
+.board-editor[data-surface="dark"] textarea {
+  background: var(--ncut-surface-raised);
+  border-color: var(--ncut-border-strong);
+  color: var(--ncut-ink);
+}
+
+.board-editor[data-surface="dark"] .ghost-button,
+.board-editor[data-surface="dark"] .small-button {
+  background: transparent;
+  border-color: var(--ncut-border-strong);
+  color: var(--ncut-ink);
+}
+
+/* 판단 바는 두 테마에서 같은 역할이므로 토큰으로만 그린다. */
+.board-editor[data-surface="dark"] .ws-judgement {
+  background: var(--ncut-accent-soft);
+  border-bottom-color: var(--ncut-border);
+  color: var(--ncut-accent-ink);
+}
+
+.board-editor[data-surface="dark"] .ws-judgement p {
+  color: var(--ncut-ink);
+}
+
+.board-editor[data-surface="dark"] .ws-tuner-dropped {
+  color: var(--ncut-ink-faint);
 }
 
 .board-editor-header {
@@ -3714,8 +4004,8 @@ button.flow-stepper-item.is-clickable:hover {
   gap: 12px;
   padding: 0;
   border: 1px solid var(--line);
-  border-radius: 16px;
-  background: color-mix(in srgb, var(--surface) 92%, #0b1220);
+  border-radius: var(--ncut-radius-lg);
+  background: var(--ncut-surface);
   text-align: left;
   overflow: hidden;
   cursor: pointer;
@@ -3724,14 +4014,13 @@ button.flow-stepper-item.is-clickable:hover {
 }
 
 .yt-hub-card:hover {
-  border-color: color-mix(in srgb, #5e81f4 55%, var(--line));
-  transform: translateY(-1px);
+  border-color: var(--ncut-accent);
 }
 
 .yt-hub-thumb {
   position: relative;
   aspect-ratio: 16 / 9;
-  background: #111827;
+  background: var(--ncut-surface-sunken);
   display: grid;
   place-items: center;
   overflow: hidden;
@@ -3749,9 +4038,10 @@ button.flow-stepper-item.is-clickable:hover {
   right: 8px;
   bottom: 8px;
   padding: 2px 8px;
-  border-radius: 6px;
+  border-radius: var(--ncut-radius-sm);
+  font-family: var(--ncut-mono);
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 500;
   background: rgb(0 0 0 / 72%);
   color: #fff;
 }
@@ -3780,7 +4070,7 @@ button.flow-stepper-item.is-clickable:hover {
 }
 
 .yt-hub-done {
-  color: #34d399;
+  color: var(--ncut-positive);
   font-weight: 600;
 }
 
@@ -3837,21 +4127,21 @@ button.flow-stepper-item.is-clickable:hover {
   display: grid;
   gap: 10px;
   padding: 10px;
-  border: 1px solid color-mix(in srgb, var(--line) 85%, #475569);
-  border-radius: 14px;
-  background: color-mix(in srgb, #111827 88%, #1e293b);
+  border: 1px solid var(--ncut-border);
+  border-radius: var(--ncut-radius-md);
+  background: var(--ncut-surface);
 }
 
 .yt-workspace-card.is-selected {
-  border-color: #3b82f6;
-  box-shadow: inset 0 0 0 1px #3b82f6;
+  border-color: var(--ncut-accent);
+  background: var(--ncut-accent-soft);
 }
 
 .yt-workspace-card-main {
   display: grid;
-  grid-template-columns: 92px 1fr;
+  grid-template-columns: 52px 1fr;
   gap: 12px;
-  align-items: start;
+  align-items: stretch;
   width: 100%;
   padding: 0;
   border: 0;
@@ -3862,9 +4152,9 @@ button.flow-stepper-item.is-clickable:hover {
 }
 
 .yt-workspace-card-preview {
-  width: 92px;
+  width: 52px;
   aspect-ratio: 9 / 16;
-  border-radius: 8px;
+  border-radius: var(--ncut-radius-xs);
   overflow: hidden;
   background: #1b2838;
 }
@@ -3884,8 +4174,9 @@ button.flow-stepper-item.is-clickable:hover {
 }
 
 .yt-workspace-card-body strong {
-  font-size: 15px;
-  line-height: 1.35;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
@@ -3901,16 +4192,18 @@ button.flow-stepper-item.is-clickable:hover {
 
 .yt-action-btn {
   border: 0;
-  border-radius: 10px;
-  padding: 8px 12px;
+  border-radius: var(--ncut-radius-sm);
+  padding: 4px 10px;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 500;
   color: #fff;
   cursor: pointer;
 }
 
 .yt-action-download {
-  background: #3b82f6;
+  background: transparent;
+  border: 1px solid var(--ncut-border-strong);
+  color: var(--ncut-ink);
 }
 
 .yt-action-dup {
@@ -4116,8 +4409,9 @@ button.flow-stepper-item.is-clickable:hover {
   display: grid;
   place-items: center;
   font-size: 12px;
-  font-weight: 700;
-  background: linear-gradient(135deg, #5e81f4, #f658a6);
+  font-weight: 600;
+  background: var(--ncut-surface-sunken);
+  color: var(--ncut-ink-muted);
 }
 
 .yt-profile-channel strong {
@@ -4273,10 +4567,10 @@ button.flow-stepper-item.is-clickable:hover {
   border-radius: 999px;
   display: grid;
   place-items: center;
-  font-weight: 700;
+  font-weight: 600;
   font-size: 14px;
-  color: #fff;
-  background: linear-gradient(135deg, #5e81f4, #f658a6);
+  color: var(--ncut-ink-muted);
+  background: var(--ncut-surface-raised);
 }
 
 .yt-ws-profile-copy {
@@ -4473,7 +4767,7 @@ button.flow-stepper-item.is-clickable:hover {
 
 .preview-edit-bar .small-button.is-active {
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   border-color: var(--accent);
 }
 
@@ -5371,6 +5665,181 @@ button.flow-stepper-item.is-clickable:hover {
 
 /* --- Create screen: single input + static 9:16 preview (step 8, A안) --- */
 
+/* ======================================================================
+   홈 — 어두운 작업대 (목업 HomeB.dc.html)
+
+   화면 가장자리까지 꽉 차는 어두운 띠다. .create-studio 가 좌우 여백 안에
+   있으므로 음수 마진으로 그 여백을 되돌려 끝까지 닿게 한다. 띠가 중간에서
+   끊기면 "패널"로 읽히고, 작업 화면과 관리 화면의 경계가 흐려진다.
+   ====================================================================== */
+.create-workbench {
+  margin: -22px calc(50% - 50vw) 0;
+  padding: 40px 28px 36px;
+  background: var(--ncut-canvas);
+  color: var(--ncut-ink);
+}
+
+.create-workbench-inner {
+  max-width: 760px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* 넣는 것 하나뿐인 화면이므로 가운데 정렬이 자연스럽다. */
+.create-workbench .create-studio-copy {
+  text-align: center;
+}
+
+.create-workbench .create-studio-copy h2 {
+  font-size: 28px;
+  line-height: 34px;
+  letter-spacing: -0.01em;
+  color: var(--ncut-ink);
+}
+
+.create-workbench .create-lead {
+  max-width: none;
+  margin: 0 auto;
+  color: var(--ncut-ink-muted);
+}
+
+/* 입력 상자는 작업대에서 유일하게 액센트 테두리를 두르는 요소다 —
+   이 화면에서 할 일이 하나라는 뜻이다. */
+.create-workbench .create-input-shell {
+  height: 56px;
+  padding: 0 16px;
+  border-color: var(--ncut-accent);
+  border-radius: var(--ncut-radius-md);
+  background: var(--ncut-surface);
+}
+
+.create-workbench .create-single-input {
+  font-family: var(--ncut-mono);
+  font-size: 14px;
+  color: var(--ncut-ink);
+}
+
+.create-workbench .create-single-input::placeholder {
+  color: var(--ncut-ink-faint);
+}
+
+.create-workbench .create-detected-card,
+.create-workbench .create-advanced {
+  background: var(--ncut-surface);
+  border-color: var(--ncut-border);
+}
+
+.create-workbench .create-detected-title,
+.create-workbench .create-advanced > summary {
+  color: var(--ncut-ink);
+}
+
+.create-workbench .create-detected-note,
+.create-workbench .create-advanced-summary,
+.create-workbench .create-note {
+  color: var(--ncut-ink-faint);
+}
+
+.create-workbench .create-detected-check {
+  color: var(--ncut-accent);
+}
+
+.create-workbench .create-chip {
+  background: var(--ncut-surface);
+  border-color: var(--ncut-border);
+  color: var(--ncut-ink-muted);
+}
+
+.create-workbench .create-chip.is-active {
+  background: var(--ncut-accent-soft);
+  border-color: var(--ncut-accent);
+  color: var(--ncut-accent-ink);
+}
+
+.create-workbench .create-credit-box {
+  background: var(--ncut-surface);
+  border-color: var(--ncut-border);
+  color: var(--ncut-ink);
+}
+
+/* 소스 안내 — 작업대 바로 아래. 네 종류를 한 줄에 놓아 "이것도 되는구나"가
+   한눈에 읽히게 한다. */
+.create-studio-guide {
+  padding-top: 26px;
+}
+
+.create-studio-guide h3 {
+  margin: 0 0 2px;
+  font-size: 15px;
+  line-height: 22px;
+}
+
+.create-source-guide {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.create-source-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 14px;
+  text-align: left;
+  background: var(--ncut-surface);
+  border: 1px solid var(--ncut-border);
+  border-radius: var(--ncut-radius-md);
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 140ms ease;
+}
+
+.create-source-card:hover {
+  border-color: var(--ncut-border-strong);
+}
+
+.create-source-card-name {
+  font-size: 14px;
+  line-height: 21px;
+  font-weight: 500;
+  color: var(--ncut-ink);
+}
+
+/* 예시 주소는 모노스페이스 — 주소라는 걸 글꼴이 먼저 알려준다. */
+.create-source-card-sample {
+  font-family: var(--ncut-mono);
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--ncut-ink-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.create-source-card-note {
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--ncut-ink-muted);
+}
+
+/* 밝은 영역 — 읽는 것들. 작업대와 맞닿으므로 위쪽 여백을 넉넉히 둔다. */
+.create-studio-light {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 22px;
+  padding-top: 8px;
+}
+
+.create-studio-light .create-steps {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
 .create-hero {
   display: flex;
   gap: 22px;
@@ -5474,8 +5943,34 @@ button.flow-stepper-item.is-clickable:hover {
   background: linear-gradient(160deg, var(--ink) 0%, var(--ink-soft) 100%);
 }
 
+/* A recognised video shows its real thumbnail, so this one is 16:9 and holds
+   an image rather than the placeholder gradient. */
+.create-detected-thumb-img {
+  width: 72px;
+  height: 44px;
+  overflow: hidden;
+  background: var(--ink);
+}
+
+.create-detected-thumb-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
 .create-detected-body {
   min-width: 0;
+}
+
+.create-detected-title {
+  margin: 2px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .create-detected-check {
@@ -5672,7 +6167,7 @@ button.flow-stepper-item.is-clickable:hover {
   padding: 0 7px;
   border-radius: 4px;
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   font-size: 9.5px;
   font-weight: 800;
   white-space: nowrap;
@@ -5996,9 +6491,9 @@ button.flow-stepper-item.is-clickable:hover {
 }
 
 .gallery-chip.is-active {
-  background: var(--ink);
-  border-color: var(--ink);
-  color: var(--surface);
+  background: var(--ncut-accent-soft);
+  border-color: var(--ncut-accent);
+  color: var(--ncut-accent-ink);
 }
 
 .gallery-grid {
@@ -6090,7 +6585,7 @@ button.flow-stepper-item.is-clickable:hover {
 .gallery-card-badge-accent {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 .gallery-right {
@@ -6237,228 +6732,279 @@ button.flow-stepper-item.is-clickable:hover {
   }
 }
 
-/* ①-b 분석 대기(다크 2단 카드) — 목업 수치 그대로 */
-.wait-screen {
-  border-radius: var(--radius);
-  background: #16161a;
-  padding: 24px 26px;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 200px;
-  gap: 24px;
-  align-items: center;
+/* wait: 목업 Progress */
+.studio-shell[data-surface="dark"] {
+  background: var(--ncut-canvas);
+  color: var(--ncut-ink);
 }
 
-.wait-main {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  min-width: 0;
+.studio-shell[data-surface="dark"] .studio-shell-body {
+  background: var(--ncut-canvas);
+}
+
+.wait-screen {
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 40px 0 48px;
+  box-sizing: border-box;
+  background: transparent;
+  color: var(--ncut-ink);
+  font-size: 14px;
+}
+
+.wait-head {
+  padding: 12px;
 }
 
 .wait-kicker {
   margin: 0 0 6px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.09em;
-  color: #8b8b98;
+  font-size: 12px;
+  color: var(--ncut-ink-faint);
 }
 
 .wait-title {
   margin: 0;
-  font-size: 22px;
-  font-weight: 700;
-  line-height: 1.35;
-  color: #fff;
-}
-
-.wait-steps {
-  display: flex;
-  flex-direction: column;
-  gap: 13px;
-}
-
-.wait-step {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.wait-step.is-pending {
-  opacity: 0.45;
-}
-
-.wait-dot {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  font-size: 11px;
-  font-weight: 800;
-  border: 1.5px solid #63636f;
-  background: transparent;
-}
-
-.wait-step.is-done .wait-dot {
-  background: #0f7b52;
-  border-color: transparent;
-}
-
-.wait-step.is-on .wait-dot {
-  background: #8b7cff;
-  border-color: transparent;
-}
-
-.wait-step-label {
-  font-size: 13.5px;
-  font-weight: 400;
-  color: #8b8b98;
-}
-
-.wait-step.is-done .wait-step-label {
-  color: #f2f2f5;
-}
-
-.wait-step.is-on .wait-step-label {
+  font-size: 20px;
   font-weight: 600;
-  color: #fff;
+  line-height: 1.35;
+}
+
+.wait-source {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: var(--ncut-surface);
+  border-radius: var(--ncut-radius-md);
+}
+
+.wait-source-thumb {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--ncut-radius-sm);
+  background: var(--ncut-surface-raised) center / cover no-repeat;
+}
+
+.wait-source-copy {
+  display: block;
+  min-width: 0;
+  flex-grow: 1;
+}
+
+.wait-source-title {
+  display: block;
+  overflow: hidden;
+  font-size: 14px;
+  line-height: 21px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wait-source-meta {
+  display: block;
+  font-size: 11px;
+  color: var(--ncut-ink-faint);
+}
+
+.wait-remain {
+  margin-top: 28px;
+  text-align: center;
+}
+
+.wait-remain-label {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ncut-ink-faint);
+}
+
+.wait-remain-value {
+  margin: 4px 0 0;
+  font-size: 34px;
+  line-height: 40px;
+  font-weight: 500;
+}
+
+.wait-remain-value.is-calculating {
+  font-family: inherit;
+  font-size: 18px;
+  font-weight: 400;
+  color: var(--ncut-ink-faint);
 }
 
 .wait-track {
-  height: 6px;
-  border-radius: 9999px;
-  background: #26262f;
+  height: 4px;
+  margin-top: 14px;
+  border-radius: 999px;
+  background: var(--ncut-surface-raised);
   overflow: hidden;
 }
 
 .wait-fill {
   display: block;
   height: 100%;
-  background: #8b7cff;
+  border-radius: inherit;
+  background: var(--ncut-accent);
   transition: width 0.5s ease;
 }
 
 .wait-caption {
   margin: 8px 0 0;
+  font-family: var(--ncut-mono);
+  font-variant-numeric: tabular-nums;
   font-size: 12px;
-  color: #8b8b98;
+  color: var(--ncut-ink-faint);
+}
+
+.wait-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 26px;
+}
+
+.wait-step {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+}
+
+.wait-step.is-on {
+  background: var(--ncut-accent-soft);
+}
+
+.wait-dot {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--ncut-surface-raised);
+  color: var(--ncut-ink-faint);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.wait-step.is-done .wait-dot {
+  background: var(--ncut-positive);
+  color: var(--ncut-canvas);
+}
+
+.wait-step.is-on .wait-dot {
+  background: var(--ncut-accent);
+  color: var(--ncut-on-accent);
+}
+
+.wait-step-label {
+  flex-grow: 1;
+  min-width: 0;
+  font-size: 14px;
+  color: var(--ncut-ink-faint);
+}
+
+.wait-step.is-done .wait-step-label {
+  color: var(--ncut-ink-muted);
+}
+
+.wait-step.is-on .wait-step-label {
+  color: var(--ncut-ink);
 }
 
 .wait-found {
-  border-radius: var(--radius);
-  background: #1a1a21;
-  border: 1px solid #26262f;
-  padding: 13px 15px;
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+  padding: 14px;
+  background: var(--ncut-surface);
+  border-radius: var(--ncut-radius-md);
+  color: var(--ncut-accent);
 }
 
-.wait-found-label {
-  margin: 0 0 5px;
-  font-size: 11px;
-  font-weight: 700;
-  color: #8b7cff;
+.wait-found svg {
+  flex: none;
+  margin-top: 1px;
 }
 
 .wait-found-text {
   margin: 0;
   font-size: 13px;
-  line-height: 1.6;
-  color: #c9c9d2;
+  line-height: 20px;
+  color: var(--ncut-ink-muted);
 }
 
-.wait-side {
+.wait-found-text b {
+  font-weight: 500;
+  color: var(--ncut-ink);
+}
+
+.wait-notice {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--ncut-border);
+  border-radius: var(--ncut-radius-md);
 }
 
-.wait-phone {
-  position: relative;
-  aspect-ratio: 9 / 16;
-  border-radius: var(--radius);
-  background: #1a1a21;
-  border: 1px solid #26262f;
-  overflow: hidden;
+.wait-notice-copy {
+  flex: 999 1 200px;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--ncut-ink-muted);
 }
 
-.wait-phone-badge {
-  position: absolute;
-  top: 10px;
-  left: 10px;
+.wait-notify {
   display: inline-flex;
   align-items: center;
-  height: 20px;
-  padding: 0 7px;
-  border-radius: 5px;
-  background: #8b7cff;
-  color: #16161a;
-  font-size: 10.5px;
-  font-weight: 800;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--ncut-ink);
+  cursor: pointer;
 }
 
-.wait-phone-title {
-  position: absolute;
-  left: 12px;
-  right: 12px;
-  bottom: 14px;
-  font-size: 12px;
-  font-weight: 700;
-  color: #fff;
-  line-height: 1.4;
+.wait-notify input {
+  accent-color: var(--ncut-accent);
+}
+
+.wait-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 20px;
 }
 
 .wait-leave {
+  flex: 1 1 160px;
+  height: 36px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 44px;
-  border-radius: var(--radius);
-  border: 1px solid #332c52;
+  border: 1px solid var(--ncut-border-strong);
+  border-radius: var(--ncut-radius-sm);
   background: transparent;
-  font-size: 13px;
-  font-weight: 600;
-  color: #8b8b98;
+  color: var(--ncut-ink);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
   cursor: pointer;
 }
 
 .wait-leave:hover {
-  color: #fff;
-}
-
-.wait-note {
-  margin: 0;
-  font-size: 11px;
-  line-height: 1.5;
-  color: #63636f;
-  text-align: center;
-}
-
-.wait-notify {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  font-size: 11px;
-  color: #63636f;
-  cursor: pointer;
+  border-color: var(--ncut-ink-muted);
 }
 
 .wait-error {
-  margin: 0;
-  font-size: 12.5px;
-  color: #ff8a80;
-}
-
-@media (max-width: 720px) {
-  .wait-screen {
-    grid-template-columns: 1fr;
-  }
-
-  .wait-phone {
-    display: none;
-  }
+  margin: 16px 0 0;
+  font-size: 13px;
+  color: var(--ncut-danger, #ff8a80);
 }
 
 .candidates-options {
@@ -6599,4 +7145,1222 @@ button.flow-stepper-item.is-clickable:hover {
   border-radius: 8px;
   background: var(--surface);
   font-size: 12.5px;
+}
+
+
+/* ======================================================================
+   결과 화면 — 목업 Results.dc.html
+   ScoreBadge, CreditMeter 는 디자인 시스템 컴포넌트다. 숫자는 모노·tabular.
+   ====================================================================== */
+.ncut-score {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+  padding: 2px 6px;
+  border-radius: var(--ncut-radius-xs, 4px);
+  background: var(--ncut-accent-soft);
+  color: var(--ncut-accent-ink);
+  line-height: 18px;
+}
+
+.ncut-score .ncut-num {
+  font-size: 13px;
+}
+
+.ncut-score-unit {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.ncut-score.is-solid {
+  background: var(--ncut-accent);
+  color: var(--ncut-on-accent);
+  padding: 3px 7px;
+}
+
+.ncut-credit-meter {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 112px;
+  padding: 6px 12px;
+  background: var(--ncut-surface);
+  border: 1px solid var(--ncut-border);
+  border-radius: var(--ncut-radius-sm);
+}
+
+.ncut-credit-meter-row {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+}
+
+.ncut-credit-meter-now {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.ncut-credit-meter-max {
+  font-size: 11px;
+  color: var(--ncut-ink-faint);
+}
+
+.ncut-credit-meter-bar {
+  display: block;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--ncut-surface-sunken);
+}
+
+.ncut-credit-meter-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--ncut-accent);
+}
+
+/* 상단 바 */
+.ws-topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 0 24px;
+}
+
+.ws-topbar-back {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--ncut-radius-sm);
+  background: transparent;
+  color: var(--ncut-ink-muted);
+  cursor: pointer;
+}
+
+.ws-topbar-back:hover {
+  background: var(--ncut-surface-sunken);
+}
+
+.ws-topbar-title {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ws-topbar-meta {
+  font-family: var(--ncut-mono);
+  font-size: 11px;
+  color: var(--ncut-ink-faint);
+  white-space: nowrap;
+}
+
+.ws-topbar-grow {
+  flex-grow: 1;
+}
+
+/* 목록 */
+.yt-workspace-sort {
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--ncut-border-strong);
+  border-radius: var(--ncut-radius-sm);
+  background: var(--ncut-surface);
+  color: var(--ncut-ink);
+  font-family: inherit;
+  font-size: 12px;
+}
+
+.yt-workspace-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: auto;
+}
+
+.yt-workspace-card-meta > .ncut-num {
+  font-size: 13px;
+  color: var(--ncut-ink-muted);
+}
+
+/* 플레이어 위 메타 */
+.ws-preview-meta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.ws-preview-duration {
+  font-size: 11px;
+  color: var(--ncut-ink-muted);
+}
+
+/* 우측 패널 구획 */
+.ws-section {
+  padding-top: 18px;
+  border-top: 1px solid var(--ncut-border);
+}
+
+.ws-section-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.ws-section-head h3 {
+  margin: 0;
+  font-size: 15px;
+  line-height: 22px;
+}
+
+.ws-section-head-upload {
+  padding-top: 18px;
+  border-top: 1px solid var(--ncut-border);
+}
+
+.ws-section-body {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--ncut-ink-muted);
+}
+
+.ws-apply-all {
+  width: 100%;
+  height: 28px;
+  margin-top: 10px;
+  border: 1px solid var(--ncut-accent);
+  border-radius: var(--ncut-radius-sm);
+  background: var(--ncut-accent-soft);
+  color: var(--ncut-accent-ink);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.ws-apply-all:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* 선택된 클립 — 2px 앰버 테두리 (패딩 1px 줄여 흔들림 방지) */
+.board-editor[data-surface="dark"] .yt-workspace-card.is-selected {
+  border-width: 2px;
+}
+
+/* 목록 머리와 라벨 — 어두운 편집기에서 읽히게 */
+.yt-workspace-list-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.yt-workspace-list-head strong {
+  flex-grow: 1;
+  white-space: nowrap;
+}
+
+.yt-workspace-list-head .yt-workspace-sort {
+  flex: none;
+  width: auto;
+}
+
+.board-editor[data-surface="dark"] .create-field > span,
+.board-editor[data-surface="dark"] label > span {
+  color: var(--ncut-ink-muted);
+}
+
+.yt-workspace-card-body .yt-workspace-card-meta {
+  align-self: end;
+}
+
+.yt-workspace-list-head .yt-workspace-sort {
+  min-width: 116px;
+  padding-right: 24px;
+}
+
+
+/* ======================================================================
+   상단 가로 바 — 목업 HomeB / Results / Progress. 왼쪽 레일을 대체한다.
+   ====================================================================== */
+.studio-shell.is-topnav {
+  flex-direction: column;
+}
+
+.studio-topbar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  height: 52px;
+  box-sizing: border-box;
+  padding: 0 28px;
+  background: var(--ncut-surface);
+  color: var(--ncut-ink);
+  border-bottom: 1px solid var(--ncut-border);
+}
+
+/* 만들기 화면: 바가 어두운 작업대와 이어진다 */
+.studio-topbar[data-surface="dark"] {
+  background: var(--ncut-canvas);
+}
+
+.studio-topbar-brand {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.studio-topbar-nav {
+  display: flex;
+  gap: 2px;
+}
+
+.studio-topbar-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--ncut-radius-sm);
+  background: transparent;
+  color: var(--ncut-ink-muted);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.studio-topbar-link:hover:not(.is-soon) {
+  background: var(--ncut-surface-sunken);
+}
+
+.studio-topbar-link.is-active {
+  background: var(--ncut-accent-soft);
+  color: var(--ncut-accent-ink);
+}
+
+.studio-topbar-link.is-soon {
+  color: var(--ncut-ink-faint);
+  cursor: default;
+}
+
+.studio-topbar-count {
+  font-family: var(--ncut-mono);
+  font-size: 11px;
+  color: var(--ncut-ink-faint);
+}
+
+.studio-topbar-hub {
+  font-size: 12px;
+  color: var(--ncut-ink-muted);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.studio-topbar-grow {
+  flex-grow: 1;
+}
+
+/* 어두운 바에서는 미터가 상자 없이 숫자만 (HomeB) */
+.studio-topbar[data-surface="dark"] .ncut-credit-meter {
+  min-width: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+
+.studio-topbar[data-surface="dark"] .ncut-credit-meter-bar {
+  display: none;
+}
+
+.studio-topbar .studio-account {
+  padding: 0;
+}
+
+.studio-topbar .studio-account-avatar {
+  width: 28px;
+  height: 28px;
+  background: var(--ncut-surface-sunken);
+  color: var(--ncut-ink-muted);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.studio-topbar .studio-account-menu {
+  top: calc(100% + 8px);
+  bottom: auto;
+  left: auto;
+  right: 0;
+  min-width: 200px;
+  background: var(--ncut-surface-raised);
+  border: 1px solid var(--ncut-border);
+  border-radius: var(--ncut-radius-md);
+  box-shadow: var(--ncut-shadow-menu);
+  color: var(--ncut-ink);
+  z-index: 50;
+}
+
+.studio-account-item {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--ncut-ink);
+  font-family: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.studio-account-item:hover,
+.studio-account-item.is-active {
+  background: var(--ncut-accent-soft);
+  color: var(--ncut-accent-ink);
+}
+
+.studio-subbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 40px;
+  padding: 0 28px;
+  background: var(--ncut-surface);
+  border-bottom: 1px solid var(--ncut-border);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+@media (max-width: 768px) {
+  .studio-topbar {
+    gap: 10px;
+    padding: 0 12px;
+    overflow-x: auto;
+  }
+
+  .studio-topbar-hub {
+    display: none;
+  }
+}
+
+
+/* 이어서 작업하기 — 목업 HomeB */
+.create-recent {
+  padding-top: 8px;
+}
+
+.create-recent-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.create-recent-head h3 {
+  margin: 0;
+  font-size: 15px;
+  line-height: 22px;
+}
+
+.create-recent-grow {
+  flex-grow: 1;
+}
+
+.create-recent-all {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ncut-accent-ink);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.create-recent-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.create-recent-card {
+  flex: 1 1 220px;
+  min-width: 0;
+  padding: 12px;
+  text-align: left;
+  background: var(--ncut-surface);
+  border: 1px solid var(--ncut-border);
+  border-radius: var(--ncut-radius-md);
+  color: inherit;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.create-recent-card:hover {
+  border-color: var(--ncut-border-strong);
+}
+
+.create-recent-copy {
+  display: block;
+  min-width: 0;
+}
+
+.create-recent-title {
+  display: block;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 19px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.create-recent-state {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.create-recent-state.is-done {
+  color: var(--ncut-positive);
+}
+
+.create-recent-state.is-running {
+  color: var(--ncut-accent-ink);
+}
+
+/* 작업대 입력창 안쪽이 흰 바탕으로 남던 것 */
+.create-workbench .create-single-input,
+.create-workbench .create-input-shell input {
+  background: transparent;
+}
+
+
+/* 변환 줄 — 목업 HomeB. 설명은 왼쪽, 큰 버튼은 오른쪽 */
+.create-convert-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.create-convert-note {
+  flex: 999 1 200px;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--ncut-ink-faint);
+}
+
+.create-convert-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 22px;
+  border: 0;
+  border-radius: var(--ncut-radius-sm);
+  background: var(--ncut-accent);
+  color: var(--ncut-on-accent);
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.create-convert-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.create-file-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px;
+  background: transparent;
+  border: 1px solid var(--ncut-border-strong);
+  border-radius: var(--ncut-radius-sm);
+  color: var(--ncut-ink);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.create-option-lengths {
+  margin: 10px 0 4px;
+}
+
+/* 어두운 작업대 안의 입력 요소 — 전역 input/select 흰 바탕을 토큰으로 */
+.create-workbench .create-input-shell .create-single-input {
+  background: transparent !important;
+  color: var(--ncut-ink);
+}
+
+.create-workbench select,
+.create-workbench input[type="text"]:not(.create-single-input) {
+  background: var(--ncut-surface-raised);
+  border-color: var(--ncut-border-strong);
+  color: var(--ncut-ink);
+}
+
+.create-workbench .create-field > span,
+.create-workbench .create-chip-label {
+  color: var(--ncut-ink-muted);
+}
+
+.create-workbench .create-input-shell .create-single-input {
+  color: var(--ncut-ink) !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  outline: none;
+}
+
+
+/* 템플릿 화면 — 목업 TemplateGallery.dc.html */
+.tpl-page {
+  width: 100%;
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 8px 0 32px;
+}
+
+.tpl-head h1 {
+  margin: 0;
+  font-size: 28px;
+  line-height: 34px;
+  letter-spacing: -0.01em;
+}
+
+.tpl-head p {
+  margin: 6px 0 0;
+  max-width: 640px;
+  font-size: 14px;
+  line-height: 21px;
+  color: var(--ncut-ink-muted);
+}
+
+.tpl-section-head {
+  margin-top: 28px;
+}
+
+.tpl-section-head h2 {
+  margin: 0;
+  font-size: 15px;
+  line-height: 22px;
+}
+
+.tpl-count {
+  font-family: var(--ncut-mono);
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--ncut-ink-faint);
+}
+
+.tpl-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 16px;
+}
+
+.tpl-chip {
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--ncut-border);
+  border-radius: var(--ncut-radius-full);
+  background: var(--ncut-surface);
+  color: var(--ncut-ink-muted);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.tpl-chip.is-active {
+  background: var(--ncut-accent-soft);
+  border-color: var(--ncut-accent);
+  color: var(--ncut-accent-ink);
+}
+
+.tpl-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.tpl-card {
+  width: 124px;
+}
+
+.tpl-thumb {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-sizing: border-box;
+  width: 124px;
+  height: 220px;
+  padding: 14px 10px;
+  border-radius: var(--ncut-radius-lg);
+  overflow: hidden;
+}
+
+.tpl-thumb-title {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.14;
+  text-shadow: 0 2px 0 rgb(0 0 0 / 45%);
+}
+
+.tpl-thumb-caption {
+  align-self: center;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 700;
+  text-shadow: 0 2px 0 rgb(0 0 0 / 45%);
+}
+
+.tpl-name {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+}
+
+.tpl-meta {
+  margin: 1px 0 0;
+  font-size: 11px;
+  line-height: 15px;
+  color: var(--ncut-ink-faint);
+}
+
+/* 변환 결과·오류 — 변환 버튼 바로 아래. 예전에는 페이지 맨 아래에 떠서 안 보였다. */
+.create-message {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--ncut-border-strong);
+  border-radius: var(--ncut-radius-sm);
+  background: var(--ncut-accent-soft);
+  color: var(--ncut-ink);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+
+/* 결과 화면: 목업 Results */
+.rs-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--ncut-canvas);
+  color: var(--ncut-ink);
+  font-size: 14px;
+}
+
+.rs-topbar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 56px;
+  box-sizing: border-box;
+  padding: 0 24px;
+  background: var(--ncut-surface);
+  border-bottom: 1px solid var(--ncut-border);
+}
+
+.rs-back {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: var(--ncut-radius-sm);
+  background: transparent;
+  color: var(--ncut-ink-muted);
+  cursor: pointer;
+}
+
+.rs-back:hover {
+  background: var(--ncut-surface-sunken);
+}
+
+.rs-topbar-title {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rs-topbar-meta {
+  font-size: 11px;
+  color: var(--ncut-ink-faint);
+  white-space: nowrap;
+}
+
+.rs-grow {
+  flex-grow: 1;
+}
+
+.rs-page .ws-judgement {
+  flex: none;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 12px 24px;
+  background: var(--ncut-accent-soft);
+  border-bottom: 1px solid var(--ncut-border);
+  color: var(--ncut-accent-ink);
+}
+
+.rs-page .ws-judgement p {
+  color: var(--ncut-ink);
+}
+
+.rs-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr) 380px;
+}
+
+.rs-list,
+.rs-side {
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--ncut-surface);
+}
+
+.rs-list {
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--ncut-border);
+}
+
+.rs-list-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 14px 16px 10px;
+}
+
+.rs-list-head strong {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.rs-select {
+  height: 28px;
+  box-sizing: border-box;
+  padding: 0 8px;
+  border: 1px solid var(--ncut-border-strong);
+  border-radius: var(--ncut-radius-sm);
+  background: var(--ncut-surface);
+  color: var(--ncut-ink);
+  font-family: inherit;
+  font-size: 12px;
+}
+
+.rs-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0 12px 16px;
+  list-style: none;
+}
+
+.rs-card {
+  display: flex;
+  width: 100%;
+  gap: 12px;
+  box-sizing: border-box;
+  padding: 8px;
+  text-align: left;
+  background: var(--ncut-surface);
+  border: 1px solid var(--ncut-border);
+  border-radius: var(--ncut-radius-md);
+  color: inherit;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.rs-card.is-selected {
+  padding: 7px;
+  background: var(--ncut-accent-soft);
+  border: 2px solid var(--ncut-accent);
+}
+
+.rs-card-thumb {
+  flex: none;
+  width: 52px;
+  height: 92px;
+  border-radius: var(--ncut-radius-xs);
+  background: var(--ncut-surface-sunken) center / cover no-repeat;
+}
+
+.rs-card-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex-grow: 1;
+}
+
+.rs-card-title {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.rs-card-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: auto;
+}
+
+.rs-card-dur {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ncut-ink-muted);
+}
+
+.rs-player {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.rs-phone {
+  position: relative;
+  flex: none;
+  width: 282px;
+  height: 502px;
+  overflow: hidden;
+  border-radius: var(--ncut-radius-lg);
+  background: var(--ncut-surface-sunken);
+}
+
+.rs-video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+}
+
+.rs-phone-score {
+  position: absolute;
+  z-index: 2;
+  top: 10px;
+  left: 10px;
+}
+
+.rs-phone-dur {
+  position: absolute;
+  z-index: 2;
+  top: 10px;
+  right: 10px;
+  padding: 3px 6px;
+  border-radius: var(--ncut-radius-xs);
+  background: rgb(0 0 0 / 50%);
+  color: #fff;
+  font-size: 11px;
+}
+
+.rs-phone-note {
+  position: absolute;
+  inset: auto 12px 12px;
+  margin: 0;
+  font-size: 12px;
+  color: var(--ncut-ink-muted);
+  text-align: center;
+}
+
+.rs-phone-note.is-error {
+  color: var(--ncut-danger, #c0392b);
+}
+
+.rs-phone-busy {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgb(0 0 0 / 55%);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.rs-actions {
+  display: flex;
+  gap: 6px;
+  width: 282px;
+}
+
+.rs-btn {
+  flex: 1 1 86px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 12px;
+  background: var(--ncut-surface);
+  border: 1px solid var(--ncut-border-strong);
+  border-radius: var(--ncut-radius-sm);
+  color: var(--ncut-ink);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.rs-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.rs-btn-primary {
+  background: var(--ncut-accent);
+  border-color: var(--ncut-accent);
+  color: var(--ncut-on-accent);
+}
+
+.rs-btn-accent-outline {
+  height: 28px;
+  background: var(--ncut-accent-soft);
+  border-color: var(--ncut-accent);
+  color: var(--ncut-accent-ink);
+  font-size: 12px;
+}
+
+.rs-btn-small {
+  flex: none;
+  height: 28px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.rs-side {
+  box-sizing: border-box;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  border-left: 1px solid var(--ncut-border);
+}
+
+.rs-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.rs-section-head h2 {
+  flex-grow: 1;
+  margin: 0;
+  font-size: 15px;
+  line-height: 22px;
+  font-weight: 600;
+}
+
+.rs-free {
+  padding: 1px 6px;
+  border-radius: var(--ncut-radius-xs);
+  background: var(--ncut-positive-soft, #e6f2f0);
+  color: var(--ncut-positive);
+  font-size: 11px;
+}
+
+.rs-divided {
+  padding-top: 18px;
+  border-top: 1px solid var(--ncut-border);
+}
+
+.rs-note {
+  margin: 6px 0 10px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--ncut-ink-muted);
+}
+
+.rs-body-text {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--ncut-ink-muted);
+}
+
+.rs-tpl-strip {
+  display: flex;
+  gap: 8px;
+  padding: 4px 4px 4px;
+  overflow-x: auto;
+}
+
+.rs-tpl {
+  flex: none;
+  width: 62px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.rs-tpl-thumb {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-sizing: border-box;
+  width: 62px;
+  height: 110px;
+  padding: 8px 5px;
+  border-radius: var(--ncut-radius-md);
+}
+
+.rs-tpl.is-picked .rs-tpl-thumb {
+  outline: 2px solid var(--ncut-accent);
+  outline-offset: 2px;
+}
+
+.rs-tpl-title {
+  text-align: center;
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 1.12;
+  text-shadow: 0 1px 0 rgb(0 0 0 / 50%);
+}
+
+.rs-tpl-cap {
+  align-self: center;
+  border-radius: 2px;
+  font-size: 8px;
+  font-weight: 700;
+}
+
+.rs-tpl-name {
+  display: block;
+  margin-top: 5px;
+  overflow: hidden;
+  font-size: 11px;
+  line-height: 15px;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rs-scope {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.rs-scope .rs-btn {
+  height: 28px;
+  font-size: 12px;
+}
+
+.rs-more summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ncut-ink-muted);
+}
+
+.rs-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 10px 0;
+  font-size: 12px;
+  color: var(--ncut-ink-muted);
+}
+
+@media (max-width: 1100px) {
+  .rs-page {
+    overflow-y: auto;
+  }
+
+  .rs-body {
+    grid-template-columns: minmax(0, 1fr);
+    flex: none;
+  }
+
+  .rs-list,
+  .rs-side {
+    overflow: visible;
+    border: 0;
+  }
+
+  .rs-list-head + .rs-cards {
+    flex-direction: row;
+    overflow-x: auto;
+  }
+
+  .rs-card {
+    min-width: 240px;
+  }
+}
+
+.rs-list-head strong {
+  white-space: nowrap;
+}
+
+.rs-select {
+  flex: none;
+  width: auto;
+}
+
+.rs-page .ws-judgement .rs-btn {
+  flex: none;
+  margin-left: auto;
+  white-space: nowrap;
 }

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { StudioTab } from "../lib/appRoute";
 import type { Usage } from "../types";
+import { CreditMeter } from "./CreditMeter";
 
 const HUB_URL = (import.meta.env.VITE_DITODIO_HUB_URL as string | undefined)?.replace(/\/$/, "") || "";
 
@@ -16,6 +17,10 @@ type Props = {
   email: string;
   planLabel?: string | null;
   bodyMode?: BodyMode;
+  /** 화면 전체를 어두운 작업면으로(변환 중). */
+  dark?: boolean;
+  /** 결과 화면처럼 화면이 자기 상단 바를 가질 때. */
+  hideTopbar?: boolean;
   titleAside?: ReactNode;
   children: ReactNode;
   onNavChange: (tab: StudioTab) => void;
@@ -26,51 +31,20 @@ type Props = {
 function initialsFromEmail(email?: string) {
   if (!email) return "U";
   const local = email.split("@")[0] || email;
-  return local.slice(0, 2).toUpperCase();
-}
-
-function IconPlus() {
-  return (
-    <svg className="studio-rail-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function IconFolder() {
-  return (
-    <svg className="studio-rail-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4.2c.3 0 .58.12.79.34L11 8h8.5A1.5 1.5 0 0 1 21 9.5v8A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5v-10Z"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function IconSettings() {
-  return (
-    <svg className="studio-rail-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.7" />
-      <path
-        d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09A1.65 1.65 0 0 0 15 4.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.36.6.94.98 1.51 1H21a2 2 0 1 1 0 4h-.09c-.57.02-1.15.4-1.51 1Z"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
+  return local.slice(0, 1).toUpperCase();
 }
 
 function AccountMenu({
   email,
   planLabel,
+  usageActive,
+  onUsage,
   onLogout,
 }: {
   email: string;
   planLabel?: string | null;
+  usageActive: boolean;
+  onUsage: () => void;
   onLogout: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -98,19 +72,28 @@ function AccountMenu({
         type="button"
         className="studio-account-avatar"
         title={email}
+        aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
       >
         {initialsFromEmail(email)}
       </button>
-      <div className="studio-account-copy">
-        <span className="studio-account-email-inline">{email}</span>
-        {planLabel ? <span className="studio-account-plan">{planLabel}</span> : null}
-      </div>
       {open ? (
         <div className="studio-account-menu" role="menu">
           <p className="studio-account-email">{email}</p>
-          <button type="button" className="studio-account-logout" onClick={onLogout}>
+          {planLabel ? <p className="studio-account-plan">{planLabel}</p> : null}
+          <button
+            type="button"
+            role="menuitem"
+            className={`studio-account-item${usageActive ? " is-active" : ""}`}
+            onClick={() => {
+              setOpen(false);
+              onUsage();
+            }}
+          >
+            요금제 · 사용량
+          </button>
+          <button type="button" role="menuitem" className="studio-account-item" onClick={onLogout}>
             로그아웃
           </button>
         </div>
@@ -119,126 +102,93 @@ function AccountMenu({
   );
 }
 
-/** 이번 달 사용량 — Ditodio 허브 연동 시 블로그 글·쇼츠 각자의 실제 쿼터를 보여준다.
- * 두 자원은 서로 다른 한도라 하나의 게이지로 합치지 않고 항목별로 표시한다. */
-function UsageMeter({ usage }: { usage?: Usage | null }) {
-  if (!usage) return null;
-  const shortsUsed = usage.shorts_used ?? usage.monthly_usage ?? 0;
-  const shortsLimit = usage.shorts_limit ?? usage.usage_limit ?? 0;
-  const rows: { key: string; label: string; used: number; limit: number; tone: "accent" | "accent-2" }[] = [
-    { key: "shorts", label: "쇼츠", used: shortsUsed, limit: shortsLimit, tone: "accent" },
-  ];
-  if (usage.ditodio_linked && usage.posts_limit != null && usage.posts_limit > 0) {
-    rows.push({ key: "posts", label: "블로그 글", used: usage.posts_used ?? 0, limit: usage.posts_limit, tone: "accent-2" });
-  }
-  return (
-    <div className="studio-usage-meter">
-      {rows.map((row) => {
-        const pct = row.limit > 0 ? Math.min(100, Math.round((row.used / row.limit) * 100)) : 0;
-        return (
-          <div className="studio-usage-row" key={row.key}>
-            <span className="studio-usage-label">{row.label}</span>
-            <span className={`studio-usage-gauge tone-${row.tone}`}>
-              <span style={{ width: `${pct}%` }} />
-            </span>
-            <span className="studio-usage-count">
-              {Math.max(row.limit - row.used, 0)}/{row.limit}
-            </span>
-          </div>
-        );
-      })}
-      {usage.usage_month ? <span className="studio-usage-reset">{usage.usage_month} 기준 · 매월 초기화</span> : null}
-    </div>
-  );
-}
-
 export function StudioShell({
   title,
   activeTab,
   projectCount,
-  inProgressCount = 0,
-  doneCount = 0,
   usage = null,
   email,
   planLabel,
   bodyMode = "page",
+  dark = false,
+  hideTopbar = false,
   titleAside,
   children,
   onNavChange,
-  onProjectsBucket,
   onLogout,
 }: Props) {
+  const createActive = bodyMode === "page" && activeTab === "create";
   const projectsActive = bodyMode === "page" && activeTab === "projects";
+  const templatesActive = bodyMode === "page" && activeTab === "templates";
   const usageActive = bodyMode === "page" && activeTab === "usage";
+  // 목업 HomeB: 만들기 화면에서는 상단 바가 어두운 작업대와 한 덩어리다.
+  const darkBar = createActive || dark;
+  const showSubbar = bodyMode === "flow" && Boolean(titleAside) && !dark;
 
   return (
-    <div className="studio-shell">
-      <aside className="studio-rail">
-        <div className="studio-rail-brand">
-          <span className="studio-rail-mark">NC</span>
-          <span className="studio-rail-wordmark">New Cut</span>
-        </div>
+    <div className="studio-shell is-topnav" data-surface={dark ? "dark" : undefined}>
+      {hideTopbar ? null : (
+      <header className="studio-topbar" data-surface={darkBar ? "dark" : undefined}>
+        <button type="button" className="studio-topbar-brand" onClick={() => onNavChange("create")}>
+          New Cut
+        </button>
 
-        {HUB_URL ? (
-          <div className="studio-switcher" role="tablist" aria-label="제품 전환">
-            <a className="studio-switcher-item" href={`${HUB_URL}/dashboard`} target="_blank" rel="noreferrer">
-              블로그 글
-            </a>
-            <span className="studio-switcher-item is-active" aria-current="page">
-              쇼츠
-            </span>
-          </div>
-        ) : null}
-
-        <nav className="studio-rail-nav" aria-label="스튜디오 메뉴">
-          <button type="button" className="studio-rail-cta" onClick={() => onNavChange("create")}>
-            <IconPlus />＋ 새로 만들기
+        <nav className="studio-topbar-nav" aria-label="스튜디오 메뉴">
+          <button
+            type="button"
+            className={`studio-topbar-link${createActive ? " is-active" : ""}`}
+            aria-current={createActive ? "page" : undefined}
+            onClick={() => onNavChange("create")}
+          >
+            만들기
           </button>
           <button
             type="button"
-            className={`studio-rail-link${projectsActive ? " is-active" : ""}`}
+            className={`studio-topbar-link${projectsActive ? " is-active" : ""}`}
             aria-current={projectsActive ? "page" : undefined}
             onClick={() => onNavChange("projects")}
           >
-            <IconFolder />
-            <span>프로젝트</span>
-            {projectCount > 0 ? <span className="studio-rail-count">{projectCount}</span> : null}
+            내 작업
+            {projectCount > 0 ? <span className="studio-topbar-count ncut-num">{projectCount}</span> : null}
           </button>
           <button
             type="button"
-            className="studio-rail-subitem"
-            onClick={() => (onProjectsBucket ? onProjectsBucket("in_progress") : onNavChange("projects"))}
+            className={`studio-topbar-link${templatesActive ? " is-active" : ""}`}
+            aria-current={templatesActive ? "page" : undefined}
+            onClick={() => onNavChange("templates")}
           >
-            진행 중 <strong>{inProgressCount}</strong>
+            템플릿
           </button>
-          <button
-            type="button"
-            className="studio-rail-subitem"
-            onClick={() => (onProjectsBucket ? onProjectsBucket("done") : onNavChange("projects"))}
-          >
-            완성된 쇼츠 <strong>{doneCount}</strong>
-          </button>
+          <span className="studio-topbar-link is-soon" aria-disabled="true" title="준비 중입니다">
+            에셋
+          </span>
         </nav>
 
-        <div className="studio-rail-foot">
-          <UsageMeter usage={usage} />
-          <button
-            type="button"
-            className={`studio-rail-link${usageActive ? " is-active" : ""}`}
-            aria-current={usageActive ? "page" : undefined}
-            onClick={() => onNavChange("usage")}
-          >
-            <IconSettings />
-            <span>요금제 · 사용량</span>
-          </button>
-          <AccountMenu email={email} planLabel={planLabel} onLogout={onLogout} />
-        </div>
-      </aside>
+        {HUB_URL ? (
+          <a className="studio-topbar-hub" href={`${HUB_URL}/dashboard`} target="_blank" rel="noreferrer">
+            블로그 글 ↗
+          </a>
+        ) : null}
+
+        <span className="studio-topbar-grow" />
+        <CreditMeter usage={usage} />
+        <AccountMenu
+          email={email}
+          planLabel={planLabel}
+          usageActive={usageActive}
+          onUsage={() => onNavChange("usage")}
+          onLogout={onLogout}
+        />
+      </header>
+      )}
+
       <div className="studio-shell-main">
-        <header className="studio-shell-title">
-          <span className="studio-shell-title-text">{title}</span>
-          {titleAside ? <div className="studio-shell-title-aside">{titleAside}</div> : null}
-        </header>
+        {showSubbar ? (
+          <div className="studio-subbar">
+            <span className="studio-subbar-title">{title}</span>
+            <div className="studio-shell-title-aside">{titleAside}</div>
+          </div>
+        ) : null}
         <div className={`studio-shell-body is-${bodyMode}`}>{children}</div>
       </div>
     </div>

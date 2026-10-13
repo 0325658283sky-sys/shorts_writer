@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, EmailStr, Field, HttpUrl
 
@@ -81,6 +81,8 @@ class VideoResponse(BaseModel):
     error_message: str | None = None
     created_at: str
     updated_at: str
+    genre: str | None = None
+    genre_judgement: str | None = None
 
 
 class VideoStatusResponse(BaseModel):
@@ -121,6 +123,43 @@ class HighlightResponse(BaseModel):
     created_at: str
 
 
+class CreditQuoteResponse(BaseModel):
+    """What converting a source of this length costs, before committing to it.
+
+    ``supported`` false means the source is past the longest band; ``reason``
+    then says so in the user's words and no price is given.
+    """
+
+    duration_seconds: float | None = None
+    credits: int | None = None
+    tier_label: str | None = None
+    supported: bool = True
+    reason: str | None = None
+
+
+class ReanalyzeRequest(BaseModel):
+    """Re-cut the video — a 컷 setting, so it is charged (FLOW_REDESIGN §3).
+
+    ``genre`` is optional: omitted means "infer it again", which is what the
+    plain "다르게 다시 찾기" button sends. A value means the user disagreed
+    with the inference and picked one themselves.
+    """
+
+    genre: str | None = None
+
+
+class ReanalyzeResponse(BaseModel):
+    """What changed, so the screen can redraw without a second round-trip."""
+
+    video_id: int
+    genre: str | None = None
+    genre_judgement: str | None = None
+    highlights: list[HighlightResponse]
+    discarded_clips: int
+    credits_remaining: int
+    credits_charged: int = 1
+
+
 class ClipCreateRequest(BaseModel):
     highlight_id: int
     visual_style: str | None = None
@@ -149,6 +188,10 @@ class ClipTemplateRenderRequest(BaseModel):
     # When true, burn ASS captions onto source before Remotion wrap (best effort).
     burn_subtitles: bool = True
     subtitle_style: SubtitleStyle = "bold"
+    # 모양 overrides for a schema-v1 template, keyed by dotted path
+    # ("caption.motion"). Unknown or unrenderable keys are ignored — see
+    # template_schema.EDITABLE_PATHS. Free: re-render only, no re-analysis.
+    template_overrides: dict[str, Any] | None = None
 
 
 class ClipResponse(BaseModel):

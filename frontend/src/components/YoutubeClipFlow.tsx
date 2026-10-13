@@ -19,6 +19,25 @@ function durationMatchesBand(seconds: number, band: YoutubeLengthBand): boolean 
   return seconds > 25 && seconds <= 45;
 }
 
+/** 처음 만들 때 입힐 템플릿: 분석이 판단한 장르에 맞는 것, 없으면 서버 기본값. */
+async function pickDefaultTemplateSlug(videoId: number): Promise<string | undefined> {
+  try {
+    const list = await authorizedRequest<{ defaultSlug?: string; templates: { slug: string; genre: string }[] }>(
+      "/video-templates",
+    );
+    let genre: string | null | undefined;
+    try {
+      genre = (await authorizedRequest<{ genre?: string | null }>(`/videos/${videoId}`)).genre;
+    } catch {
+      genre = null;
+    }
+    const byGenre = genre ? list.templates.find((item) => item.genre === genre) : undefined;
+    return byGenre?.slug ?? list.defaultSlug ?? list.templates[0]?.slug;
+  } catch {
+    return undefined;
+  }
+}
+
 function pickHighlightTargets(highlights: Highlight[], count: number, band: YoutubeLengthBand): Highlight[] {
   const ranked = [...highlights].sort((a, b) => b.score - a.score || a.start_time - b.start_time);
   const inBand = ranked.filter((item) => durationMatchesBand(Math.max(0, item.end_time - item.start_time), band));
@@ -87,7 +106,7 @@ export function YoutubeClipFlow({
   onHighlightsReady: (videoId: number, items: Highlight[]) => void;
   onTranscriptReady: (videoId: number, transcript: Transcript) => void;
   onCreateClip: (highlightId: number, removeSilence?: boolean) => Promise<Clip | null>;
-  onBurnSubtitles: (clip: Clip, style?: SubtitleStyle) => Promise<Clip | null>;
+  onBurnSubtitles: (clip: Clip, style?: SubtitleStyle, visualStyle?: string) => Promise<Clip | null>;
   onApplyNarration?: (clip: Clip) => void;
   onGenerateMetadata?: (clip: Clip) => void;
   onDownloadClip?: (clip: Clip) => void;
@@ -112,14 +131,14 @@ export function YoutubeClipFlow({
   const [selectedHighlightIds, setSelectedHighlightIds] = useState<number[]>([]);
   const [elapsedSec, setElapsedSec] = useState(0);
   // ④ 템플릿 갤러리: 쇼츠 생성 완료 후 한 번 보여주고, 적용/건너뛰기 후엔 숨긴다(블로그 흐름과 동일 패턴).
-  const [showTemplateGallery, setShowTemplateGallery] = useState(true);
+  const [showTemplateGallery, setShowTemplateGallery] = useState(false);
   const autoGenRef = useRef(false);
   const hubUrlRef = useRef<string | null>(null);
 
   const subtitleStyle = initialSubtitleStyle ?? "shorts";
-  const displayTitle = projectTitle?.trim() || video.original_filename;
+  const displayTitle = projectTitle?.trim() || video.original_filename.replace(/^YouTube - /, "").replace(/\.mp4$/i, "");
   // 채널 정보는 유튜브 가져오기에서만 채워진다(MP4 업로드는 없음) — ①-b 대기 문구 분기용.
-  const isYoutubeSource = Boolean(projectChannel);
+  const isYoutubeSource = Boolean(projectChannel) || /^YouTube - /.test(video.original_filename);
 
   const videoClips = useMemo(() => {
     return Object.values(clips)
@@ -164,6 +183,12 @@ export function YoutubeClipFlow({
     setCandidateHighlights(items);
     const preselected = pickHighlightTargets(items, shortsCount, lengthBand);
     setSelectedHighlightIds(preselected.map((item) => item.id));
+    // 후보 고르기·템플릿 고르기 화면은 거치지 않는다. 점수 높은 순으로 곧바로 만들고,
+    // 고르기·템플릿 바꾸기·내보내기는 결과(3단 편집기)에서 한다 (목업 Results).
+    if (preselected.length > 0) {
+      void generateShorts(preselected);
+      return;
+    }
     setStep("candidates");
   }
 
@@ -189,6 +214,7 @@ export function YoutubeClipFlow({
     setStageLabel(`쇼츠 생성 중 · 0/${targets.length}`);
 
     try {
+      const templateSlug = await pickDefaultTemplateSlug(video.id);
       const made: Clip[] = [];
       for (const highlight of targets) {
         const existing =
@@ -201,7 +227,7 @@ export function YoutubeClipFlow({
             : await onCreateClip(highlight.id, removeSilence);
         if (!clip) throw new Error(`쇼츠 생성에 실패했습니다: ${highlight.title}`);
         onStyleChange(clip.id, subtitleStyle);
-        let burned = (await onBurnSubtitles(clip, subtitleStyle)) ?? clip;
+        let burned = (await onBurnSubtitles(clip, subtitleStyle, templateSlug)) ?? clip;
         if (voiceMode === "ai_narration") {
           try {
             burned = await authorizedRequest<Clip>(`/clips/${burned.id}/narration`, {
@@ -218,6 +244,9 @@ export function YoutubeClipFlow({
         setLocalClips([...made]);
         setProgress(78 + Math.round((done / targets.length) * 22));
         setStageLabel(`쇼츠 생성 중 · ${done}/${targets.length}`);
+        // 첫 쇼츠가 나오면 바로 결과 화면으로 보낸다. 나머지는 뒤에서 계속 만들고,
+        // 끝나는 대로 결과 화면의 목록에 붙는다.
+        if (done === 1 && targets.length > 1) setStep("hub");
       }
       setProgress(100);
       setStageLabel("쇼츠 생성 완료");
@@ -391,6 +420,17 @@ export function YoutubeClipFlow({
     setShowTemplateGallery(false);
   }
 
+  // 허브는 없앴다 — 변환이 끝나면 곧바로 3단 편집기로 간다 (FLOW_REDESIGN §7).
+  // 편집기를 닫으면 프로젝트 목록으로 가므로 이 효과가 다시 돌 일은 없다.
+  const autoOpenedRef = useRef(false);
+  useEffect(() => {
+    if (step !== "hub" || isTemplateStep || autoOpenedRef.current) return;
+    const first = workspaceClips[0];
+    if (!first) return;
+    autoOpenedRef.current = true;
+    onOpenDetailedEditor(first);
+  });
+
   function handleOpenWorkspace() {
     const first = workspaceClips[0];
     if (!first) {
@@ -418,9 +458,14 @@ export function YoutubeClipFlow({
               }
               activeIndex={step === "generating" ? 3 : progress < 40 ? 0 : progress < 68 ? 1 : 2}
               percent={progress}
-              caption={waitCaption(elapsedSec, progress)}
+              caption={`${Math.round(elapsedSec)}초 지남`}
+              remainSec={progress >= 100 || progress <= 12 || elapsedSec < 5 ? null : (elapsedSec / progress) * (100 - progress)}
+              source={{
+                thumbnail: hubThumb,
+                title: displayTitle,
+                meta: isYoutubeSource ? "유튜브" : "MP4 파일",
+              }}
               found={firstFound ? { label: "먼저 찾은 구간", text: firstFound.text } : null}
-              thumb={firstFound ? { badge: firstFound.badge, title: firstFound.title } : null}
               note={
                 isYoutubeSource
                   ? "다 되면 알림 보낼게요"
@@ -572,7 +617,7 @@ export function YoutubeClipFlow({
             />
           ) : null}
 
-          {step === "hub" && !isTemplateStep ? (
+          {step === "hub" && !isTemplateStep && workspaceClips.length === 0 ? (
             <section className="flow-card yt-hub-section">
               <p className="create-kicker">프로젝트</p>
               <h1>{displayTitle}</h1>

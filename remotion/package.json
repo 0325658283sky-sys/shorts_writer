@@ -10,6 +10,8 @@
     "build": "remotion bundle",
     "render": "remotion render BlogShorts out/blog-shorts-spike.mp4",
     "smoke-styles": "node scripts/smoke-style-renders.mjs",
+    "smoke-motions": "node scripts/smoke-motions.mjs",
+    "smoke-caption-lines": "node scripts/smoke-caption-lines.mjs",
     "assert-gif-media": "node scripts/assert-gif-media-fit.mjs",
     "service": "node server.mjs",
     "sync-clip": "node scripts/sync-blog-clip.mjs",

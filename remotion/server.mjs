@@ -60,7 +60,21 @@ function syncProjectPublicIntoBundle(serveUrl) {
   }
 
   const destClips = path.join(destPublic, "clips");
-  fs.cpSync(srcClips, destClips, { recursive: true });
+  // 지금까지 만든 클립 폴더를 매번 통째로 복사하면 쌓일수록 느려진다. 바뀐 파일만 옮긴다.
+  fs.cpSync(srcClips, destClips, {
+    recursive: true,
+    preserveTimestamps: true,
+    filter: (src, dest) => {
+      try {
+        const s = fs.statSync(src);
+        if (s.isDirectory()) return true;
+        const d = fs.statSync(dest);
+        return !(d.size === s.size && Math.abs(d.mtimeMs - s.mtimeMs) < 1);
+      } catch {
+        return true;
+      }
+    },
+  });
   console.log(`[remotion-service] synced public/clips → ${destClips}`);
 }
 
